@@ -1,0 +1,201 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Исходные файлы">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Файлы заголовков">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Файлы ресурсов">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Исходные файлы\Common">
+      <UniqueIdentifier>{0f7b462d-91d2-452f-9203-d65d2a3c6d10}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Common">
+      <UniqueIdentifier>{96155e66-fc89-48c3-babd-092f0f6d57bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Graphics">
+      <UniqueIdentifier>{2635d715-87ac-425f-bfd5-541598c9cc91}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Graphics">
+      <UniqueIdentifier>{539bc466-45d0-4707-b993-0f74b47306ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Graphics\Resources">
+      <UniqueIdentifier>{7636277f-eb31-4e67-9565-e1978064baba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Graphics\Resources\ResourceFactory">
+      <UniqueIdentifier>{4da8c796-2501-48f2-a1c3-7b65d25ca357}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Graphics\Resources">
+      <UniqueIdentifier>{7c00515b-21a9-4f87-8409-279ccec4ea5e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Graphics\Resources\ResourceFactory">
+      <UniqueIdentifier>{50e68bfe-49a5-4fcb-925a-d9604eaba6e8}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Main.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Application.cpp">
+      <Filter>Исходные файлы\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\DirectX12Renderer.cpp">
+      <Filter>Исходные файлы\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\ConstantBufferFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\DepthStencilFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\IndexBufferFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\RenderTargetFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\RWBufferFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\RWTextureFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\SamplerFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\SwapChainBufferFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\TextureFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\VertexBufferFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\BufferAllocationPage.cpp">
+      <Filter>Исходные файлы\Graphics\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\BufferAllocator.cpp">
+      <Filter>Исходные файлы\Graphics\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\DescriptorAllocationPage.cpp">
+      <Filter>Исходные файлы\Graphics\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\DescriptorAllocator.cpp">
+      <Filter>Исходные файлы\Graphics\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceManager.cpp">
+      <Filter>Исходные файлы\Graphics\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\TextureAllocationPage.cpp">
+      <Filter>Исходные файлы\Graphics\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\TextureAllocator.cpp">
+      <Filter>Исходные файлы\Graphics\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Resources\ResourceFactory\BufferFactory.cpp">
+      <Filter>Исходные файлы\Graphics\Resources\ResourceFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Window.cpp">
+      <Filter>Исходные файлы\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Scene.cpp">
+      <Filter>Исходные файлы\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\SceneManager.cpp">
+      <Filter>Исходные файлы\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\DirectX12Helper.cpp">
+      <Filter>Исходные файлы\Graphics</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Includes.h">
+      <Filter>Исходные файлы</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Application.h">
+      <Filter>Файлы заголовков\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\DirectX12Renderer.h">
+      <Filter>Файлы заголовков\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\ConstantBufferFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\DepthStencilFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\IndexBufferFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\IResourceFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\RenderTargetFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\RWBufferFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\RWTextureFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\SamplerFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\SwapChainBufferFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\TextureFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\VertexBufferFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\BufferAllocationPage.h">
+      <Filter>Файлы заголовков\Graphics\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\BufferAllocator.h">
+      <Filter>Файлы заголовков\Graphics\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\DescriptorAllocationPage.h">
+      <Filter>Файлы заголовков\Graphics\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\DescriptorAllocator.h">
+      <Filter>Файлы заголовков\Graphics\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceManager.h">
+      <Filter>Файлы заголовков\Graphics\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\TextureAllocationPage.h">
+      <Filter>Файлы заголовков\Graphics\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\TextureAllocator.h">
+      <Filter>Файлы заголовков\Graphics\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Resources\ResourceFactory\BufferFactory.h">
+      <Filter>Файлы заголовков\Graphics\Resources\ResourceFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Window.h">
+      <Filter>Файлы заголовков\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\SceneManager.h">
+      <Filter>Файлы заголовков\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Scene.h">
+      <Filter>Файлы заголовков\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\DirectX12Helper.h">
+      <Filter>Файлы заголовков\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\CommonUtilities.h">
+      <Filter>Файлы заголовков\Common</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{49fa0278-8665-4f38-87e0-c9297df2be8f}</ProjectGuid>
+    <RootNamespace>VFXCollectionDemo</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="Common\Application.cpp" />
+    <ClCompile Include="Common\Scene.cpp" />
+    <ClCompile Include="Common\SceneManager.cpp" />
+    <ClCompile Include="Common\Window.cpp" />
+    <ClCompile Include="Graphics\DirectX12Helper.cpp" />
+    <ClCompile Include="Graphics\DirectX12Renderer.cpp" />
+    <ClCompile Include="Graphics\Resources\BufferAllocationPage.cpp" />
+    <ClCompile Include="Graphics\Resources\BufferAllocator.cpp" />
+    <ClCompile Include="Graphics\Resources\DescriptorAllocationPage.cpp" />
+    <ClCompile Include="Graphics\Resources\DescriptorAllocator.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\BufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\ConstantBufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\DepthStencilFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\IndexBufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\RenderTargetFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\RWBufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\RWTextureFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\SamplerFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\SwapChainBufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\TextureFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceFactory\VertexBufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceManager.cpp" />
+    <ClCompile Include="Graphics\Resources\TextureAllocationPage.cpp" />
+    <ClCompile Include="Graphics\Resources\TextureAllocator.cpp" />
+    <ClCompile Include="Main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Common\Application.h" />
+    <ClInclude Include="Common\CommonUtilities.h" />
+    <ClInclude Include="Common\Scene.h" />
+    <ClInclude Include="Common\SceneManager.h" />
+    <ClInclude Include="Common\Window.h" />
+    <ClInclude Include="Graphics\DirectX12Helper.h" />
+    <ClInclude Include="Graphics\DirectX12Renderer.h" />
+    <ClInclude Include="Graphics\Resources\BufferAllocationPage.h" />
+    <ClInclude Include="Graphics\Resources\BufferAllocator.h" />
+    <ClInclude Include="Graphics\Resources\DescriptorAllocationPage.h" />
+    <ClInclude Include="Graphics\Resources\DescriptorAllocator.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\BufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\ConstantBufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\DepthStencilFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\IndexBufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\IResourceFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\RenderTargetFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\RWBufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\RWTextureFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\SamplerFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\SwapChainBufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\TextureFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceFactory\VertexBufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceManager.h" />
+    <ClInclude Include="Graphics\Resources\TextureAllocationPage.h" />
+    <ClInclude Include="Graphics\Resources\TextureAllocator.h" />
+    <ClInclude Include="Includes.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
