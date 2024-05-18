@@ -18,6 +18,74 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Common\Application.h" />
+    <ClInclude Include="Common\ProcessHandler.h" />
+    <ClInclude Include="Common\Window.h" />
+    <ClInclude Include="Common\WindowProcedure.h" />
+    <ClInclude Include="Graphics\Assets\GeometryUtilities.h" />
+    <ClInclude Include="Graphics\Assets\Loaders\DDSLoader.h" />
+    <ClInclude Include="Graphics\Assets\Loaders\HLSLLoader.h" />
+    <ClInclude Include="Graphics\Assets\Loaders\OBJLoader.h" />
+    <ClInclude Include="Graphics\Assets\Material.h" />
+    <ClInclude Include="Graphics\Assets\MaterialBuilder.h" />
+    <ClInclude Include="Graphics\Assets\Mesh.h" />
+    <ClInclude Include="Graphics\Assets\MeshDesc.h" />
+    <ClInclude Include="Graphics\BufferManager.h" />
+    <ClInclude Include="Graphics\CommandManager.h" />
+    <ClInclude Include="Graphics\DescriptorManager.h" />
+    <ClInclude Include="Graphics\DirectX12Includes.h" />
+    <ClInclude Include="Graphics\DirectX12Renderer.h" />
+    <ClInclude Include="Graphics\DirectX12Utilities.h" />
+    <ClInclude Include="Graphics\Resources\BufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\ConstantBufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\DepthStencilFactory.h" />
+    <ClInclude Include="Graphics\Resources\GPUResource.h" />
+    <ClInclude Include="Graphics\Resources\IndexBufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\IResource.h" />
+    <ClInclude Include="Graphics\Resources\IResourceDesc.h" />
+    <ClInclude Include="Graphics\Resources\IResourceFactory.h" />
+    <ClInclude Include="Graphics\Resources\RenderTargetFactory.h" />
+    <ClInclude Include="Graphics\Resources\ResourceManager.h" />
+    <ClInclude Include="Graphics\Resources\RWBufferFactory.h" />
+    <ClInclude Include="Graphics\Resources\RWTextureFactory.h" />
+    <ClInclude Include="Graphics\Resources\TextureFactory.h" />
+    <ClInclude Include="Graphics\Resources\VertexBufferFactory.h" />
+    <ClInclude Include="Graphics\TextureManager.h" />
+    <ClInclude Include="Graphics\VertexFormat.h" />
+    <ClInclude Include="Includes.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Common\Application.cpp" />
+    <ClCompile Include="Common\ProcessHandler.cpp" />
+    <ClCompile Include="Common\Window.cpp" />
+    <ClCompile Include="Common\WindowProcedure.cpp" />
+    <ClCompile Include="Graphics\Assets\GeometryUtilities.cpp" />
+    <ClCompile Include="Graphics\Assets\Loaders\DDSLoader.cpp" />
+    <ClCompile Include="Graphics\Assets\Loaders\HLSLLoader.cpp" />
+    <ClCompile Include="Graphics\Assets\Loaders\OBJLoader.cpp" />
+    <ClCompile Include="Graphics\Assets\Material.cpp" />
+    <ClCompile Include="Graphics\Assets\MaterialBuilder.cpp" />
+    <ClCompile Include="Graphics\Assets\Mesh.cpp" />
+    <ClCompile Include="Graphics\BufferManager.cpp" />
+    <ClCompile Include="Graphics\CommandManager.cpp" />
+    <ClCompile Include="Graphics\DescriptorManager.cpp" />
+    <ClCompile Include="Graphics\DirectX12Renderer.cpp" />
+    <ClCompile Include="Graphics\DirectX12Utilities.cpp" />
+    <ClCompile Include="Graphics\Resources\BufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ConstantBufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\DepthStencilFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\GPUResource.cpp" />
+    <ClCompile Include="Graphics\Resources\IndexBufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\RenderTargetFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\ResourceManager.cpp" />
+    <ClCompile Include="Graphics\Resources\RWBufferFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\RWTextureFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\TextureFactory.cpp" />
+    <ClCompile Include="Graphics\Resources\VertexBufferFactory.cpp" />
+    <ClCompile Include="Graphics\TextureManager.cpp" />
+    <ClCompile Include="Main.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -130,62 +198,6 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="Common\Application.cpp" />
-    <ClCompile Include="Common\Scene.cpp" />
-    <ClCompile Include="Common\SceneManager.cpp" />
-    <ClCompile Include="Common\Window.cpp" />
-    <ClCompile Include="Graphics\DirectX12Helper.cpp" />
-    <ClCompile Include="Graphics\DirectX12Renderer.cpp" />
-    <ClCompile Include="Graphics\Resources\BufferAllocationPage.cpp" />
-    <ClCompile Include="Graphics\Resources\BufferAllocator.cpp" />
-    <ClCompile Include="Graphics\Resources\DescriptorAllocationPage.cpp" />
-    <ClCompile Include="Graphics\Resources\DescriptorAllocator.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\BufferFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\ConstantBufferFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\DepthStencilFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\IndexBufferFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\RenderTargetFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\RWBufferFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\RWTextureFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\SamplerFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\SwapChainBufferFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\TextureFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceFactory\VertexBufferFactory.cpp" />
-    <ClCompile Include="Graphics\Resources\ResourceManager.cpp" />
-    <ClCompile Include="Graphics\Resources\TextureAllocationPage.cpp" />
-    <ClCompile Include="Graphics\Resources\TextureAllocator.cpp" />
-    <ClCompile Include="Main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Common\Application.h" />
-    <ClInclude Include="Common\CommonUtilities.h" />
-    <ClInclude Include="Common\Scene.h" />
-    <ClInclude Include="Common\SceneManager.h" />
-    <ClInclude Include="Common\Window.h" />
-    <ClInclude Include="Graphics\DirectX12Helper.h" />
-    <ClInclude Include="Graphics\DirectX12Renderer.h" />
-    <ClInclude Include="Graphics\Resources\BufferAllocationPage.h" />
-    <ClInclude Include="Graphics\Resources\BufferAllocator.h" />
-    <ClInclude Include="Graphics\Resources\DescriptorAllocationPage.h" />
-    <ClInclude Include="Graphics\Resources\DescriptorAllocator.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\BufferFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\ConstantBufferFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\DepthStencilFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\IndexBufferFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\IResourceFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\RenderTargetFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\RWBufferFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\RWTextureFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\SamplerFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\SwapChainBufferFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\TextureFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceFactory\VertexBufferFactory.h" />
-    <ClInclude Include="Graphics\Resources\ResourceManager.h" />
-    <ClInclude Include="Graphics\Resources\TextureAllocationPage.h" />
-    <ClInclude Include="Graphics\Resources\TextureAllocator.h" />
-    <ClInclude Include="Includes.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

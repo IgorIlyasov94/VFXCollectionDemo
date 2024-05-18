@@ -1,85 +1,124 @@
 #pragma once
 
-#include "..\..\Includes.h"
-#include "ResourceFactory\VertexBufferFactory.h"
-#include "ResourceFactory\IndexBufferFactory.h"
-#include "ResourceFactory\ConstantBufferFactory.h"
-#include "ResourceFactory\TextureFactory.h"
-#include "ResourceFactory\BufferFactory.h"
-#include "ResourceFactory\SamplerFactory.h"
-#include "ResourceFactory\RenderTargetFactory.h"
-#include "ResourceFactory\DepthStencilFactory.h"
-#include "ResourceFactory\RWTextureFactory.h"
-#include "ResourceFactory\RWBufferFactory.h"
-#include "ResourceFactory\SwapChainBufferFactory.h"
+#include "../DirectX12Includes.h"
+#include "../DirectX12Utilities.h"
+#include "../CommandManager.h"
+#include "../DescriptorManager.h"
+#include "../BufferManager.h"
+#include "../TextureManager.h"
+#include "IResource.h"
+#include "IResourceDesc.h"
+#include "IResourceFactory.h"
 
-namespace Memory
+namespace Graphics::Resources
 {
-	struct RWTexture
+	template<typename T>
+	concept ResourceType = std::derived_from<T, IResource>;
+
+	using ResourceID = uint32_t;
+
+	enum class BufferResourceType : uint32_t
 	{
-		D3D12_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
-		D3D12_UNORDERED_ACCESS_VIEW_DESC unorderedAccessViewDesc;
-		Graphics::TextureInfo info;
-		TextureAllocation textureAllocation;
-		DescriptorAllocation shaderResourceDescriptorAllocation;
-		DescriptorAllocation unorderedAccessDescriptorAllocation;
-		DescriptorAllocation shaderNonVisibleDescriptorAllocation;
-		D3D12_RESOURCE_STATES currentResourceState;
+		BUFFER = 0,
+		CONSTANT_BUFFER = 1,
+		INDEX_BUFFER = 2,
+		RW_BUFFER = 3,
+		VERTEX_BUFFER = 4
 	};
 
-	struct RWBuffer
+	enum class TextureResourceType : uint32_t
 	{
-		D3D12_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
-		D3D12_UNORDERED_ACCESS_VIEW_DESC unorderedAccessViewDesc;
-		BufferAllocation bufferAllocation;
-		DescriptorAllocation shaderResourceDescriptorAllocation;
-		DescriptorAllocation unorderedAccessDescriptorAllocation;
-		DescriptorAllocation shaderNonVisibleDescriptorAllocation;
-		D3D12_RESOURCE_STATES currentResourceState;
+		DEPTH_STENCIL_TARGET = 0,
+		RENDER_TARGET = 1,
+		RW_TEXTURE = 2,
+		TEXTURE = 3
 	};
 
 	class ResourceManager
 	{
 	public:
-		ResourceManager(ID3D12Device* _device);
+		ResourceManager(DescriptorManager* descriptorManager, BufferManager* bufferManager, TextureManager* textureManager);
 		~ResourceManager();
 
-		ResourceId CreateResource(ResourceType resourceType, const ResourceDesc& desc);
-		void ReleaseResource(const ResourceId& resourceId);
-		void UpdateResources();
+		ResourceID CreateBufferResource(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			BufferResourceType type, const BufferDesc& desc);
 
-		const ResourceData& GetResourceData(const ResourceId& resourceId) const;
+		ResourceID CreateTextureResource(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			TextureResourceType type, const TextureDesc& desc);
 
-		D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView(const ResourceId& resourceId) const;
-		D3D12_INDEX_BUFFER_VIEW GetIndexBufferView(const ResourceId& resourceId) const;
+		ResourceID CreateSamplerResource(ID3D12Device* device, D3D12_SAMPLER_DESC desc);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetDescriptorBase(const ResourceId& resourceId) const;
-		D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilDescriptorBase(const ResourceId& resourceId) const;
+		template<ResourceType T>
+		T* GetResource(ResourceID id)
+		{
+			return static_cast<T*>(resources[id]);
+		}
 
-		ID3D12DescriptorHeap* GetCurrentCbvSrvUavDescriptorHeap();
-		ID3D12DescriptorHeap* GetCurrentSamplerDescriptorHeap();
+		template<ResourceType T>
+		void DeleteResource(ResourceID id)
+		{
+			auto resource = static_cast<T*>(resources[id]);
 
-		void UpdateBuffer(const ResourceId& resourceId, const void* data, size_t dataSize);
-		void SetResourceBarrier(ID3D12GraphicsCommandList* _commandList, const ResourceId& resourceId,
-			D3D12_RESOURCE_BARRIER_FLAGS resourceBarrierFlags, D3D12_RESOURCE_STATES newState);
-		void SetUAVBarrier(ID3D12GraphicsCommandList* _commandList, const ResourceId& resourceId);
+			if constexpr (std::is_same_v<T, Buffer> || std::is_same_v<T, DepthStencilTarget> ||
+				std::is_same_v<T, RenderTarget> || std::is_same_v<T, RWBuffer> ||
+				std::is_same_v<T, RWTexture> || std::is_same_v<T, Texture>)
+				_descriptorManager->Deallocate(DescriptorType::CBV_SRV_UAV, resource->srvDescriptor);
+
+			if constexpr (std::is_same_v<T, ConstantBuffer>)
+				_descriptorManager->Deallocate(DescriptorType::CBV_SRV_UAV, resource->cbvDescriptor);
+
+			if constexpr (std::is_same_v<T, DepthStencilTarget>)
+				_descriptorManager->Deallocate(DescriptorType::DSV, resource->dsvDescriptor);
+
+			if constexpr (std::is_same_v<T, RenderTarget>)
+				_descriptorManager->Deallocate(DescriptorType::RTV, resource->rtvDescriptor);
+
+			if constexpr (std::is_same_v<T, RWBuffer> || std::is_same_v<T, RWTexture>)
+			{
+				_descriptorManager->Deallocate(DescriptorType::CBV_SRV_UAV, resource->uavDescriptor);
+				_descriptorManager->Deallocate(DescriptorType::CBV_SRV_UAV_NON_SHADER_VISIBLE, resource->uavNonShaderVisibleDescriptor);
+			}
+
+			if constexpr (std::is_same_v<T, Buffer> || std::is_same_v<T, ConstantBuffer> || std::is_same_v<T, RWBuffer>)
+				_bufferManager->Deallocate(resource->resource, resource->resourceGPUAddress, resource->size);
+
+			if constexpr (std::is_same_v<T, VertexBuffer> || std::is_same_v<T, IndexBuffer>)
+				_bufferManager->Deallocate(resource->resource, resource->viewDesc.BufferLocation, resource->viewDesc.SizeInBytes);
+
+			if constexpr (std::is_same_v<T, DepthStencilTarget> || std::is_same_v<T, RenderTarget> ||
+				std::is_same_v<T, RWTexture> || std::is_same_v<T, Texture>)
+				_textureManager->Deallocate(resource->resource);
+
+			delete resources[id];
+			resources[id] = nullptr;
+
+			freeSlots.push(id);
+		}
 
 	private:
-		ID3D12Device* device;
-		ComPtr<ID3D12GraphicsCommandList> commandList;
-		ComPtr<ID3D12CommandAllocator> commandAllocator;
-		ComPtr<ID3D12CommandQueue> commandQueue;
-		ComPtr<ID3D12Fence> fence;
-		HANDLE fenceEvent;
-		uint64_t fenceValue;
+		ResourceManager() = delete;
+		ResourceManager(const ResourceManager&) = delete;
+		ResourceManager(ResourceManager&&) = delete;
+		ResourceManager& operator=(const ResourceManager&) = delete;
+		ResourceManager& operator=(ResourceManager&&) = delete;
 
-		std::shared_ptr<DescriptorAllocator> descriptorAllocator;
-		std::shared_ptr<BufferAllocator> bufferAllocator;
-		std::shared_ptr<TextureAllocator> textureAllocator;
+		template<typename T>
+		constexpr std::underlying_type_t<T> EnumValue(T value)
+		{
+			return static_cast<std::underlying_type_t<T>>(value);
+		}
 
-		std::vector<IResourceFactory*> resourceFactories;
-		std::vector<ResourceData> resources;
+		static constexpr size_t BUFFER_RESOURCE_TYPES_NUMBER = 5u;
+		static constexpr size_t TEXTURE_RESOURCE_TYPES_NUMBER = 4u;
 
-		std::queue<size_t> freePlaceIndices;
+		std::vector<IResource*> resources;
+		std::queue<ResourceID> freeSlots;
+
+		std::array<IResourceFactory*, BUFFER_RESOURCE_TYPES_NUMBER> bufferFactories;
+		std::array<IResourceFactory*, TEXTURE_RESOURCE_TYPES_NUMBER> textureFactories;
+
+		BufferManager* _bufferManager;
+		TextureManager* _textureManager;
+		DescriptorManager* _descriptorManager;
 	};
 }

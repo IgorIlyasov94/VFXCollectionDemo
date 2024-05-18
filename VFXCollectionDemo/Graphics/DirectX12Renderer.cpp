@@ -1,296 +1,404 @@
 #include "DirectX12Renderer.h"
-#include "DirectX12Helper.h"
+#include "DirectX12Utilities.h"
 
-Graphics::DirectX12Renderer::DirectX12Renderer(HWND windowHandler, uint32_t initialWidth, uint32_t initialHeight, bool fullscreen)
-	: fenceEvent(nullptr), bufferIndex(0), fenceValues{}, resourceManager(nullptr), _windowHandler(windowHandler)
+Graphics::DirectX12Renderer::DirectX12Renderer(const RECT& windowPlacement, HWND windowHandler, bool _isFullscreen)
+    : commandManager(nullptr), descriptorManager(nullptr), commandQueueId{}, isFullscreen(_isFullscreen)
 {
-	initialWidth = std::max(initialWidth, 1u);
-	initialHeight = std::max(initialHeight, 1u);
+    currentWidth = windowPlacement.right - windowPlacement.left;
+    currentHeight = windowPlacement.bottom - windowPlacement.top;
 
-	sceneViewport.TopLeftX = 0.0f;
-	sceneViewport.TopLeftY = 0.0f;
-	sceneViewport.Width = static_cast<float>(initialWidth);
-	sceneViewport.Height = static_cast<float>(initialHeight);
-	sceneViewport.MinDepth = D3D12_MIN_DEPTH;
-	sceneViewport.MaxDepth = D3D12_MAX_DEPTH;
+    backBuffers.fill(nullptr);
+    fenceValues.fill(0u);
 
-	sceneScissorRect.left = 0;
-	sceneScissorRect.top = 0;
-	sceneScissorRect.right = initialWidth;
-	sceneScissorRect.bottom = initialHeight;
-
-	Initialize(initialWidth, initialHeight, fullscreen);
+    CreateGPUResources(currentWidth, currentHeight, windowHandler);
 }
 
 Graphics::DirectX12Renderer::~DirectX12Renderer()
 {
+#ifdef _DEBUG
+    ID3D12Debug* _debug{};
+    D3D12GetDebugInterface(IID_PPV_ARGS(&_debug));
+    _debug->EnableDebugLayer();
 
+    ID3D12DebugDevice* _debugDevice{};
+    device->QueryInterface(IID_PPV_ARGS(&_debugDevice));
+    _debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
+#endif
+
+    WaitForGPU();
+
+#ifdef _DEBUG
+    _debugDevice->Release();
+    _debug->Release();
+#endif
+
+    for (auto& buffer : backBuffers)
+        buffer->Release();
+
+    delete descriptorManager;
+    delete resourceManager;
+    delete textureManager;
+    delete bufferManager;
+
+    WaitForGPU();
+
+    delete commandManager;
+
+    fence->Release();
+    swapChain->Release();
+
+    CloseHandle(fenceEvent);
+
+    device->Release();
 }
 
-void Graphics::DirectX12Renderer::GpuRelease()
+void Graphics::DirectX12Renderer::OnResize(uint32_t newWidth, uint32_t newHeight, HWND windowHandler)
 {
-	WaitForGpu();
+    currentWidth = newWidth;
+    currentHeight = newHeight;
 
-	swapChain->SetFullscreenState(false, nullptr);
-
-	CloseHandle(fenceEvent);
+    ResetSwapChain(currentWidth, currentHeight, windowHandler);
 }
 
-void Graphics::DirectX12Renderer::OnResize(uint32_t newWidth, uint32_t newHeight)
+void Graphics::DirectX12Renderer::OnSetFocus(HWND windowHandler)
 {
-	ResetSwapChainBuffers(newWidth, newHeight);
+    WaitForGPU();
+
+    swapChain->SetFullscreenState(isFullscreen, nullptr);
+
+    for (auto& fenceValue : fenceValues)
+        fenceValue = fenceValues[bufferIndex];
+
+    ResetSwapChain(currentWidth, currentHeight, windowHandler);
 }
 
-void Graphics::DirectX12Renderer::OnSetFocus()
+void Graphics::DirectX12Renderer::OnLostFocus(HWND windowHandler)
 {
-	WaitForGpu();
+    WaitForGPU();
 
-	swapChain->SetFullscreenState(isFullscreen, nullptr);
+    swapChain->SetFullscreenState(false, nullptr);
 
-	for (auto& fenceValue : fenceValues)
-		fenceValue = fenceValues[bufferIndex];
+    for (auto& fenceValue : fenceValues)
+        fenceValue = fenceValues[bufferIndex];
 
-	const auto& bufferData = resourceManager->GetResourceData(swapChainBuffers[0]);
-
-	ResetSwapChainBuffers(static_cast<uint32_t>(bufferData.textureInfo->width), static_cast<uint32_t>(bufferData.textureInfo->height));
+    ResetSwapChain(currentWidth, currentHeight, windowHandler);
 }
 
-void Graphics::DirectX12Renderer::OnLostFocus()
+void Graphics::DirectX12Renderer::OnDeviceLost(HWND windowHandler)
 {
-	WaitForGpu();
+    WaitForGPU();
 
-	swapChain->SetFullscreenState(false, nullptr);
+    for (auto& buffer : backBuffers)
+        buffer->Release();
 
-	for (auto& fenceValue : fenceValues)
-		fenceValue = fenceValues[bufferIndex];
+    fence->Release();
+    swapChain->Release();
+    device->Release();
 
-	const auto& bufferData = resourceManager->GetResourceData(swapChainBuffers[0]);
+    CloseHandle(fenceEvent);
 
-	ResetSwapChainBuffers(static_cast<uint32_t>(bufferData.textureInfo->width), static_cast<uint32_t>(bufferData.textureInfo->height));
+    CreateGPUResources(currentWidth, currentHeight, windowHandler);
 }
 
-void Graphics::DirectX12Renderer::OnDeviceLost()
+void Graphics::DirectX12Renderer::Render()
 {
-	const auto& bufferData = resourceManager->GetResourceData(swapChainBuffers[0]);
-	auto width = bufferData.textureInfo->width;
-	auto height = bufferData.textureInfo->height;
+    auto d3dCommandList = commandManager->BeginRecord(commandListId, commandAllocators[bufferIndex]);
 
-	ReleaseResources();
-	Initialize(static_cast<uint32_t>(width), static_cast<uint32_t>(height), isFullscreen);
+    //ID3D12DescriptorHeap* descriptorHeaps[] = {descriptorManager->GetHeap(DescriptorType::RTV)};
+    //d3dCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = backBuffers[bufferIndex];
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+    d3dCommandList->ResourceBarrier(1u, &barrier);
+
+    d3dCommandList->ClearRenderTargetView(backBufferCPUDescriptors[bufferIndex], BACK_BUFFER_COLOR, 0u, nullptr);
+
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+
+    d3dCommandList->ResourceBarrier(1u, &barrier);
+
+    commandManager->EndRecord(commandListId);
+    commandManager->SubmitCommandList(commandListId);
+    commandManager->ExecuteCommands(commandQueueId);
+
+    swapChain->Present(1u, 0u);
+
+    PrepareToNextFrame();
 }
 
-ID3D12GraphicsCommandList6* Graphics::DirectX12Renderer::FrameStart()
+ID3D12Device* Graphics::DirectX12Renderer::GetDevice()
 {
-	ThrowIfFailed(commandAllocator->Reset(), "DirectX12Renderer::FrameStart: Command Allocator resetting error!");
-	ThrowIfFailed(commandList->Reset(commandAllocator.Get(), nullptr), "DirectX12Renderer::FrameStart: Command List resetting error!");
-
-	ID3D12DescriptorHeap* descHeaps[] = { resourceManager->GetCurrentCbvSrvUavDescriptorHeap() };
-	commandList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
-
-	return commandList.Get();
+    return device;
 }
 
-void Graphics::DirectX12Renderer::FrameEnd()
+Graphics::CommandManager* Graphics::DirectX12Renderer::GetCommandManager()
 {
-	ThrowIfFailed(commandList->Close(), "DirectX12Renderer::FrameRender: Command List closing error!");
-
-	ID3D12CommandList* commandLists[] = { commandList.Get() };
-
-	commandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
-
-	ThrowIfFailed(swapChain->Present(1, 0), "DirectX12Renderer::FrameRender: Frame not presented!");
-
-	PrepareNextFrame();
+    return commandManager;
 }
 
-Memory::ResourceManager* Graphics::DirectX12Renderer::GetResourceManager()
+Graphics::Resources::ResourceManager* Graphics::DirectX12Renderer::GetResourceManager()
 {
-	return resourceManager.get();
+    return resourceManager;
 }
 
-ID3D12Device2* Graphics::DirectX12Renderer::GetDevice()
+ID3D12GraphicsCommandList* Graphics::DirectX12Renderer::StartCreatingResources()
 {
-	return device.Get();
+    return commandManager->BeginRecord(resourceCommandListId, resourceCommandAllocators[bufferIndex]);
 }
 
-void Graphics::DirectX12Renderer::SwitchFullscreenMode(bool enableFullscreen)
+void Graphics::DirectX12Renderer::EndCreatingResources()
 {
-	if (isFullscreen == enableFullscreen)
-		return;
+    commandManager->EndRecord(resourceCommandListId);
+    commandManager->SubmitCommandList(resourceCommandListId);
+    commandManager->ExecuteCommands(resourceCommandQueueId);
 
-	ThrowIfFailed(swapChain->SetFullscreenState(enableFullscreen, nullptr),
-		"DirectX12Renderer::SwitchFullscreenMode: Fullscreen transition failed!");
+    WaitForGPU();
 
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-	swapChain->GetDesc1(&swapChainDesc);
-
-	ThrowIfFailed(swapChain->ResizeBuffers(SWAP_CHAIN_BUFFER_COUNT, swapChainDesc.Width,
-		swapChainDesc.Height, swapChainDesc.Format, swapChainDesc.Flags),
-		"DirectX12Renderer::SwitchFullscreenMode: Back buffers resizing error!");
-
-	isFullscreen = enableFullscreen;
+    bufferManager->ReleaseUploadBuffers();
+    textureManager->ReleaseUploadBuffers();
 }
 
-void Graphics::DirectX12Renderer::Initialize(uint32_t initialWidth, uint32_t initialHeight, bool fullscreen)
+void Graphics::DirectX12Renderer::CreateGPUResources(uint32_t width, uint32_t height, HWND windowHandler)
 {
-	DirectX12Helper::CreateFactory(&dxgiFactory);
+    auto factory = CreateFactory();
+    device = CreateDevice(factory);
 
-	ComPtr<IDXGIAdapter4> adapter;
-	DirectX12Helper::GetHardwareAdapter(dxgiFactory.Get(), &adapter);
+    for (uint32_t backBufferId = 0u; backBufferId < BACK_BUFFER_NUMBER; backBufferId++)
+        if (backBuffers[backBufferId] != nullptr)
+            backBuffers[backBufferId]->Release();
 
-	ComPtr<ID3D12Device> device0;
-	DirectX12Helper::CreateDevice(adapter.Get(), &device0);
-	ThrowIfFailed(device0.As(&device), "DirectX12Renderer::Initialize: Device conversion error!");
+    if (commandManager == nullptr)
+    {
+        commandManager = new CommandManager(device);
+        commandQueueId = commandManager->CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+        resourceCommandQueueId = commandManager->CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-	DirectX12Helper::CreateCommandQueue(device.Get(), &commandQueue);
+        auto commandQueue = commandManager->GetQueue(commandQueueId);
 
-	ComPtr<IDXGISwapChain1> swapChain1;
-	DirectX12Helper::CreateSwapChain(dxgiFactory.Get(), commandQueue.Get(), _windowHandler, SWAP_CHAIN_BUFFER_COUNT,
-		initialWidth, initialHeight, &swapChain1);
+        swapChain = CreateSwapChain(width, height, windowHandler, factory, commandQueue);
+        bufferIndex = swapChain->GetCurrentBackBufferIndex();
 
-	ThrowIfFailed(swapChain1.As(&swapChain), "DirectX12Renderer::Initialize: Swap Chain conversion error!");
+        for (uint32_t backBufferId = 0u; backBufferId < BACK_BUFFER_NUMBER; backBufferId++)
+        {
+            commandAllocators[backBufferId] = commandManager->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT);
+            resourceCommandAllocators[backBufferId] = commandManager->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT);
+        }
 
-	isFullscreen = fullscreen;
+        commandListId = commandManager->CreateCommandList(commandAllocators[bufferIndex]);
+        resourceCommandListId = commandManager->CreateCommandList(resourceCommandAllocators[bufferIndex]);
+        
+        commandManager->SubmitCommandList(commandListId);
+        commandManager->SubmitCommandList(resourceCommandListId);
+        commandManager->ExecuteCommands(commandQueueId);
+    }
+    else
+    {
+        auto commandQueue = commandManager->GetQueue(commandQueueId);
 
-	if (fullscreen)
-		SwitchFullscreenMode(true);
+        swapChain->Release();
 
-	bufferIndex = swapChain->GetCurrentBackBufferIndex();
+        swapChain = CreateSwapChain(width, height, windowHandler, factory, commandQueue);
+        bufferIndex = swapChain->GetCurrentBackBufferIndex();
+    }
 
-	ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)),
-		"DirectX12Renderer::Initialize: Command Allocator creating error!");
+    if (descriptorManager == nullptr)
+    {
+        descriptorManager = new DescriptorManager(device);
 
-	ThrowIfFailed(device->CreateFence(fenceValues[bufferIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)),
-		"DirectX12Renderer::Initialize: Fence creating error!");
-	fenceValues[bufferIndex]++;
+        for (uint32_t backBufferId = 0u; backBufferId < BACK_BUFFER_NUMBER; backBufferId++)
+        {
+            auto allocation = descriptorManager->Allocate(DescriptorType::RTV);
+            backBufferCPUDescriptors[backBufferId] = allocation.cpuDescriptor;
+        }
+    }
 
-	fenceEvent = CreateEvent(nullptr, false, false, nullptr);
-	if (fenceEvent == nullptr)
-		ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()), "DirectX12Renderer::Initialize: Fence Event creating error!");
+    if (bufferManager == nullptr)
+        bufferManager = new BufferManager();
 
-	ThrowIfFailed(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)),
-		"DirectX12Renderer::Initialize: Command List creating error!");
+    if (textureManager == nullptr)
+        textureManager = new TextureManager();
 
-	ThrowIfFailed(commandList->Close(), "DirectX12Renderer::Initialize: Command List closing error!");
+    if (resourceManager == nullptr)
+        resourceManager = new Resources::ResourceManager(descriptorManager, bufferManager, textureManager);
 
-	if (resourceManager == nullptr)
-		resourceManager = std::make_shared<Memory::ResourceManager>(device.Get());
+    device->CreateFence(fenceValues[bufferIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+    fenceEvent = CreateEvent(nullptr, false, false, nullptr);
 
-	CreateSwapChainBuffers(initialWidth, initialHeight);
+    for (uint32_t backBufferId = 0u; backBufferId < BACK_BUFFER_NUMBER; backBufferId++)
+    {
+       swapChain->GetBuffer(backBufferId, IID_PPV_ARGS(&backBuffers[backBufferId]));
 
-	//resourceManager->UpdateResources();
+       D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+       rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+       rtvDesc.Format = BACK_BUFFER_FORMAT;
+       
+       device->CreateRenderTargetView(backBuffers[backBufferId], &rtvDesc, backBufferCPUDescriptors[backBufferId]);
+    }
 
-	//WaitForGpu();
+    WaitForGPU();
+
+    factory->Release();
 }
 
-void Graphics::DirectX12Renderer::CreateSwapChainBuffers(uint32_t initialWidth, uint32_t initialHeight)
+ID3D12Device2* Graphics::DirectX12Renderer::CreateDevice(IDXGIFactory4* factory)
 {
-	for (uint32_t bufferId = 0; bufferId < SWAP_CHAIN_BUFFER_COUNT; bufferId++)
-	{
-		Memory::ResourceDesc desc{};
-		desc.textureInfo = std::make_shared<Graphics::TextureInfo>(Graphics::TextureInfo{});
-		desc.textureInfo->width = initialWidth;
-		desc.textureInfo->height = initialHeight;
-		desc.textureInfo->depth = 1;
-		desc.textureInfo->mipLevels = 1;
-		desc.textureInfo->dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-		desc.textureInfo->format = SWAP_CHAIN_FORMAT;
+    ID3D12Device2* newDevice = nullptr;
 
-		swapChain->GetBuffer(bufferId, IID_PPV_ARGS(&swapChainResources[bufferId]));
+    auto adapter = FindHighestPerformanceAdapter(factory);
+    D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&newDevice));
+    newDevice->SetName(L"DEVICE");
 
-		desc.preparedResource = swapChainResources[bufferId].Get();
+    adapter->Release();
 
-		swapChainBuffers[bufferId] = resourceManager->CreateResource(Memory::ResourceType::SWAP_CHAIN, desc);
-		swapChainCPUDescriptors[bufferId] = resourceManager->GetRenderTargetDescriptorBase(swapChainBuffers[bufferId]);
-	}
+	return newDevice;
 }
 
-void Graphics::DirectX12Renderer::ReleaseResources()
+IDXGIFactory4* Graphics::DirectX12Renderer::CreateFactory()
 {
-	for (uint32_t bufferId = 0; bufferId < SWAP_CHAIN_BUFFER_COUNT; bufferId++)
-	{
-		swapChainResources[bufferId].Reset();
-		resourceManager->ReleaseResource(swapChainBuffers[bufferId]);
-	}
+    UINT dxgiFactoryFlags = 0;
 
-	commandAllocator.Reset();
-	commandQueue.Reset();
-	commandList.Reset();
-	fence.Reset();
-	swapChain.Reset();
-	device.Reset();
-	dxgiFactory.Reset();
+#if defined(_DEBUG)
+    ID3D12Debug* debugController = nullptr;
+
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+    {
+        debugController->EnableDebugLayer();
+
+        dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+
+        debugController->Release();
+    }
+#endif
+
+    IDXGIFactory4* factory = nullptr;
+    CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory));
+
+    return factory;
 }
 
-void Graphics::DirectX12Renderer::ResetSwapChainBuffers(uint32_t width, uint32_t height)
+IDXGIAdapter1* Graphics::DirectX12Renderer::FindHighestPerformanceAdapter(IDXGIFactory4* factory)
 {
-	WaitForGpu();
+    IDXGIAdapter1* adapter = nullptr;
+    IDXGIFactory6* factory6;
 
-	for (auto& swapChainResource : swapChainResources)
-		swapChainResource.Reset();
+    if (SUCCEEDED(factory->QueryInterface(IID_PPV_ARGS(&factory6))))
+    {
+        for (uint32_t adapterIndex = 0u;
+            factory6->EnumAdapterByGpuPreference(adapterIndex, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND;
+            ++adapterIndex)
+        {
+            DXGI_ADAPTER_DESC1 desc;
+            adapter->GetDesc1(&desc);
 
-	width = std::max(width, 1u);
-	height = std::max(height, 1u);
+            if ((desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) > 0u)
+                continue;
 
-	auto hResult = swapChain->ResizeBuffers(SWAP_CHAIN_BUFFER_COUNT, width, height, SWAP_CHAIN_FORMAT, 0);
+            if (SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_0, _uuidof(ID3D12Device), nullptr)))
+            {
+                factory6->Release();
 
-	if (hResult == DXGI_ERROR_DEVICE_REMOVED || hResult == DXGI_ERROR_DEVICE_RESET)
-	{
-		OnDeviceLost();
+                break;
+            }
+        }
+    }
 
-		return;
-	}
-	else
-		ThrowIfFailed(hResult, "DirectX12Renderer::ResetSwapChainBuffers: Resizing Swap Chain error!");
+    if (adapter == nullptr)
+    {
+        for (UINT adapterIndex = 0; SUCCEEDED(factory->EnumAdapters1(adapterIndex, &adapter)); ++adapterIndex)
+        {
+            DXGI_ADAPTER_DESC1 desc;
+            adapter->GetDesc1(&desc);
 
-	for (uint32_t bufferId = 0; bufferId < SWAP_CHAIN_BUFFER_COUNT; bufferId++)
-	{
-		swapChain->GetBuffer(bufferId, IID_PPV_ARGS(&swapChainResources[bufferId]));
+            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+                continue;
 
-		D3D12_RENDER_TARGET_VIEW_DESC renderTargetViewDesc{};
-		renderTargetViewDesc.Format = SWAP_CHAIN_FORMAT;
-		renderTargetViewDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+            if (SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_0, _uuidof(ID3D12Device), nullptr)))
+            {
+                break;
+            }
+        }
+    }
 
-		device->CreateRenderTargetView(swapChainResources[bufferId].Get(), &renderTargetViewDesc, swapChainCPUDescriptors[bufferId]);
-	}
-
-	bufferIndex = swapChain->GetCurrentBackBufferIndex();
-
-	sceneViewport.TopLeftX = 0.0f;
-	sceneViewport.TopLeftY = 0.0f;
-	sceneViewport.Width = static_cast<float>(width);
-	sceneViewport.Height = static_cast<float>(height);
-	sceneViewport.MinDepth = D3D12_MIN_DEPTH;
-	sceneViewport.MaxDepth = D3D12_MAX_DEPTH;
-
-	sceneScissorRect.left = 0;
-	sceneScissorRect.top = 0;
-	sceneScissorRect.right = width;
-	sceneScissorRect.bottom = height;
+	return adapter;
 }
 
-void Graphics::DirectX12Renderer::PrepareNextFrame()
+IDXGISwapChain3* Graphics::DirectX12Renderer::CreateSwapChain(uint32_t width, uint32_t height, HWND windowHandler,
+    IDXGIFactory4* factory, ID3D12CommandQueue* commandQueue)
 {
-	auto currentFenceValue = fenceValues[bufferIndex];
-	ThrowIfFailed(commandQueue->Signal(fence.Get(), currentFenceValue), "DirectX12Renderer::PrepareNextFrame: Signal error!");
+    IDXGISwapChain1* newSwapChain1 = nullptr;
+    DXGI_SWAP_CHAIN_DESC1 desc{};
+    desc.Width = width;
+    desc.Height = height;
+    desc.Format = BACK_BUFFER_FORMAT;
+    desc.SampleDesc.Count = 1;
+    desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    desc.BufferCount = BACK_BUFFER_NUMBER;
+    desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
-	bufferIndex = swapChain->GetCurrentBackBufferIndex();
+    factory->CreateSwapChainForHwnd(commandQueue, windowHandler, &desc, nullptr, nullptr, &newSwapChain1);
 
-	if (fence->GetCompletedValue() < fenceValues[bufferIndex])
-	{
-		ThrowIfFailed(fence->SetEventOnCompletion(fenceValues[bufferIndex], fenceEvent), "DirectX12Renderer::PrepareNextFrame: Fence error!");
-		WaitForSingleObjectEx(fenceEvent, INFINITE, false);
-	}
+    IDXGISwapChain3* newSwapChain = nullptr;
+    newSwapChain1->QueryInterface(IID_PPV_ARGS(&newSwapChain));
 
-	fenceValues[bufferIndex] = currentFenceValue + 1;
+    newSwapChain1->Release();
+
+    return newSwapChain;
 }
 
-void Graphics::DirectX12Renderer::WaitForGpu()
+void Graphics::DirectX12Renderer::ResetSwapChain(uint32_t width, uint32_t height, HWND windowHandler)
 {
-	ThrowIfFailed(commandQueue->Signal(fence.Get(), fenceValues[bufferIndex]), "DirectX12Renderer::WaitForGpu: Signal error!");
-	ThrowIfFailed(fence->SetEventOnCompletion(fenceValues[bufferIndex], fenceEvent), "DirectX12Renderer::WaitForGpu: Fence error!");
+    for (auto& buffer : backBuffers)
+        buffer->Release();
 
-	WaitForSingleObjectEx(fenceEvent, INFINITE, false);
+    auto hResult = swapChain->ResizeBuffers(BACK_BUFFER_NUMBER, width, height, BACK_BUFFER_FORMAT, 0u);
 
-	fenceValues[bufferIndex]++;
+    if (hResult == DXGI_ERROR_DEVICE_REMOVED || hResult == DXGI_ERROR_DEVICE_RESET)
+    {
+        OnDeviceLost(windowHandler);
+
+        return;
+    }
+
+    for (uint32_t bufferId = 0; bufferId < BACK_BUFFER_NUMBER; bufferId++)
+    {
+        swapChain->GetBuffer(bufferId, IID_PPV_ARGS(&backBuffers[bufferId]));
+
+        D3D12_RENDER_TARGET_VIEW_DESC renderTargetViewDesc{};
+        renderTargetViewDesc.Format = BACK_BUFFER_FORMAT;
+        renderTargetViewDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+        device->CreateRenderTargetView(backBuffers[bufferId], &renderTargetViewDesc, backBufferCPUDescriptors[bufferId]);
+    }
+
+    bufferIndex = swapChain->GetCurrentBackBufferIndex();
+}
+
+void Graphics::DirectX12Renderer::WaitForGPU()
+{
+    auto commandQueue = commandManager->GetQueue(commandQueueId);
+
+    DirectX12Utilities::WaitForGPU(commandQueue, fence, fenceEvent, fenceValues[bufferIndex]);
+}
+
+void Graphics::DirectX12Renderer::PrepareToNextFrame()
+{
+    const UINT64 currentFenceValue = fenceValues[bufferIndex];
+
+    auto commandQueue = commandManager->GetQueue(commandQueueId);
+    commandQueue->Signal(fence, currentFenceValue);
+
+    bufferIndex = swapChain->GetCurrentBackBufferIndex();
+
+    if (fence->GetCompletedValue() < fenceValues[bufferIndex])
+    {
+        fence->SetEventOnCompletion(fenceValues[bufferIndex], fenceEvent);
+        WaitForSingleObjectEx(fenceEvent, INFINITE, FALSE);
+    }
+
+    fenceValues[bufferIndex] = currentFenceValue + 1;
 }

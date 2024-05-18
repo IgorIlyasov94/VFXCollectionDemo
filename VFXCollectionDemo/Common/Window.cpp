@@ -1,6 +1,6 @@
 #include "Window.h"
 
-Common::Window::Window(HINSTANCE instance, int cmdShow, const RECT& initialPlacement, bool fullscreen, WNDPROC windowProc, void* procData)
+Common::Window::Window(HINSTANCE instance, int cmdShow, const RECT& initialPlacement, bool fullscreen, WNDPROC windowProc)
 {
 	WNDCLASSEX windowClass{};
 
@@ -15,8 +15,9 @@ Common::Window::Window(HINSTANCE instance, int cmdShow, const RECT& initialPlace
 	windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
 	windowClass.lpszClassName = windowClassName;
 	windowClass.hIconSm = LoadIcon(windowClass.hInstance, IDI_APPLICATION);
+	windowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
-	RegisterClassExW(&windowClass);
+	RegisterClassEx(&windowClass);
 
 	DWORD styles = WS_OVERLAPPEDWINDOW | WS_SYSMENU;
 	DWORD exStyles = WS_EX_APPWINDOW;
@@ -29,9 +30,8 @@ Common::Window::Window(HINSTANCE instance, int cmdShow, const RECT& initialPlace
 	int initialWidth = adjustedPlacement.right - adjustedPlacement.left;
 	int initialHeight = adjustedPlacement.bottom - adjustedPlacement.top;
 
-	
-	windowHandler = CreateWindowExW(WS_EX_APPWINDOW, windowClassName, windowTitleName, WS_OVERLAPPEDWINDOW,
-		initialX, initialY, initialWidth, initialHeight, nullptr, nullptr, instance, procData);
+	windowHandler = CreateWindowEx(exStyles, windowClassName, windowTitleName, styles,
+		initialX, initialY, initialWidth, initialHeight, nullptr, nullptr, instance, nullptr);
 
 	ShowWindow(windowHandler, SW_SHOWDEFAULT);
 	UpdateWindow(windowHandler);

@@ -1,3 +1,4 @@
+#include "Includes.h"
 #include "Common/Application.h"
 
 _Use_decl_annotations_

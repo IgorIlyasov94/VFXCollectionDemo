@@ -1,31 +1,34 @@
 #pragma once
 
-#include "../Includes.h"
+#include "DirectX12Includes.h"
+#include "CommandManager.h"
+#include "DescriptorManager.h"
+#include "BufferManager.h"
+#include "TextureManager.h"
 #include "Resources/ResourceManager.h"
 
 namespace Graphics
 {
-	class DirectX12Renderer final
+	class DirectX12Renderer
 	{
 	public:
-		DirectX12Renderer(HWND windowHandler, uint32_t initialWidth, uint32_t initialHeight, bool fullscreen);
+		DirectX12Renderer(const RECT& windowPlacement, HWND windowHandler, bool _isFullscreen);
 		~DirectX12Renderer();
 
-		void GpuRelease();
+		void OnResize(uint32_t newWidth, uint32_t newHeight, HWND windowHandler);
+		void OnSetFocus(HWND windowHandler);
+		void OnLostFocus(HWND windowHandler);
+		void OnDeviceLost(HWND windowHandler);
 
-		void OnResize(uint32_t newWidth, uint32_t newHeight);
-		void OnSetFocus();
-		void OnLostFocus();
-		void OnDeviceLost();
-		
-		ID3D12GraphicsCommandList6* FrameStart();
-		void FrameEnd();
+		void Render();
 
-		Memory::ResourceManager* GetResourceManager();
+		ID3D12Device* GetDevice();
 
-		ID3D12Device2* GetDevice();
+		CommandManager* GetCommandManager();
+		Resources::ResourceManager* GetResourceManager();
 
-		void SwitchFullscreenMode(bool enableFullscreen);
+		ID3D12GraphicsCommandList* StartCreatingResources();
+		void EndCreatingResources();
 
 	private:
 		DirectX12Renderer() = delete;
@@ -34,41 +37,52 @@ namespace Graphics
 		DirectX12Renderer& operator=(const DirectX12Renderer&) = delete;
 		DirectX12Renderer& operator=(DirectX12Renderer&&) = delete;
 
-		void Initialize(uint32_t initialWidth, uint32_t initialHeight, bool fullscreen);
-		void CreateSwapChainBuffers(uint32_t initialWidth, uint32_t initialHeight);
-		void ReleaseResources();
+		void CreateGPUResources(uint32_t width, uint32_t height, HWND windowHandler);
 
-		void ResetSwapChainBuffers(uint32_t width, uint32_t height);
-		void PrepareNextFrame();
-		void WaitForGpu();
-		
-		static const uint32_t SWAP_CHAIN_BUFFER_COUNT = 2;
-		static const DXGI_FORMAT SWAP_CHAIN_FORMAT = DXGI_FORMAT_R10G10B10A2_UNORM;
+		ID3D12Device2* CreateDevice(IDXGIFactory4* factory);
+		IDXGIFactory4* CreateFactory();
+		IDXGIAdapter1* FindHighestPerformanceAdapter(IDXGIFactory4* factory);
+		IDXGISwapChain3* CreateSwapChain(uint32_t width, uint32_t height, HWND windowHandler,
+			IDXGIFactory4* factory, ID3D12CommandQueue* commandQueue);
 
-		ComPtr<ID3D12Device2> device;
-		ComPtr<ID3D12GraphicsCommandList6> commandList;
-		ComPtr<ID3D12CommandQueue> commandQueue;
-		ComPtr<ID3D12CommandAllocator> commandAllocator;
-		ComPtr<ID3D12Fence1> fence;
+		void ResetSwapChain(uint32_t width, uint32_t height, HWND windowHandler);
 
-		ComPtr<IDXGIFactory7> dxgiFactory;
-		ComPtr<IDXGISwapChain4> swapChain;
+		void WaitForGPU();
+		void PrepareToNextFrame();
 
-		std::shared_ptr<Memory::ResourceManager> resourceManager;
-		Memory::ResourceId swapChainBuffers[SWAP_CHAIN_BUFFER_COUNT];
-		ComPtr<ID3D12Resource> swapChainResources[SWAP_CHAIN_BUFFER_COUNT];
-		D3D12_CPU_DESCRIPTOR_HANDLE swapChainCPUDescriptors[SWAP_CHAIN_BUFFER_COUNT];
+		static const uint32_t BACK_BUFFER_NUMBER = 2u;
+		static const DXGI_FORMAT BACK_BUFFER_FORMAT = DXGI_FORMAT_R10G10B10A2_UNORM;
+		static constexpr float BACK_BUFFER_COLOR[4] = { 1.0f, 0.5f, 0.75f, 1.0f };
+
+		ID3D12Device2* device;
+		ID3D12Fence* fence;
+
+		std::array<ID3D12Resource*, BACK_BUFFER_NUMBER> backBuffers;
+		std::array<D3D12_CPU_DESCRIPTOR_HANDLE, BACK_BUFFER_NUMBER> backBufferCPUDescriptors;
+
+		IDXGISwapChain3* swapChain;
 
 		HANDLE fenceEvent;
+		std::array<uint64_t, BACK_BUFFER_NUMBER> fenceValues;
 
-		D3D12_VIEWPORT sceneViewport;
-		D3D12_RECT sceneScissorRect;
+		CommandListID commandListId;
+		std::array<CommandAllocatorID, BACK_BUFFER_NUMBER> commandAllocators;
+		CommandQueueID commandQueueId;
 
-		HWND _windowHandler;
+		CommandListID resourceCommandListId;
+		std::array<CommandAllocatorID, BACK_BUFFER_NUMBER> resourceCommandAllocators;
+		CommandQueueID resourceCommandQueueId;
+
+		CommandManager* commandManager;
+		DescriptorManager* descriptorManager;
+		BufferManager* bufferManager;
+		TextureManager* textureManager;
+		Resources::ResourceManager* resourceManager;
+
+		uint32_t currentWidth;
+		uint32_t currentHeight;
+		uint32_t bufferIndex;
 
 		bool isFullscreen;
-
-		uint32_t bufferIndex;
-		uint64_t fenceValues[SWAP_CHAIN_BUFFER_COUNT];
 	};
 }
