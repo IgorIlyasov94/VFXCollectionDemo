@@ -10,16 +10,30 @@ Common::ProcessHandler::~ProcessHandler()
 
 }
 
-int Common::ProcessHandler::Run()
+int Common::ProcessHandler::Run(Logic::MainLogic* mainLogic)
 {
 	MSG message{};
 
-	while (message.message != WM_QUIT)
+	for (;;)
 	{
-		PeekMessage(&message, nullptr, 0, 0, PM_REMOVE);
+		for (;;)
+		{
+			if (mainLogic != nullptr && mainLogic->NeedBackgroundUpdate())
+			{
+				if (!PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
+					break;
+			}
+			else
+				GetMessage(&message, nullptr, 0, 0);
 
-		TranslateMessage(&message);
-		DispatchMessage(&message);
+			if (message.message == WM_QUIT)
+				return static_cast<int>(message.wParam);
+
+			TranslateMessage(&message);
+			DispatchMessage(&message);
+		}
+
+		mainLogic->Update();
 	}
 
 	return static_cast<int>(message.wParam);

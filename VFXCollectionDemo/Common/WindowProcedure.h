@@ -1,16 +1,11 @@
 #pragma once
 
 #include "../Includes.h"
-#include "../Graphics/DirectX12Renderer.h"
+#include "Logic/MainLogic.h"
 
 namespace Common
 {
-	struct WindowProcedureData
-	{
-		Graphics::DirectX12Renderer* renderer;
-	};
-
-	class WindowProcedure
+	class WindowProcedure final
 	{
 	public:
 		WindowProcedure();

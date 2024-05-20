@@ -43,6 +43,12 @@
     <Filter Include="Файлы заголовков\Graphics\Assets\Loaders">
       <UniqueIdentifier>{0aefdb12-c3d5-4047-99d5-6e38679adcfc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Исходные файлы\Common\Logic">
+      <UniqueIdentifier>{2308110e-0a15-48b3-85b4-2f16489b05c2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Common\Logic">
+      <UniqueIdentifier>{04018d43-86e2-4edc-80bb-1019fd7d23ae}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -131,6 +137,18 @@
     </ClCompile>
     <ClCompile Include="Graphics\Resources\VertexBufferFactory.cpp">
       <Filter>Исходные файлы\Graphics\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Logic\MainLogic.cpp">
+      <Filter>Исходные файлы\Common\Logic</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Logic\MeshObject.cpp">
+      <Filter>Исходные файлы\Common\Logic</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Logic\SceneManager.cpp">
+      <Filter>Исходные файлы\Common\Logic</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Logic\Scene.cpp">
+      <Filter>Исходные файлы\Common\Logic</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -238,6 +256,21 @@
     </ClInclude>
     <ClInclude Include="Graphics\Resources\BufferFactory.h">
       <Filter>Файлы заголовков\Graphics\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\IDrawable.h">
+      <Filter>Файлы заголовков\Common\Logic</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\MainLogic.h">
+      <Filter>Файлы заголовков\Common\Logic</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\MeshObject.h">
+      <Filter>Файлы заголовков\Common\Logic</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\Scene.h">
+      <Filter>Файлы заголовков\Common\Logic</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\SceneManager.h">
+      <Filter>Файлы заголовков\Common\Logic</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

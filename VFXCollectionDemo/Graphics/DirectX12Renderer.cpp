@@ -100,27 +100,25 @@ void Graphics::DirectX12Renderer::OnDeviceLost(HWND windowHandler)
     CreateGPUResources(currentWidth, currentHeight, windowHandler);
 }
 
-void Graphics::DirectX12Renderer::Render()
+ID3D12GraphicsCommandList* Graphics::DirectX12Renderer::StartFrame()
 {
     auto d3dCommandList = commandManager->BeginRecord(commandListId, commandAllocators[bufferIndex]);
 
     //ID3D12DescriptorHeap* descriptorHeaps[] = {descriptorManager->GetHeap(DescriptorType::RTV)};
     //d3dCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
+    return d3dCommandList;
+}
+
+void Graphics::DirectX12Renderer::EndFrame(ID3D12GraphicsCommandList* commandList)
+{
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = backBuffers[bufferIndex];
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-    d3dCommandList->ResourceBarrier(1u, &barrier);
-
-    d3dCommandList->ClearRenderTargetView(backBufferCPUDescriptors[bufferIndex], BACK_BUFFER_COLOR, 0u, nullptr);
-
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 
-    d3dCommandList->ResourceBarrier(1u, &barrier);
+    commandList->ResourceBarrier(1u, &barrier);
 
     commandManager->EndRecord(commandListId);
     commandManager->SubmitCommandList(commandListId);
@@ -129,6 +127,20 @@ void Graphics::DirectX12Renderer::Render()
     swapChain->Present(1u, 0u);
 
     PrepareToNextFrame();
+}
+
+void Graphics::DirectX12Renderer::SetRenderToBackBuffer(ID3D12GraphicsCommandList* commandList)
+{
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = backBuffers[bufferIndex];
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+    commandList->ResourceBarrier(1u, &barrier);
+
+    commandList->ClearRenderTargetView(backBufferCPUDescriptors[bufferIndex], BACK_BUFFER_COLOR, 0u, nullptr);
+    commandList->OMSetRenderTargets(1u, &backBufferCPUDescriptors[bufferIndex], true, nullptr);
 }
 
 ID3D12Device* Graphics::DirectX12Renderer::GetDevice()

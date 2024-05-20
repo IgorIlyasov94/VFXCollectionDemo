@@ -3,7 +3,7 @@
 #include "../Includes.h"
 #include "WindowProcedure.h"
 #include "Window.h"
-#include "../Graphics/DirectX12Renderer.h"
+#include "Logic/MainLogic.h"
 
 namespace Common
 {
@@ -24,7 +24,6 @@ namespace Common
 
 		WindowProcedure* procedure;
 		Window* window;
-		
-		WindowProcedureData procedureData;
+		Logic::MainLogic* mainLogic;
 	};
 }

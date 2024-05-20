@@ -24,7 +24,7 @@ void Common::WindowProcedure::CreateMenuBar(HWND windowHandler)
 
 LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	auto data = reinterpret_cast<WindowProcedureData*>(GetWindowLongPtr(windowHandler, GWLP_USERDATA));
+	auto mainLogic = reinterpret_cast<Logic::MainLogic*>(GetWindowLongPtr(windowHandler, GWLP_USERDATA));
 
 	switch (message)
 	{
@@ -58,11 +58,10 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 		}
 		case WM_PAINT:
 		{
-			if (data != nullptr)
+			if (mainLogic != nullptr)
 			{
-				auto renderer = data->renderer;
-
-				renderer->Render();
+				mainLogic->Update();
+				mainLogic->Render();
 			}
 
 			return 0;

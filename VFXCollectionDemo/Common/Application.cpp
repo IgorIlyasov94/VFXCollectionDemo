@@ -7,14 +7,14 @@ Common::Application::Application(HINSTANCE instance, int cmdShow)
 
 	procedure = new WindowProcedure();
 	window = new Window(instance, cmdShow, initialPlacement, false, procedure->Get());
-	procedureData.renderer = new Graphics::DirectX12Renderer(initialPlacement, window->GetHandler(), false);
+	mainLogic = new Logic::MainLogic(initialPlacement, window->GetHandler(), false);
 
-	SetWindowLongPtr(window->GetHandler(), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&procedureData));
+	SetWindowLongPtr(window->GetHandler(), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(mainLogic));
 }
 
 Common::Application::~Application()
 {
-	delete procedureData.renderer;
+	delete mainLogic;
 	delete procedure;
 	delete window;
 }
@@ -22,5 +22,5 @@ Common::Application::~Application()
 int Common::Application::Run()
 {
 	ProcessHandler processHandler{};
-	return processHandler.Run();
+	return processHandler.Run(mainLogic);
 }

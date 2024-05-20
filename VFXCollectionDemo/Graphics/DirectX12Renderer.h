@@ -9,7 +9,7 @@
 
 namespace Graphics
 {
-	class DirectX12Renderer
+	class DirectX12Renderer final
 	{
 	public:
 		DirectX12Renderer(const RECT& windowPlacement, HWND windowHandler, bool _isFullscreen);
@@ -20,7 +20,10 @@ namespace Graphics
 		void OnLostFocus(HWND windowHandler);
 		void OnDeviceLost(HWND windowHandler);
 
-		void Render();
+		ID3D12GraphicsCommandList* StartFrame();
+		void EndFrame(ID3D12GraphicsCommandList* commandList);
+
+		void SetRenderToBackBuffer(ID3D12GraphicsCommandList* commandList);
 
 		ID3D12Device* GetDevice();
 

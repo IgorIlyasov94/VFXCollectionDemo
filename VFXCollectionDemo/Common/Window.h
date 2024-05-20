@@ -13,6 +13,7 @@ namespace Common
 		HWND GetHandler();
 
 	private:
+		Window() = delete;
 		Window(const Window&) = delete;
 		Window(Window&&) = delete;
 		Window& operator=(const Window&) = delete;

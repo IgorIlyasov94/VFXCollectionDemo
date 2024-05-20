@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Includes.h"
+#include "Logic/MainLogic.h"
 
 namespace Common
 {
@@ -10,7 +11,7 @@ namespace Common
 		ProcessHandler();
 		~ProcessHandler();
 
-		int Run();
+		int Run(Logic::MainLogic* mainLogic);
 
 	private:
 		ProcessHandler(const ProcessHandler&) = delete;
