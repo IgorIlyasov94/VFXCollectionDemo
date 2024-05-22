@@ -1,48 +1,51 @@
 #include "SceneManager.h"
+#include "Scene/Scene_Empty.h"
 
 Common::Logic::SceneManager::SceneManager()
-	: currentScene(-1), emptyScene{}
+	: currentScene(0u), _renderer(nullptr)
 {
-
+	scenes.push_back(new Scene::Scene_Empty());
 }
 
 Common::Logic::SceneManager::~SceneManager()
 {
+	for (auto& scene : scenes)
+	{
+		if (scene->IsLoaded())
+			scene->Unload(_renderer);
 
+		delete scene;
+	}
 }
 
-Common::Logic::SceneID Common::Logic::SceneManager::AddScene()
+Common::Logic::Scene::SceneID Common::Logic::SceneManager::AddScene(Scene::IScene* newScene)
 {
-	auto sceneId = static_cast<SceneID>(scenes.size());
+	auto sceneId = static_cast<Scene::SceneID>(scenes.size());
 
-	scenes.push_back({});
+	scenes.push_back(newScene);
 
 	return sceneId;
 }
 
-Common::Logic::Scene& Common::Logic::SceneManager::GetScene(SceneID id)
+Common::Logic::Scene::IScene* Common::Logic::SceneManager::GetScene(Scene::SceneID id)
 {
-	if (id < 0u || id >= scenes.size())
-		return emptyScene;
-
 	return scenes[id];
 }
 
-Common::Logic::Scene& Common::Logic::SceneManager::GetCurrentScene()
+Common::Logic::Scene::IScene* Common::Logic::SceneManager::GetCurrentScene()
 {
-	if (currentScene < 0u || currentScene >= scenes.size())
-		return emptyScene;
-
 	return scenes[currentScene];
 }
 
-void Common::Logic::SceneManager::LoadScene(SceneID id)
+void Common::Logic::SceneManager::LoadScene(Scene::SceneID id, Graphics::DirectX12Renderer* renderer)
 {
-	if (scenes[id].IsLoaded())
+	if (scenes[id]->IsLoaded())
 		return;
 
-	scenes[currentScene].Unload();
-	scenes[id].Load();
+	_renderer = renderer;
+
+	scenes[currentScene]->Unload(renderer);
+	scenes[id]->Load(renderer);
 
 	currentScene = id;
 }

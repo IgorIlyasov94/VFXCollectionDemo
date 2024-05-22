@@ -37,6 +37,9 @@ void Graphics::Assets::Loaders::OBJLoader::Load(std::filesystem::path filePath, 
 
 		auto token = GetToken(objLineStream);
 
+		if (token == TokenType::NO_TOKEN)
+			continue;
+
 		if (token == TokenType::POSITION)
 			positions.push_back(GetVector3(objLineStream));
 		else if (token == TokenType::NORMAL)
@@ -108,35 +111,52 @@ void Graphics::Assets::Loaders::OBJLoader::Load(std::filesystem::path filePath, 
 
 	meshDesc.vertexFormat = vertexFormat;
 
-	auto verticesNumber = static_cast<uint32_t>(verticesData.size() * sizeof(float) / (stride));
+	auto verticesNumber = static_cast<uint32_t>(verticesData.size() / stride);
 	meshDesc.verticesNumber = verticesNumber;
-	meshDesc.indicesNumber = static_cast<uint32_t>(resultIndices.size() * 2u);
+	meshDesc.indicesNumber = static_cast<uint32_t>(resultIndices.size());
 
-	uint32_t shift = 0u;
-
-	if (verticesNumber <= std::numeric_limits<uint16_t>::max())
+	struct VERTEX_DATA
 	{
-		shift = 2u;
-		meshDesc.indexFormat = IndexFormat::UINT16_INDEX;
-	}
-	else
-	{
-		shift = 4u;
-		meshDesc.indexFormat = IndexFormat::UINT32_INDEX;
-	}
+	public:
+		float posX;
+		float posY;
+		float posZ;
 
-	indicesData.resize(resultIndices.size() * shift);
+		uint16_t normX;
+		uint16_t normY;
+		uint16_t normZ;
+		uint16_t normW;
+
+		uint16_t texX;
+		uint16_t texY;
+		//DirectX::PackedVector::XMHALF4 norm;
+		//DirectX::PackedVector::XMHALF2 tex;
+	};
+
+	auto str2 = sizeof(VERTEX_DATA);
+
+	std::vector<VERTEX_DATA> testBuffer;
+	testBuffer.resize(verticesNumber);
+
+	auto startAddress = verticesData.data();
+	auto endAddress = startAddress + verticesNumber * stride;
+	std::copy(startAddress, endAddress, reinterpret_cast<uint8_t*>(testBuffer.data()));
+
+	uint32_t indexStride = verticesNumber <= std::numeric_limits<uint16_t>::max() ? 2u : 4u;
+	meshDesc.indexFormat = indexStride == 2u ? IndexFormat::UINT16_INDEX : IndexFormat::UINT32_INDEX;
+
+	indicesData.resize(resultIndices.size() * indexStride);
 
 	auto indicesDataPtr = indicesData.data();
 
 	for (auto& index : resultIndices)
 	{
-		if (shift == 2u)
+		if (indexStride == 2u)
 			reinterpret_cast<uint16_t*>(indicesDataPtr)[0] = static_cast<uint16_t>(index);
 		else
 			reinterpret_cast<uint32_t*>(indicesDataPtr)[0] = index;
 
-		indicesDataPtr += shift;
+		indicesDataPtr += indexStride;
 	}
 
 	meshDesc.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -147,12 +167,14 @@ Graphics::Assets::Loaders::OBJLoader::TokenType Graphics::Assets::Loaders::OBJLo
 	std::string strToken;
 	objLineStream >> strToken;
 
-	auto token = TokenType::TEXCOORD;
+	auto token = TokenType::NO_TOKEN;
 
 	if (strToken == "v")
 		token = TokenType::POSITION;
 	else if (strToken == "vn")
 		token = TokenType::NORMAL;
+	else if (strToken == "vt")
+		token = TokenType::TEXCOORD;
 	else if (strToken == "f")
 		token = TokenType::FACE;
 
@@ -233,45 +255,76 @@ void Graphics::Assets::Loaders::OBJLoader::AppendToBuffer(const TempGeometryData
 			continue;
 
 		auto& position = tempGeometryData.positions[vertexIndices[0]];
+		PushPositionToBuffer(position, vertexBufferData);
 
-		PushVector3ToBuffer(position, vertexBufferData);
-
-		if (vertexIndices[1] > 0)
+		if (vertexIndices[1] >= 0)
 		{
 			auto& normal = tempGeometryData.normals[vertexIndices[1]];
-
-			PushVector3ToBuffer(normal, vertexBufferData);
+			PushNormalToBuffer(normal, vertexBufferData);
 		}
 
-		if (vertexIndices[2] > 0)
+		if (vertexIndices[2] >= 0)
 		{
 			auto& texCoord = tempGeometryData.texCoords[vertexIndices[2]];
-
-			PushVector2ToBuffer(texCoord, vertexBufferData);
+			PushTexCoordToBuffer(texCoord, vertexBufferData);
 		}
 	}
 }
 
-void Graphics::Assets::Loaders::OBJLoader::PushVector2ToBuffer(const float2& value, std::vector<uint8_t>& vertexBufferData)
+uint32_t Graphics::Assets::Loaders::OBJLoader::CalculateLocalStride(VertexFormat format)
 {
-	auto address0 = reinterpret_cast<float*>(&vertexBufferData.back());
-	auto address1 = reinterpret_cast<float*>(&vertexBufferData.back() + sizeof(float));
+	uint32_t result = 12u;
 
-	vertexBufferData.resize(vertexBufferData.size() + sizeof(float2));
+	if ((format & VertexFormat::NORMAL) == VertexFormat::NORMAL)
+		result += 12u;
 
-	*address0 = value.x;
-	*address1 = value.y;
+	if ((format & VertexFormat::TEXCOORD0) == VertexFormat::TEXCOORD0)
+		result += 8u;
+
+	return result;
 }
 
-void Graphics::Assets::Loaders::OBJLoader::PushVector3ToBuffer(const float3& value, std::vector<uint8_t>& vertexBufferData)
+void Graphics::Assets::Loaders::OBJLoader::PushPositionToBuffer(const float3& value, std::vector<uint8_t>& vertexBufferData)
 {
-	auto address0 = reinterpret_cast<float*>(&vertexBufferData.back());
-	auto address1 = reinterpret_cast<float*>(&vertexBufferData.back() + sizeof(float));
-	auto address2 = reinterpret_cast<float*>(&vertexBufferData.back() + sizeof(float) * 2u);
+	auto offset = vertexBufferData.size();
 
-	vertexBufferData.resize(vertexBufferData.size() + sizeof(float3));
+	vertexBufferData.resize(offset + sizeof(float3));
+
+	auto address0 = reinterpret_cast<float*>(vertexBufferData.data() + offset);
+	auto address1 = address0 + 1u;
+	auto address2 = address1 + 1u;
 
 	*address0 = value.x;
 	*address1 = value.y;
 	*address2 = value.z;
+}
+
+void Graphics::Assets::Loaders::OBJLoader::PushNormalToBuffer(const float3& value, std::vector<uint8_t>& vertexBufferData)
+{
+	auto offset = vertexBufferData.size();
+
+	vertexBufferData.resize(offset + sizeof(DirectX::PackedVector::XMHALF4));
+
+	auto address0 = reinterpret_cast<DirectX::PackedVector::HALF*>(vertexBufferData.data() + offset);
+	auto address1 = address0 + 1u;
+	auto address2 = address1 + 1u;
+	auto address3 = address2 + 1u;
+
+	*address0 = DirectX::PackedVector::XMConvertFloatToHalf(value.x);
+	*address1 = DirectX::PackedVector::XMConvertFloatToHalf(value.y);
+	*address2 = DirectX::PackedVector::XMConvertFloatToHalf(value.z);
+	*address3 = 0u;
+}
+
+void Graphics::Assets::Loaders::OBJLoader::PushTexCoordToBuffer(const float2& value, std::vector<uint8_t>& vertexBufferData)
+{
+	auto offset = vertexBufferData.size();
+
+	vertexBufferData.resize(offset + sizeof(DirectX::PackedVector::XMHALF2));
+
+	auto address0 = reinterpret_cast<DirectX::PackedVector::HALF*>(vertexBufferData.data() + offset);
+	auto address1 = address0 + 1u;
+
+	*address0 = DirectX::PackedVector::XMConvertFloatToHalf(value.x);
+	*address1 = DirectX::PackedVector::XMConvertFloatToHalf(value.y);
 }

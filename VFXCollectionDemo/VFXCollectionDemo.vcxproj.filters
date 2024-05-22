@@ -49,6 +49,18 @@
     <Filter Include="Файлы заголовков\Common\Logic">
       <UniqueIdentifier>{04018d43-86e2-4edc-80bb-1019fd7d23ae}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Файлы заголовков\Common\Logic\SceneEntity">
+      <UniqueIdentifier>{16c82e2b-f560-4466-8d96-9d294622e99f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Common\Logic\SceneEntity">
+      <UniqueIdentifier>{5e1b17ba-19a3-4deb-b74d-eacc746f0db9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Common\Logic\Scene">
+      <UniqueIdentifier>{312bb7d2-b76c-4f6c-8247-ec073873aa61}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Common\Logic\Scene">
+      <UniqueIdentifier>{4dead331-8f14-4c2e-8d8a-571a0c1b6bcf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -141,14 +153,20 @@
     <ClCompile Include="Common\Logic\MainLogic.cpp">
       <Filter>Исходные файлы\Common\Logic</Filter>
     </ClCompile>
-    <ClCompile Include="Common\Logic\MeshObject.cpp">
-      <Filter>Исходные файлы\Common\Logic</Filter>
-    </ClCompile>
     <ClCompile Include="Common\Logic\SceneManager.cpp">
       <Filter>Исходные файлы\Common\Logic</Filter>
     </ClCompile>
-    <ClCompile Include="Common\Logic\Scene.cpp">
-      <Filter>Исходные файлы\Common\Logic</Filter>
+    <ClCompile Include="Common\Logic\SceneEntity\MeshObject.cpp">
+      <Filter>Исходные файлы\Common\Logic\SceneEntity</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Logic\Scene\Scene_0_Lux.cpp">
+      <Filter>Исходные файлы\Common\Logic\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Logic\Scene\Scene_Empty.cpp">
+      <Filter>Исходные файлы\Common\Logic\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Logic\SceneEntity\Camera.cpp">
+      <Filter>Исходные файлы\Common\Logic\SceneEntity</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -257,20 +275,29 @@
     <ClInclude Include="Graphics\Resources\BufferFactory.h">
       <Filter>Файлы заголовков\Graphics\Resources</Filter>
     </ClInclude>
-    <ClInclude Include="Common\Logic\IDrawable.h">
-      <Filter>Файлы заголовков\Common\Logic</Filter>
-    </ClInclude>
     <ClInclude Include="Common\Logic\MainLogic.h">
-      <Filter>Файлы заголовков\Common\Logic</Filter>
-    </ClInclude>
-    <ClInclude Include="Common\Logic\MeshObject.h">
-      <Filter>Файлы заголовков\Common\Logic</Filter>
-    </ClInclude>
-    <ClInclude Include="Common\Logic\Scene.h">
       <Filter>Файлы заголовков\Common\Logic</Filter>
     </ClInclude>
     <ClInclude Include="Common\Logic\SceneManager.h">
       <Filter>Файлы заголовков\Common\Logic</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\SceneEntity\IDrawable.h">
+      <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\SceneEntity\MeshObject.h">
+      <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\Scene\IScene.h">
+      <Filter>Файлы заголовков\Common\Logic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\Scene\Scene_0_Lux.h">
+      <Filter>Файлы заголовков\Common\Logic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\Scene\Scene_Empty.h">
+      <Filter>Файлы заголовков\Common\Logic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\SceneEntity\Camera.h">
+      <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

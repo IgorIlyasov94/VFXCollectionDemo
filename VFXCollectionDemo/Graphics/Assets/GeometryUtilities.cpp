@@ -46,7 +46,7 @@ bool Graphics::Assets::GeometryUtilities::PointInTriangle(const float3& point0, 
 {
 	float3 barycentric = CalculateBarycentric(point0, point1, point2, point);
 
-	if (barycentric.x + barycentric.y + barycentric.z <= 1.0f)
+	if (barycentric.x + barycentric.y + barycentric.z <= (1.0f + EPSILON * 3.0f))
 		return true;
 
 	return false;
@@ -91,7 +91,7 @@ void Graphics::Assets::GeometryUtilities::TriangulatePolygon(const std::vector<u
 			std::swap(index1, index2);
 			std::swap(index0, index1);
 		}
-
+		
 		auto previousIndex = tempIndices[index0];
 		auto currentIndex = tempIndices[index1];
 		auto nextIndex = tempIndices[index2];
@@ -111,16 +111,16 @@ void Graphics::Assets::GeometryUtilities::TriangulatePolygon(const std::vector<u
 		else if (indicesCount == 4)
 		{
 			triangles.push_back(previousIndex);
-			triangles.push_back(currentIndex);
 			triangles.push_back(nextIndex);
-
+			triangles.push_back(currentIndex);
+			
 			for (auto& index : tempIndices)
 				if (index != previousIndex && index != currentIndex && index != nextIndex)
 				{
 					triangles.push_back(nextIndex);
 					triangles.push_back(index);
-					triangles.push_back(previousIndex);
-
+					triangles.push_back(currentIndex);
+					
 					break;
 				}
 

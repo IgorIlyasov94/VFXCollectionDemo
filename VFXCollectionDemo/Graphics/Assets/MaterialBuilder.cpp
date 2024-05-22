@@ -101,52 +101,52 @@ void Graphics::Assets::MaterialBuilder::SetGeometryFormat(VertexFormat format, D
 		inputElements.push_back({ "TANGENT", 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::COLOR0) == VertexFormat::COLOR0)
-		inputElements.push_back({ "COLOR0", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::COLOR1) == VertexFormat::COLOR1)
-		inputElements.push_back({ "COLOR1", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "COLOR", 1, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::COLOR2) == VertexFormat::COLOR2)
-		inputElements.push_back({ "COLOR2", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "COLOR", 2, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::COLOR3) == VertexFormat::COLOR3)
-		inputElements.push_back({ "COLOR3", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "COLOR", 3, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::COLOR4) == VertexFormat::COLOR4)
-		inputElements.push_back({ "COLOR4", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "COLOR", 4, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::COLOR5) == VertexFormat::COLOR5)
-		inputElements.push_back({ "COLOR5", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "COLOR", 5, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::COLOR6) == VertexFormat::COLOR6)
-		inputElements.push_back({ "COLOR6", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "COLOR", 6, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::COLOR7) == VertexFormat::COLOR7)
-		inputElements.push_back({ "COLOR7", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "COLOR", 7, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::TEXCOORD0) == VertexFormat::TEXCOORD0)
-		inputElements.push_back({ "TEXCOORD0", 0, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::TEXCOORD1) == VertexFormat::TEXCOORD1)
-		inputElements.push_back({ "TEXCOORD1", 0, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "TEXCOORD", 1, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::TEXCOORD2) == VertexFormat::TEXCOORD2)
-		inputElements.push_back({ "TEXCOORD2", 0, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "TEXCOORD", 2, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::TEXCOORD3) == VertexFormat::TEXCOORD3)
-		inputElements.push_back({ "TEXCOORD3", 0, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "TEXCOORD", 3, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::TEXCOORD4) == VertexFormat::TEXCOORD4)
-		inputElements.push_back({ "TEXCOORD4", 0, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "TEXCOORD", 4, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::TEXCOORD5) == VertexFormat::TEXCOORD5)
-		inputElements.push_back({ "TEXCOORD5", 0, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "TEXCOORD", 5, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::TEXCOORD6) == VertexFormat::TEXCOORD6)
-		inputElements.push_back({ "TEXCOORD6", 0, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "TEXCOORD", 6, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::TEXCOORD7) == VertexFormat::TEXCOORD7)
-		inputElements.push_back({ "TEXCOORD7", 0, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "TEXCOORD", 7, DXGI_FORMAT_R16G16_FLOAT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::BLENDINDICES) == VertexFormat::BLENDINDICES)
 		inputElements.push_back({ "BLENDINDICES", 0, DXGI_FORMAT_R8G8B8A8_UINT, 0, appendParameter, classification, 0 });
@@ -345,7 +345,9 @@ ID3D12RootSignature* Graphics::Assets::MaterialBuilder::CreateRootSignature(ID3D
 	device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 
 	signature->Release();
-	error->Release();
+
+	if (error != nullptr)
+		error->Release();
 
 	return rootSignature;
 }

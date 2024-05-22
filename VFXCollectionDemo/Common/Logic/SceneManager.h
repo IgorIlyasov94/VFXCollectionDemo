@@ -1,7 +1,8 @@
 #pragma once
 
 #include "../../Includes.h"
-#include "Scene.h"
+#include "../../Graphics/DirectX12Renderer.h"
+#include "Scene/IScene.h"
 
 namespace Common::Logic
 {
@@ -11,11 +12,11 @@ namespace Common::Logic
 		SceneManager();
 		~SceneManager();
 
-		SceneID AddScene();
-		Scene& GetScene(SceneID id);
-		Scene& GetCurrentScene();
+		Scene::SceneID AddScene(Scene::IScene* newScene);
+		Scene::IScene* GetScene(Scene::SceneID id);
+		Scene::IScene* GetCurrentScene();
 
-		void LoadScene(SceneID id);
+		void LoadScene(Scene::SceneID id, Graphics::DirectX12Renderer* renderer);
 
 	private:
 		SceneManager(const SceneManager&) = delete;
@@ -23,8 +24,8 @@ namespace Common::Logic
 		SceneManager& operator=(const SceneManager&) = delete;
 		SceneManager& operator=(SceneManager&&) = delete;
 
-		std::vector<Scene> scenes;
-		Scene emptyScene;
-		SceneID currentScene;
+		Graphics::DirectX12Renderer* _renderer;
+		std::vector<Scene::IScene*> scenes;
+		Scene::SceneID currentScene;
 	};
 }

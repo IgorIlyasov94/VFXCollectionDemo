@@ -6,6 +6,7 @@
 #include "../DescriptorManager.h"
 #include "../BufferManager.h"
 #include "../TextureManager.h"
+#include "../Assets/Loaders/HLSLLoader.h"
 #include "IResource.h"
 #include "IResourceDesc.h"
 #include "IResourceFactory.h"
@@ -47,6 +48,9 @@ namespace Graphics::Resources
 			TextureResourceType type, const TextureDesc& desc);
 
 		ResourceID CreateSamplerResource(ID3D12Device* device, D3D12_SAMPLER_DESC desc);
+
+		ResourceID CreateShaderResource(ID3D12Device* device, std::filesystem::path filePath,
+			Assets::Loaders::ShaderType type, Assets::Loaders::ShaderVersion version);
 
 		template<ResourceType T>
 		T* GetResource(ResourceID id)

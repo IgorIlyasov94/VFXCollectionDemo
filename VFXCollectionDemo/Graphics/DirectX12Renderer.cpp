@@ -25,7 +25,7 @@ Graphics::DirectX12Renderer::~DirectX12Renderer()
     _debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
 #endif
 
-    WaitForGPU();
+    WaitForGPU(commandQueueId);
 
 #ifdef _DEBUG
     _debugDevice->Release();
@@ -40,7 +40,7 @@ Graphics::DirectX12Renderer::~DirectX12Renderer()
     delete textureManager;
     delete bufferManager;
 
-    WaitForGPU();
+    WaitForGPU(commandQueueId);
 
     delete commandManager;
 
@@ -62,7 +62,7 @@ void Graphics::DirectX12Renderer::OnResize(uint32_t newWidth, uint32_t newHeight
 
 void Graphics::DirectX12Renderer::OnSetFocus(HWND windowHandler)
 {
-    WaitForGPU();
+    WaitForGPU(commandQueueId);
 
     swapChain->SetFullscreenState(isFullscreen, nullptr);
 
@@ -74,7 +74,7 @@ void Graphics::DirectX12Renderer::OnSetFocus(HWND windowHandler)
 
 void Graphics::DirectX12Renderer::OnLostFocus(HWND windowHandler)
 {
-    WaitForGPU();
+    WaitForGPU(commandQueueId);
 
     swapChain->SetFullscreenState(false, nullptr);
 
@@ -86,7 +86,7 @@ void Graphics::DirectX12Renderer::OnLostFocus(HWND windowHandler)
 
 void Graphics::DirectX12Renderer::OnDeviceLost(HWND windowHandler)
 {
-    WaitForGPU();
+    WaitForGPU(commandQueueId);
 
     for (auto& buffer : backBuffers)
         buffer->Release();
@@ -143,6 +143,16 @@ void Graphics::DirectX12Renderer::SetRenderToBackBuffer(ID3D12GraphicsCommandLis
     commandList->OMSetRenderTargets(1u, &backBufferCPUDescriptors[bufferIndex], true, nullptr);
 }
 
+uint32_t Graphics::DirectX12Renderer::GetWidth()
+{
+    return currentWidth;
+}
+
+uint32_t Graphics::DirectX12Renderer::GetHeight()
+{
+    return currentHeight;
+}
+
 ID3D12Device* Graphics::DirectX12Renderer::GetDevice()
 {
     return device;
@@ -169,10 +179,15 @@ void Graphics::DirectX12Renderer::EndCreatingResources()
     commandManager->SubmitCommandList(resourceCommandListId);
     commandManager->ExecuteCommands(resourceCommandQueueId);
 
-    WaitForGPU();
+    WaitForGPU(resourceCommandQueueId);
 
     bufferManager->ReleaseUploadBuffers();
     textureManager->ReleaseUploadBuffers();
+}
+
+void Graphics::DirectX12Renderer::UnbindResources()
+{
+    WaitForGPU(commandQueueId);
 }
 
 void Graphics::DirectX12Renderer::CreateGPUResources(uint32_t width, uint32_t height, HWND windowHandler)
@@ -252,7 +267,7 @@ void Graphics::DirectX12Renderer::CreateGPUResources(uint32_t width, uint32_t he
        device->CreateRenderTargetView(backBuffers[backBufferId], &rtvDesc, backBufferCPUDescriptors[backBufferId]);
     }
 
-    WaitForGPU();
+    WaitForGPU(commandQueueId);
 
     factory->Release();
 }
@@ -351,7 +366,7 @@ IDXGISwapChain3* Graphics::DirectX12Renderer::CreateSwapChain(uint32_t width, ui
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     desc.BufferCount = BACK_BUFFER_NUMBER;
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-
+    
     factory->CreateSwapChainForHwnd(commandQueue, windowHandler, &desc, nullptr, nullptr, &newSwapChain1);
 
     IDXGISwapChain3* newSwapChain = nullptr;
@@ -364,8 +379,13 @@ IDXGISwapChain3* Graphics::DirectX12Renderer::CreateSwapChain(uint32_t width, ui
 
 void Graphics::DirectX12Renderer::ResetSwapChain(uint32_t width, uint32_t height, HWND windowHandler)
 {
-    for (auto& buffer : backBuffers)
-        buffer->Release();
+    WaitForGPU(commandQueueId);
+
+    for (uint32_t bufferId = 0; bufferId < BACK_BUFFER_NUMBER; bufferId++)
+    {
+        backBuffers[bufferId]->Release();
+        fenceValues[bufferId] = fenceValues[bufferIndex];
+    }
 
     auto hResult = swapChain->ResizeBuffers(BACK_BUFFER_NUMBER, width, height, BACK_BUFFER_FORMAT, 0u);
 
@@ -390,16 +410,16 @@ void Graphics::DirectX12Renderer::ResetSwapChain(uint32_t width, uint32_t height
     bufferIndex = swapChain->GetCurrentBackBufferIndex();
 }
 
-void Graphics::DirectX12Renderer::WaitForGPU()
+void Graphics::DirectX12Renderer::WaitForGPU(CommandQueueID _commandQueueId)
 {
-    auto commandQueue = commandManager->GetQueue(commandQueueId);
+    auto commandQueue = commandManager->GetQueue(_commandQueueId);
 
     DirectX12Utilities::WaitForGPU(commandQueue, fence, fenceEvent, fenceValues[bufferIndex]);
 }
 
 void Graphics::DirectX12Renderer::PrepareToNextFrame()
 {
-    const UINT64 currentFenceValue = fenceValues[bufferIndex];
+    const uint64_t currentFenceValue = fenceValues[bufferIndex];
 
     auto commandQueue = commandManager->GetQueue(commandQueueId);
     commandQueue->Signal(fence, currentFenceValue);

@@ -52,6 +52,18 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 
 			return 0;
 		}
+		case WM_SIZE:
+		{
+			if (mainLogic != nullptr)
+			{
+				uint32_t newWidth = static_cast<uint32_t>(lParam) & 0xffffu;
+				uint32_t newHeight = static_cast<uint32_t>(lParam >> 16u) & 0xffffu;
+
+				mainLogic->OnResize(newWidth, newHeight, windowHandler);
+			}
+
+			return 0;
+		}
 		case WM_ERASEBKGND:
 		{
 			return 1;

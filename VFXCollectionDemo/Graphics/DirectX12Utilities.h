@@ -5,6 +5,12 @@
 
 namespace Graphics
 {
+	enum class DefaultBlendSetup
+	{
+		BLEND_OPAQUE = 0u,
+		BLEND_TRANSPARENT = 1u,
+	};
+
 	class DirectX12Utilities final
 	{
 	public:
@@ -20,6 +26,8 @@ namespace Graphics
 		static D3D12_RASTERIZER_DESC CreateRasterizeDesc(D3D12_CULL_MODE mode);
 		static D3D12_DEPTH_STENCIL_DESC CreateDepthStencilDesc(bool enableZTest);
 		static D3D12_DEPTH_STENCIL_DESC1 CreateDepthStencilDesc1(bool enableZTest);
+
+		static D3D12_BLEND_DESC CreateBlendDesc(DefaultBlendSetup setup);
 
 	private:
 		DirectX12Utilities() = delete;

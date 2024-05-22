@@ -27,16 +27,16 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 	CComPtr<IDxcResult> result;
 	dxCompiler->Compile(&sourceBuffer, args->GetArguments(), args->GetCount(), nullptr, IID_PPV_ARGS(&result));
 
-	CComPtr<IDxcBlobUtf16> errorBuffer = nullptr;
+	CComPtr<IDxcBlobUtf8> errorBuffer = nullptr;
 	result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errorBuffer), nullptr);
 
 	HRESULT hrStatus;
 	result->GetStatus(&hrStatus);
 
-	if (errorBuffer != nullptr && errorBuffer->GetStringLength() > 0 || FAILED(hrStatus))
+	if (errorBuffer != nullptr && errorBuffer->GetStringLength() > 0)
 	{
 		auto bufferSize = errorBuffer->GetBufferSize();
-		std::wstring errorMessage(errorBuffer->GetBufferSize(), L' ');
+		std::string errorMessage(errorBuffer->GetBufferSize(), ' ');
 
 		if (bufferSize > 0)
 		{
@@ -44,10 +44,10 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 			auto addressEnd = reinterpret_cast<uint8_t*>(addressStart) + bufferSize;
 
 			std::copy(addressStart, addressEnd, errorMessage.data());
-			errorMessage = L"HLSLLoader::CompileShader: Warnings and errors:\n\n" + errorMessage;
+			errorMessage = "HLSLLoader::CompileShader: Warnings and errors:\n\n" + errorMessage;
 		}
 
-		OutputDebugString(errorMessage.c_str());
+		OutputDebugStringA(errorMessage.c_str());
 
 		return {};
 	}

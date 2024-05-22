@@ -28,6 +28,8 @@ namespace Common::Logic
 		MainLogic& operator=(const MainLogic&) = delete;
 		MainLogic& operator=(MainLogic&&) = delete;
 
+		Scene::SceneID luxSceneId;
+
 		SceneManager* sceneManager;
 		Graphics::DirectX12Renderer* renderer;
 		bool _isFullscreen;

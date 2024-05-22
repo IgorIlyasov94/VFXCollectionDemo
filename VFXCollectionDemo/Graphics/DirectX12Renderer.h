@@ -25,6 +25,9 @@ namespace Graphics
 
 		void SetRenderToBackBuffer(ID3D12GraphicsCommandList* commandList);
 
+		uint32_t GetWidth();
+		uint32_t GetHeight();
+
 		ID3D12Device* GetDevice();
 
 		CommandManager* GetCommandManager();
@@ -32,6 +35,12 @@ namespace Graphics
 
 		ID3D12GraphicsCommandList* StartCreatingResources();
 		void EndCreatingResources();
+
+		void UnbindResources();
+
+		static const uint32_t BACK_BUFFER_NUMBER = 2u;
+		static const DXGI_FORMAT BACK_BUFFER_FORMAT = DXGI_FORMAT_R10G10B10A2_UNORM;
+		static constexpr float BACK_BUFFER_COLOR[4] = { 1.0f, 0.5f, 0.75f, 1.0f };
 
 	private:
 		DirectX12Renderer() = delete;
@@ -50,12 +59,8 @@ namespace Graphics
 
 		void ResetSwapChain(uint32_t width, uint32_t height, HWND windowHandler);
 
-		void WaitForGPU();
+		void WaitForGPU(CommandQueueID _commandQueueId);
 		void PrepareToNextFrame();
-
-		static const uint32_t BACK_BUFFER_NUMBER = 2u;
-		static const DXGI_FORMAT BACK_BUFFER_FORMAT = DXGI_FORMAT_R10G10B10A2_UNORM;
-		static constexpr float BACK_BUFFER_COLOR[4] = { 1.0f, 0.5f, 0.75f, 1.0f };
 
 		ID3D12Device2* device;
 		ID3D12Fence* fence;

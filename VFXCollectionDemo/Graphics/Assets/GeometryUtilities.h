@@ -17,6 +17,8 @@ namespace Graphics::Assets
 		static void TriangulatePolygon(const std::vector<uint8_t>& vertexBuffer, size_t stride, std::vector<uint32_t>& vertexIndices);
 		static void RecalculateNormals(const std::vector<uint32_t>& vertexIndices, size_t stride, std::vector<uint8_t>& vertexBuffer);
 
+		static constexpr float EPSILON = 1E-5f;
+
 	private:
 		GeometryUtilities() = delete;
 		~GeometryUtilities() = delete;

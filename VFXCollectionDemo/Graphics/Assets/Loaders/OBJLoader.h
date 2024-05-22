@@ -20,10 +20,11 @@ namespace Graphics::Assets::Loaders
 
 		enum class TokenType : uint8_t
 		{
-			POSITION = 0u,
-			NORMAL = 1u,
-			TEXCOORD = 2u,
-			FACE = 3u
+			NO_TOKEN = 0u,
+			POSITION = 1u,
+			NORMAL = 2u,
+			TEXCOORD = 3u,
+			FACE = 4u
 		};
 
 		struct TempGeometryData
@@ -44,8 +45,10 @@ namespace Graphics::Assets::Loaders
 		static VertexFormat GetVertexFormat(size_t texCoordCount, size_t normalCount);
 
 		static void AppendToBuffer(const TempGeometryData& tempGeometryData, std::vector<uint8_t>& vertexBufferData);
+		static uint32_t CalculateLocalStride(VertexFormat format);
 
-		static void PushVector2ToBuffer(const float2& value, std::vector<uint8_t>& vertexBufferData);
-		static void PushVector3ToBuffer(const float3& value, std::vector<uint8_t>& vertexBufferData);
+		static void PushPositionToBuffer(const float3& value, std::vector<uint8_t>& vertexBufferData);
+		static void PushNormalToBuffer(const float3& value, std::vector<uint8_t>& vertexBufferData);
+		static void PushTexCoordToBuffer(const float2& value, std::vector<uint8_t>& vertexBufferData);
 	};
 }

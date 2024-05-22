@@ -9,6 +9,9 @@ Graphics::BufferManager::~BufferManager()
 {
 	for (auto& buffer : buffers)
 	{
+		if (buffer.resource == nullptr)
+			continue;
+
 		if (buffer.type == BufferAllocationType::DYNAMIC_CONSTANT)
 			buffer.resource->Unmap();
 
@@ -143,6 +146,8 @@ void Graphics::BufferManager::Deallocate(Resources::GPUResource* allocatedResour
 					buffer.resource->Unmap();
 
 				delete buffer.resource;
+				buffer.resource = nullptr;
+
 				std::swap(buffer, buffers.back());
 				buffers.resize(buffers.size() - 1u);
 
@@ -173,6 +178,8 @@ void Graphics::BufferManager::ReleaseUploadBuffers()
 		buffer.resource->Unmap();
 		delete buffer.resource;
 	}
+
+	uploadBuffers.clear();
 }
 
 constexpr uint64_t Graphics::BufferManager::AlignValue(uint64_t value, uint64_t alignment)

@@ -97,3 +97,24 @@ Graphics::Resources::ResourceID Graphics::Resources::ResourceManager::CreateSamp
 
 	return id;
 }
+
+Graphics::Resources::ResourceID Graphics::Resources::ResourceManager::CreateShaderResource(ID3D12Device* device,
+	std::filesystem::path filePath, Assets::Loaders::ShaderType type, Assets::Loaders::ShaderVersion version)
+{
+	auto newShader = new Shader;
+	newShader->bytecode = Assets::Loaders::HLSLLoader::Load(filePath, type, version);
+
+	auto id = static_cast<ResourceID>(resources.size());
+
+	if (freeSlots.empty())
+		resources.push_back(std::move(newShader));
+	else
+	{
+		id = freeSlots.front();
+		freeSlots.pop();
+
+		resources[id] = newShader;
+	}
+
+	return id;
+}
