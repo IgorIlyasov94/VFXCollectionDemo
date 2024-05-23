@@ -7,8 +7,8 @@ namespace Graphics::Assets::Loaders
 	class OBJLoader final
 	{
 	public:
-		static void Load(std::filesystem::path filePath, bool recalculateNormals, MeshDesc& meshDesc,
-			std::vector<uint8_t>& verticesData, std::vector<uint8_t>& indicesData);
+		static void Load(std::filesystem::path filePath, bool recalculateNormals, bool addTangents,
+			MeshDesc& meshDesc, std::vector<uint8_t>& verticesData, std::vector<uint8_t>& indicesData);
 
 	private:
 		OBJLoader() = delete;
@@ -44,7 +44,8 @@ namespace Graphics::Assets::Loaders
 
 		static VertexFormat GetVertexFormat(size_t texCoordCount, size_t normalCount);
 
-		static void AppendToBuffer(const TempGeometryData& tempGeometryData, std::vector<uint8_t>& vertexBufferData);
+		static void AppendToBuffer(const TempGeometryData& tempGeometryData, bool recalculateNormals, bool addTangents,
+			std::vector<uint8_t>& vertexBufferData);
 		static uint32_t CalculateLocalStride(VertexFormat format);
 
 		static void PushPositionToBuffer(const float3& value, std::vector<uint8_t>& vertexBufferData);

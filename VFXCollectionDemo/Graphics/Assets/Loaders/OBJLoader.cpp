@@ -1,7 +1,7 @@
 #include "OBJLoader.h"
 #include "../GeometryUtilities.h"
 
-void Graphics::Assets::Loaders::OBJLoader::Load(std::filesystem::path filePath, bool recalculateNormals,
+void Graphics::Assets::Loaders::OBJLoader::Load(std::filesystem::path filePath, bool recalculateNormals, bool addTangents,
 	MeshDesc& meshDesc, std::vector<uint8_t>& verticesData, std::vector<uint8_t>& indicesData)
 {
 	std::ifstream objFile(filePath, std::ios::in);
@@ -53,8 +53,11 @@ void Graphics::Assets::Loaders::OBJLoader::Load(std::filesystem::path filePath, 
 				vertexFormat = GetVertexFormat(texCoords.size(), normals.size());
 				stride = VertexStride(vertexFormat);
 
-				if (recalculateNormals && ((vertexFormat & VertexFormat::NORMAL) != VertexFormat::NORMAL))
-					stride += 12u;
+				if ((recalculateNormals || addTangents) && ((vertexFormat & VertexFormat::NORMAL) != VertexFormat::NORMAL))
+					stride += 8u;
+
+				if (addTangents)
+					stride += 8u;
 			}
 
 			positionFace.clear();
@@ -96,17 +99,30 @@ void Graphics::Assets::Loaders::OBJLoader::Load(std::filesystem::path filePath, 
 				}
 			}
 
-			AppendToBuffer(tempGeometryData, verticesData);
+			AppendToBuffer(tempGeometryData, recalculateNormals, addTangents, verticesData);
 			GeometryUtilities::TriangulatePolygon(verticesData, stride, currentIndices);
 
 			resultIndices.insert(resultIndices.end(), currentIndices.begin(), currentIndices.end());
 		}
 	}
 
-	if (recalculateNormals)
+	if (recalculateNormals || addTangents)
 	{
-		vertexFormat |= VertexFormat::NORMAL;
-		GeometryUtilities::RecalculateNormals(resultIndices, stride, verticesData);
+		if ((vertexFormat & VertexFormat::NORMAL) != VertexFormat::NORMAL)
+		{
+			vertexFormat |= VertexFormat::NORMAL;
+			GeometryUtilities::RecalculateNormals(resultIndices, stride, verticesData);
+		}
+		else if (recalculateNormals)
+			GeometryUtilities::RecalculateNormals(resultIndices, stride, verticesData);
+	}
+
+	if (addTangents)
+	{
+		if ((vertexFormat & VertexFormat::TANGENT) != VertexFormat::TANGENT)
+			vertexFormat |= VertexFormat::TANGENT;
+
+		GeometryUtilities::CalculateTangents(stride, verticesData);
 	}
 
 	meshDesc.vertexFormat = vertexFormat;
@@ -220,7 +236,8 @@ Graphics::VertexFormat Graphics::Assets::Loaders::OBJLoader::GetVertexFormat(siz
 	return faceFormat;
 }
 
-void Graphics::Assets::Loaders::OBJLoader::AppendToBuffer(const TempGeometryData& tempGeometryData, std::vector<uint8_t>& vertexBufferData)
+void Graphics::Assets::Loaders::OBJLoader::AppendToBuffer(const TempGeometryData& tempGeometryData, bool recalculateNormals,
+	bool addTangents, std::vector<uint8_t>& vertexBufferData)
 {
 	for (auto& vertexIndices : tempGeometryData.face)
 	{
@@ -230,11 +247,20 @@ void Graphics::Assets::Loaders::OBJLoader::AppendToBuffer(const TempGeometryData
 		auto& position = tempGeometryData.positions[vertexIndices[0]];
 		PushPositionToBuffer(position, vertexBufferData);
 
-		if (vertexIndices[1] >= 0)
+		if (vertexIndices[1] >= 0 && !recalculateNormals)
 		{
 			auto& normal = tempGeometryData.normals[vertexIndices[1]];
 			PushNormalToBuffer(normal, vertexBufferData);
 		}
+		else if (recalculateNormals || addTangents)
+		{
+			for (auto iterator = 0u; iterator < sizeof(DirectX::PackedVector::XMHALF4); iterator++)
+				vertexBufferData.push_back({});
+		}
+
+		if (addTangents)
+			for (auto iterator = 0u; iterator < sizeof(DirectX::PackedVector::XMHALF4); iterator++)
+				vertexBufferData.push_back({});
 
 		if (vertexIndices[2] >= 0)
 		{
@@ -261,7 +287,8 @@ void Graphics::Assets::Loaders::OBJLoader::PushPositionToBuffer(const float3& va
 {
 	auto offset = vertexBufferData.size();
 
-	vertexBufferData.resize(offset + sizeof(float3));
+	for (auto iterator = 0u; iterator < sizeof(float3); iterator++)
+		vertexBufferData.push_back({});
 
 	auto address0 = reinterpret_cast<float*>(vertexBufferData.data() + offset);
 	auto address1 = address0 + 1u;
@@ -276,7 +303,8 @@ void Graphics::Assets::Loaders::OBJLoader::PushNormalToBuffer(const float3& valu
 {
 	auto offset = vertexBufferData.size();
 
-	vertexBufferData.resize(offset + sizeof(DirectX::PackedVector::XMHALF4));
+	for (auto iterator = 0u; iterator < sizeof(DirectX::PackedVector::XMHALF4); iterator++)
+		vertexBufferData.push_back({});
 
 	auto address0 = reinterpret_cast<DirectX::PackedVector::HALF*>(vertexBufferData.data() + offset);
 	auto address1 = address0 + 1u;
@@ -293,7 +321,8 @@ void Graphics::Assets::Loaders::OBJLoader::PushTexCoordToBuffer(const float2& va
 {
 	auto offset = vertexBufferData.size();
 
-	vertexBufferData.resize(offset + sizeof(DirectX::PackedVector::XMHALF2));
+	for (auto iterator = 0u; iterator < sizeof(DirectX::PackedVector::XMHALF2); iterator++)
+		vertexBufferData.push_back({});
 
 	auto address0 = reinterpret_cast<DirectX::PackedVector::HALF*>(vertexBufferData.data() + offset);
 	auto address1 = address0 + 1u;

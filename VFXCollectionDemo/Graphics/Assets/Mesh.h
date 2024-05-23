@@ -13,13 +13,15 @@ namespace Graphics::Assets
 		Mesh(const MeshDesc& meshDesc, Resources::ResourceID vertexBufferId, Resources::ResourceID indexBufferId,
 			Resources::ResourceManager* resourceManager);
 		Mesh(std::filesystem::path filePath, ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-			Resources::ResourceManager* resourceManager, bool recalculateNormals);
+			Resources::ResourceManager* resourceManager, bool recalculateNormals, bool addTangents);
 		~Mesh();
 
 		void Release(Resources::ResourceManager* resourceManager);
 
 		void Draw(ID3D12GraphicsCommandList* commandList);
 		
+		const MeshDesc& GetDesc();
+
 	private:
 		Mesh() = delete;
 
@@ -35,7 +37,6 @@ namespace Graphics::Assets
 		Resources::ResourceID _vertexBufferId;
 		Resources::ResourceID _indexBufferId;
 
-		uint32_t indicesNumber;
-		D3D12_PRIMITIVE_TOPOLOGY topology;
+		MeshDesc _meshDesc;
 	};
 }

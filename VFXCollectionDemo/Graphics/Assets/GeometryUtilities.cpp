@@ -160,11 +160,13 @@ void Graphics::Assets::GeometryUtilities::TriangulatePolygon(const std::vector<u
 void Graphics::Assets::GeometryUtilities::RecalculateNormals(const std::vector<uint32_t>& vertexIndices, size_t stride,
 	std::vector<uint8_t>& vertexBuffer)
 {
-	for (size_t triangleIndex = 0; triangleIndex < vertexIndices.size() / 3; triangleIndex++)
+	for (size_t triangleIndex = 0u; triangleIndex < vertexIndices.size() / 3; triangleIndex++)
 	{
-		auto& index0 = vertexIndices[triangleIndex * 3];
-		auto& index1 = vertexIndices[triangleIndex * 3 + 1];
-		auto& index2 = vertexIndices[triangleIndex * 3 + 2];
+		auto vertexIndexStart = triangleIndex * 3;
+
+		auto& index0 = vertexIndices[vertexIndexStart];
+		auto& index1 = vertexIndices[vertexIndexStart + 1];
+		auto& index2 = vertexIndices[vertexIndexStart + 2];
 
 		auto vertexIndex0 = index0 * stride;
 		auto vertexIndex1 = index1 * stride;
@@ -176,8 +178,50 @@ void Graphics::Assets::GeometryUtilities::RecalculateNormals(const std::vector<u
 
 		auto normal = CalculateNormal(position0, position1, position2);
 
-		auto& resultBufferSlot = reinterpret_cast<float3&>(vertexBuffer[vertexIndex0 + 12]);
+		DirectX::PackedVector::XMHALF4 half4Normal{};
+		half4Normal.x = DirectX::PackedVector::XMConvertFloatToHalf(normal.x);
+		half4Normal.y = DirectX::PackedVector::XMConvertFloatToHalf(normal.y);
+		half4Normal.z = DirectX::PackedVector::XMConvertFloatToHalf(normal.z);
 
-		resultBufferSlot = normal;
+		auto& resultBufferSlot = reinterpret_cast<DirectX::PackedVector::XMHALF4&>(vertexBuffer[vertexIndex0 + 12u]);
+		resultBufferSlot = half4Normal;
+	}
+}
+
+void Graphics::Assets::GeometryUtilities::CalculateTangents(size_t stride, std::vector<uint8_t>& vertexBuffer)
+{
+	auto vertexNumber = vertexBuffer.size() / stride;
+
+	for (size_t vertexIndex = 0u; vertexIndex < vertexNumber; vertexIndex++)
+	{
+		auto vertexBufferNormalIndex = vertexIndex * stride + 12u;
+		auto vertexBufferTangetIndex = vertexBufferNormalIndex + 8u;
+
+		auto& half4Normal = reinterpret_cast<const DirectX::PackedVector::XMHALF4&>(vertexBuffer[vertexBufferNormalIndex]);
+		float3 normal{};
+		normal.x = DirectX::PackedVector::XMConvertHalfToFloat(half4Normal.x);
+		normal.y = DirectX::PackedVector::XMConvertHalfToFloat(half4Normal.y);
+		normal.z = DirectX::PackedVector::XMConvertHalfToFloat(half4Normal.z);
+
+		float3 v0(0.0f, 0.0f, 1.0f);
+		float3 v1(0.0f, 1.0f, 0.0f);
+
+		floatN t0 = XMVector3Cross(XMLoadFloat3(&normal), XMLoadFloat3(&v0));
+		floatN t1 = XMVector3Cross(XMLoadFloat3(&normal), XMLoadFloat3(&v1));
+
+		float3 tangent{};
+
+		if (XMVector3Length(t0).m128_f32[0] > XMVector3Length(t1).m128_f32[0])
+			XMStoreFloat3(&tangent, XMVector3Normalize(t0));
+		else
+			XMStoreFloat3(&tangent, XMVector3Normalize(t1));
+
+		DirectX::PackedVector::XMHALF4 half4Tangent{};
+		half4Tangent.x = DirectX::PackedVector::XMConvertFloatToHalf(tangent.x);
+		half4Tangent.y = DirectX::PackedVector::XMConvertFloatToHalf(tangent.y);
+		half4Tangent.z = DirectX::PackedVector::XMConvertFloatToHalf(tangent.z);
+
+		auto& resultBufferSlot = reinterpret_cast<DirectX::PackedVector::XMHALF4&>(vertexBuffer[vertexBufferTangetIndex]);
+		resultBufferSlot = half4Tangent;
 	}
 }

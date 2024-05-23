@@ -40,7 +40,9 @@ namespace Common::Logic::Scene
 		struct MutableConstants
 		{
 		public:
-			float4x4 worldViewProjection;
+			float4x4 world;
+			float4x4 viewProjection;
+			float4 cameraDirection;
 		};
 
 		float3 cameraPosition;

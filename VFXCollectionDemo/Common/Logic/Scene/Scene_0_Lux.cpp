@@ -16,14 +16,10 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	pbrStandardPSId{}, environmentWorld{}, timer{}, fps(60.0f), cpuTimeCounter{}, prevTimePoint{},
 	frameCounter{}
 {
-	environmentPosition = float3(0.0f, 5.0f, 0.0f);
+	environmentPosition = float3(0.0f, 0.0f, 0.0f);
+	cameraPosition = float3(0.0f, 0.0f, 5.0f);
 
-	cameraPosition = float3(0.0f, 0.0f, 0.0f);
-	auto cameraLookAtN = DirectX::XMLoadFloat3(&cameraPosition);
-	auto environmentPositionN = DirectX::XMLoadFloat3(&environmentPosition);
-	cameraLookAtN += environmentPositionN;
-
-	XMStoreFloat3(&cameraLookAt, cameraLookAtN);
+	XMStoreFloat3(&cameraLookAt, DirectX::XMLoadFloat3(&environmentPosition));
 
 	cameraUpVector = float3(0.0f, 0.0f, 1.0f);
 	auto cameraUpVectorN = DirectX::XMLoadFloat3(&cameraUpVector);
@@ -62,6 +58,9 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 	scissorRectangle.right = width;
 	scissorRectangle.bottom = height;
 
+	environmentMesh = new Mesh("Resources\\Meshes\\LuxEnvironmentFloor.obj", device, commandList, resourceManager, false, true);
+	auto vertexFormat = environmentMesh->GetDesc().vertexFormat;
+
 	auto aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 
 	camera = new Camera(cameraPosition, cameraLookAt, cameraUpVector, FOV_Y, aspectRatio, Z_NEAR, Z_FAR);
@@ -92,11 +91,16 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 	auto pbrStandardVS = resourceManager->GetResource<Shader>(pbrStandardVSId);
 	auto pbrStandardPS = resourceManager->GetResource<Shader>(pbrStandardPSId);
 
-	auto vertexFormat = Graphics::VertexFormat::POSITION | Graphics::VertexFormat::NORMAL | Graphics::VertexFormat::TEXCOORD0;
-
 	auto mutableConstantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
 	mutableConstantsBuffer = reinterpret_cast<MutableConstants*>(mutableConstantsResource->resourceCPUAddress);
-	mutableConstantsBuffer->worldViewProjection = environmentWorld * view * projection;
+	mutableConstantsBuffer->world = environmentWorld;
+	mutableConstantsBuffer->viewProjection = view * projection;
+	
+	auto cameraDirection = XMLoadFloat3(&cameraLookAt);
+	cameraDirection -= XMLoadFloat3(&cameraPosition);
+	cameraDirection = XMVector3Normalize(cameraDirection);
+
+	XMStoreFloat4(&mutableConstantsBuffer->cameraDirection, cameraDirection);
 
 	TextureDesc textureDesc{};
 	DDSLoader::Load("Resources\\Textures\\LuxEnvironmentFloor_AlbedoRoughness.dds", textureDesc);
@@ -113,7 +117,7 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 	auto samplerLinearResource = resourceManager->GetResource<Sampler>(samplerLinearId);
 
 	MaterialBuilder materialBuilder{};
-	materialBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+	materialBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress);
 	materialBuilder.SetTexture(0u, environmentFloorAlbedoResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(1u, environmentFloorNormalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -126,7 +130,6 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 	materialBuilder.SetPixelShader(pbrStandardPS->bytecode);
 
 	environmentMaterial = materialBuilder.ComposeStandard(device);
-	environmentMesh = new Mesh("Resources\\Meshes\\LuxEnvironmentFloor.obj", device, commandList, resourceManager, false);
 	environmentMeshObject = new MeshObject(environmentMesh, environmentMaterial);
 
 	renderer->EndCreatingResources();
@@ -164,34 +167,39 @@ void Common::Logic::Scene::Scene_0_Lux::OnResize(uint32_t newWidth, uint32_t new
 	auto& view = camera->GetView();
 	auto& projection = camera->GetProjection();
 
-	mutableConstantsBuffer->worldViewProjection = environmentWorld * view * projection;
+	mutableConstantsBuffer->viewProjection = view * projection;
 }
 
 void Common::Logic::Scene::Scene_0_Lux::Update()
 {
-	cameraPosition = environmentPosition;
-	cameraPosition.x += std::cos(timer) * 5.0f;
-	cameraPosition.y += std::sin(timer) * 5.0f;
-	cameraPosition.z += 5.0f;
+	cameraPosition.x = std::cos(timer) * 5.0f;
+	cameraPosition.y = std::sin(timer) * 5.0f;
+	cameraPosition.z = 5.0f;
 
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 
 	auto& view = camera->GetView();
 	auto& projection = camera->GetProjection();
 
-	mutableConstantsBuffer->worldViewProjection = environmentWorld * view * projection;
+	mutableConstantsBuffer->viewProjection = view * projection;
+
+	auto cameraDirection = XMLoadFloat3(&cameraLookAt);
+	cameraDirection -= XMLoadFloat3(&cameraPosition);
+	cameraDirection = XMVector3Normalize(cameraDirection);
+
+	XMStoreFloat4(&mutableConstantsBuffer->cameraDirection, cameraDirection);
 
 	auto currentTimePoint = std::chrono::high_resolution_clock::now();
 	auto deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(currentTimePoint - prevTimePoint);
 
-	timer += 1.0f / fps;
+	timer += 0.2f / fps;
 
 	cpuTimeCounter += deltaTime.count();
 	frameCounter++;
 
 	if (cpuTimeCounter >= 1000u)
 	{
-		fps = static_cast<float>(frameCounter);
+		fps = static_cast<float>(std::min(frameCounter, 300u));
 		cpuTimeCounter = 0u;
 		frameCounter = 0u;
 	}

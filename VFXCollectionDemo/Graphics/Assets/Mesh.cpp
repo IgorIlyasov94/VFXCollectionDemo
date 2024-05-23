@@ -6,8 +6,7 @@ using namespace Graphics::Assets::Loaders;
 
 Graphics::Assets::Mesh::Mesh(const MeshDesc& meshDesc, ResourceID vertexBufferId, ResourceID indexBufferId,
 	ResourceManager* resourceManager)
-	: _vertexBufferId(vertexBufferId), _indexBufferId(indexBufferId), topology(meshDesc.topology),
-	indicesNumber(meshDesc.indicesNumber)
+	: _vertexBufferId(vertexBufferId), _indexBufferId(indexBufferId), _meshDesc(meshDesc)
 {
 	auto vertexBuffer = resourceManager->GetResource<VertexBuffer>(_vertexBufferId);
 	auto indexBuffer = resourceManager->GetResource<IndexBuffer>(_indexBufferId);
@@ -17,10 +16,8 @@ Graphics::Assets::Mesh::Mesh(const MeshDesc& meshDesc, ResourceID vertexBufferId
 }
 
 Graphics::Assets::Mesh::Mesh(std::filesystem::path filePath, ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-	ResourceManager* resourceManager, bool recalculateNormals)
+	ResourceManager* resourceManager, bool recalculateNormals, bool addTangents)
 {
-	MeshDesc meshDesc{};
-
 	BufferDesc vbDesc{};
 	BufferDesc ibDesc{};
 
@@ -38,19 +35,19 @@ Graphics::Assets::Mesh::Mesh(std::filesystem::path filePath, ID3D12Device* devic
 
 	if (loadCache)
 	{
-		LoadCache(filePathCache, meshDesc, vbDesc.data, ibDesc.data);
+		LoadCache(filePathCache, _meshDesc, vbDesc.data, ibDesc.data);
 	}
 	else
 	{
 		if (filePath.extension() == ".obj" || filePath.extension() == ".OBJ")
-			OBJLoader::Load(filePath, recalculateNormals, meshDesc, vbDesc.data, ibDesc.data);
+			OBJLoader::Load(filePath, recalculateNormals, addTangents, _meshDesc, vbDesc.data, ibDesc.data);
 
-		SaveCache(filePathCache, meshDesc, vbDesc.data, ibDesc.data);
+		SaveCache(filePathCache, _meshDesc, vbDesc.data, ibDesc.data);
 	}
-
-	vbDesc.dataStride = static_cast<uint32_t>(vbDesc.data.size() / meshDesc.verticesNumber);
-	ibDesc.dataStride = static_cast<uint32_t>(ibDesc.data.size() / meshDesc.indicesNumber);
-	ibDesc.numElements = meshDesc.indicesNumber;
+	
+	vbDesc.dataStride = static_cast<uint32_t>(vbDesc.data.size() / _meshDesc.verticesNumber);
+	ibDesc.dataStride = static_cast<uint32_t>(ibDesc.data.size() / _meshDesc.indicesNumber);
+	ibDesc.numElements = _meshDesc.indicesNumber;
 	
 	_vertexBufferId = resourceManager->CreateBufferResource(device, commandList, BufferResourceType::VERTEX_BUFFER, vbDesc);
 	_indexBufferId = resourceManager->CreateBufferResource(device, commandList, BufferResourceType::INDEX_BUFFER, ibDesc);
@@ -60,8 +57,6 @@ Graphics::Assets::Mesh::Mesh(std::filesystem::path filePath, ID3D12Device* devic
 
 	vertexBufferView = &vertexBuffer->viewDesc;
 	indexBufferView = &indexBuffer->viewDesc;
-	indicesNumber = meshDesc.indicesNumber;
-	topology = meshDesc.topology;
 }
 
 Graphics::Assets::Mesh::~Mesh()
@@ -77,11 +72,16 @@ void Graphics::Assets::Mesh::Release(Resources::ResourceManager* resourceManager
 
 void Graphics::Assets::Mesh::Draw(ID3D12GraphicsCommandList* commandList)
 {
-	commandList->IASetPrimitiveTopology(topology);
+	commandList->IASetPrimitiveTopology(_meshDesc.topology);
 	commandList->IASetVertexBuffers(0u, 1u, vertexBufferView);
 	commandList->IASetIndexBuffer(indexBufferView);
 
-	commandList->DrawIndexedInstanced(indicesNumber, 1, 0, 0, 0);
+	commandList->DrawIndexedInstanced(_meshDesc.indicesNumber, 1, 0, 0, 0);
+}
+
+const Graphics::Assets::MeshDesc& Graphics::Assets::Mesh::GetDesc()
+{
+	return _meshDesc;
 }
 
 void Graphics::Assets::Mesh::LoadCache(std::filesystem::path filePath, MeshDesc& meshDesc,
