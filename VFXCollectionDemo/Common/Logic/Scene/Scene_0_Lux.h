@@ -48,6 +48,11 @@ namespace Common::Logic::Scene
 		float3 cameraUpVector;
 		
 		float timer;
+		float fps;
+		uint32_t frameCounter;
+		uint64_t cpuTimeCounter;
+
+		std::chrono::steady_clock::time_point prevTimePoint;
 
 		float3 environmentPosition;
 

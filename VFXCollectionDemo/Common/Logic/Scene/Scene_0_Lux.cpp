@@ -12,7 +12,9 @@ using namespace Common::Logic::SceneEntity;
 Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	: isLoaded(false), environmentMaterial(nullptr), environmentMesh(nullptr), environmentMeshObject(nullptr),
 	camera(nullptr), viewport{}, scissorRectangle{}, mutableConstantsBuffer{}, mutableConstantsId{},
-	pbrStandardVSId{}, pbrStandardPSId{}, environmentWorld{}, timer{}
+	samplerLinearId{}, environmentFloorAlbedoId{}, environmentFloorNormalId{}, pbrStandardVSId{},
+	pbrStandardPSId{}, environmentWorld{}, timer{}, fps(60.0f), cpuTimeCounter{}, prevTimePoint{},
+	frameCounter{}
 {
 	environmentPosition = float3(0.0f, 5.0f, 0.0f);
 
@@ -38,6 +40,8 @@ Common::Logic::Scene::Scene_0_Lux::~Scene_0_Lux()
 
 void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* renderer)
 {
+	prevTimePoint = std::chrono::high_resolution_clock::now();
+
 	auto device = renderer->GetDevice();
 	auto resourceManager = renderer->GetResourceManager();
 
@@ -177,7 +181,22 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 
 	mutableConstantsBuffer->worldViewProjection = environmentWorld * view * projection;
 
-	timer += 1.0f / 75.0f;
+	auto currentTimePoint = std::chrono::high_resolution_clock::now();
+	auto deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(currentTimePoint - prevTimePoint);
+
+	timer += 1.0f / fps;
+
+	cpuTimeCounter += deltaTime.count();
+	frameCounter++;
+
+	if (cpuTimeCounter >= 1000u)
+	{
+		fps = static_cast<float>(frameCounter);
+		cpuTimeCounter = 0u;
+		frameCounter = 0u;
+	}
+
+	prevTimePoint = currentTimePoint;
 }
 
 void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* commandList)
