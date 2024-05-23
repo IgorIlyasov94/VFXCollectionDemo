@@ -3,14 +3,14 @@
 
 Graphics::Assets::MaterialBuilder::MaterialBuilder()
 	: vertexShader{}, hullShader{}, domainShader{}, geometryShader{}, amplificationShader{}, meshShader{}, pixelShader{},
-	topologyType{}, cullMode{}, blendDesc{}, renderTargetNumber(0u)
+	topologyType{}, cullMode(D3D12_CULL_MODE_NONE), blendDesc{}, renderTargetNumber(0u), depthStencilFormat{}, zTest(false)
 {
 	renderTargetsFormat.fill(DXGI_FORMAT_UNKNOWN);
 }
 
 Graphics::Assets::MaterialBuilder::~MaterialBuilder()
 {
-
+	Reset();
 }
 
 void Graphics::Assets::MaterialBuilder::SetConstantBuffer(uint32_t registerIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress,
@@ -216,7 +216,7 @@ void Graphics::Assets::MaterialBuilder::Reset()
 	pixelShader = {};
 
 	topologyType = {};
-	cullMode = {};
+	cullMode = D3D12_CULL_MODE_NONE;
 	blendDesc = {};
 	depthStencilFormat = {};
 
@@ -230,8 +230,11 @@ void Graphics::Assets::MaterialBuilder::Reset()
 	rwBufferSlots.clear();
 	textureSlots.clear();
 
+	for (auto& parameter : rootParameters)
+		if (parameter.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+			delete parameter.DescriptorTable.pDescriptorRanges;
+
 	rootParameters.clear();
-	descriptorRanges.clear();
 
 	inputElements.clear();
 }
@@ -263,17 +266,17 @@ void Graphics::Assets::MaterialBuilder::SetDescriptorTableParameter(uint32_t reg
 
 	textureSlots.push_back(std::move(slot));
 
-	D3D12_DESCRIPTOR_RANGE descriptorRange{};
-	descriptorRange.RangeType = rangeType;
-	descriptorRange.NumDescriptors = 1u;
-	descriptorRange.BaseShaderRegister = registerIndex;
-
-	descriptorRanges.push_back(std::move(descriptorRange));
+	D3D12_DESCRIPTOR_RANGE* descriptorRange = new D3D12_DESCRIPTOR_RANGE;
+	descriptorRange->RangeType = rangeType;
+	descriptorRange->NumDescriptors = 1u;
+	descriptorRange->BaseShaderRegister = registerIndex;
+	descriptorRange->OffsetInDescriptorsFromTableStart = 0u;
+	descriptorRange->RegisterSpace = 0u;
 
 	D3D12_ROOT_PARAMETER rootParameter{};
 	rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameter.DescriptorTable.NumDescriptorRanges = 1u;
-	rootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
+	rootParameter.DescriptorTable.pDescriptorRanges = descriptorRange;
 	rootParameter.ShaderVisibility = visibility;
 
 	rootParameters.push_back(std::move(rootParameter));
@@ -342,12 +345,17 @@ ID3D12RootSignature* Graphics::Assets::MaterialBuilder::CreateRootSignature(ID3D
 	ID3DBlob* error;
 
 	D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_0, &signature, &error);
+
+	if (error != nullptr)
+	{
+		OutputDebugStringA(reinterpret_cast<char*>(error->GetBufferPointer()));
+
+		error->Release();
+	}
+
 	device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 
 	signature->Release();
-
-	if (error != nullptr)
-		error->Release();
 
 	return rootSignature;
 }

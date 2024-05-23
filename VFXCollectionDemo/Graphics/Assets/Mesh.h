@@ -23,6 +23,12 @@ namespace Graphics::Assets
 	private:
 		Mesh() = delete;
 
+		void LoadCache(std::filesystem::path filePath, MeshDesc& meshDesc, std::vector<uint8_t>& verticesData,
+			std::vector<uint8_t>& indicesData);
+
+		void SaveCache(std::filesystem::path filePath, const MeshDesc& meshDesc, const std::vector<uint8_t>& verticesData,
+			const std::vector<uint8_t>& indicesData);
+
 		D3D12_VERTEX_BUFFER_VIEW* vertexBufferView;
 		D3D12_INDEX_BUFFER_VIEW* indexBufferView;
 

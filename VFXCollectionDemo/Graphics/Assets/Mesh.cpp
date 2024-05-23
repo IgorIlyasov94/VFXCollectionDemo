@@ -24,8 +24,29 @@ Graphics::Assets::Mesh::Mesh(std::filesystem::path filePath, ID3D12Device* devic
 	BufferDesc vbDesc{};
 	BufferDesc ibDesc{};
 
-	if (filePath.extension() == ".obj" || filePath.extension() == ".OBJ")
-		OBJLoader::Load(filePath, recalculateNormals, meshDesc, vbDesc.data, ibDesc.data);
+	std::filesystem::path filePathCache(filePath);
+	filePathCache.replace_filename(filePath.filename().generic_string() + "CACHE");
+	auto loadCache = std::filesystem::exists(filePathCache);
+
+	if (loadCache)
+	{
+		auto mainFileTimestamp = std::filesystem::last_write_time(filePath);
+		auto cacheFileTimestamp = std::filesystem::last_write_time(filePathCache);
+
+		loadCache = cacheFileTimestamp >= mainFileTimestamp;
+	}
+
+	if (loadCache)
+	{
+		LoadCache(filePathCache, meshDesc, vbDesc.data, ibDesc.data);
+	}
+	else
+	{
+		if (filePath.extension() == ".obj" || filePath.extension() == ".OBJ")
+			OBJLoader::Load(filePath, recalculateNormals, meshDesc, vbDesc.data, ibDesc.data);
+
+		SaveCache(filePathCache, meshDesc, vbDesc.data, ibDesc.data);
+	}
 
 	vbDesc.dataStride = static_cast<uint32_t>(vbDesc.data.size() / meshDesc.verticesNumber);
 	ibDesc.dataStride = static_cast<uint32_t>(ibDesc.data.size() / meshDesc.indicesNumber);
@@ -61,4 +82,29 @@ void Graphics::Assets::Mesh::Draw(ID3D12GraphicsCommandList* commandList)
 	commandList->IASetIndexBuffer(indexBufferView);
 
 	commandList->DrawIndexedInstanced(indicesNumber, 1, 0, 0, 0);
+}
+
+void Graphics::Assets::Mesh::LoadCache(std::filesystem::path filePath, MeshDesc& meshDesc,
+	std::vector<uint8_t>& verticesData, std::vector<uint8_t>& indicesData)
+{
+	std::ifstream meshFile(filePath, std::ios::binary);
+	meshFile.read(reinterpret_cast<char*>(&meshDesc), sizeof(MeshDesc));
+
+	auto vertexBufferSize = static_cast<size_t>(meshDesc.verticesNumber) * VertexStride(meshDesc.vertexFormat);
+	verticesData.resize(vertexBufferSize);
+	meshFile.read(reinterpret_cast<char*>(verticesData.data()), vertexBufferSize);
+
+	auto indexBufferSize = static_cast<size_t>(meshDesc.indicesNumber);
+	indexBufferSize *= meshDesc.indexFormat == IndexFormat::UINT16_INDEX ? 2u : 4u;
+	indicesData.resize(indexBufferSize);
+	meshFile.read(reinterpret_cast<char*>(indicesData.data()), indexBufferSize);
+}
+
+void Graphics::Assets::Mesh::SaveCache(std::filesystem::path filePath, const MeshDesc& meshDesc,
+	const std::vector<uint8_t>& verticesData, const std::vector<uint8_t>& indicesData)
+{
+	std::ofstream meshFile(filePath, std::ios::binary);
+	meshFile.write(reinterpret_cast<const char*>(&meshDesc), sizeof(MeshDesc));
+	meshFile.write(reinterpret_cast<const char*>(verticesData.data()), verticesData.size());
+	meshFile.write(reinterpret_cast<const char*>(indicesData.data()), indicesData.size());
 }

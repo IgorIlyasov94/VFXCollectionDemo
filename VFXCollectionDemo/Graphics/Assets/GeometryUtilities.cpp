@@ -65,8 +65,15 @@ void Graphics::Assets::GeometryUtilities::TriangulatePolygon(const std::vector<u
 	}
 
 	if (polygonSize == 3)
+		return;
+
+	if (polygonSize == 4)
 	{
-		vertexIndices = { 0, 1, 2 };
+		vertexIndices.resize(6u);
+		vertexIndices[4] = vertexIndices[3];
+		vertexIndices[3] = vertexIndices[2];
+		vertexIndices[5] = vertexIndices[0];
+
 		return;
 	}
 
@@ -99,33 +106,6 @@ void Graphics::Assets::GeometryUtilities::TriangulatePolygon(const std::vector<u
 		auto& previousPosition = reinterpret_cast<const float3&>(vertexBuffer[previousIndex * stride]);
 		auto& currentPosition = reinterpret_cast<const float3&>(vertexBuffer[currentIndex * stride]);
 		auto& nextPosition = reinterpret_cast<const float3&>(vertexBuffer[nextIndex * stride]);
-
-		if (indicesCount == 3)
-		{
-			triangles.push_back(previousIndex);
-			triangles.push_back(currentIndex);
-			triangles.push_back(nextIndex);
-
-			break;
-		}
-		else if (indicesCount == 4)
-		{
-			triangles.push_back(previousIndex);
-			triangles.push_back(nextIndex);
-			triangles.push_back(currentIndex);
-			
-			for (auto& index : tempIndices)
-				if (index != previousIndex && index != currentIndex && index != nextIndex)
-				{
-					triangles.push_back(nextIndex);
-					triangles.push_back(index);
-					triangles.push_back(currentIndex);
-					
-					break;
-				}
-
-			break;
-		}
 
 		auto v0 = XMLoadFloat3(&previousPosition) - XMLoadFloat3(&currentPosition);
 		auto v1 = XMLoadFloat3(&nextPosition) - XMLoadFloat3(&currentPosition);

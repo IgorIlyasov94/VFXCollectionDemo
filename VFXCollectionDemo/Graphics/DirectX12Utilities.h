@@ -11,6 +11,18 @@ namespace Graphics
 		BLEND_TRANSPARENT = 1u,
 	};
 
+	enum class DefaultFilterSetup
+	{
+		FILTER_POINT_CLAMP = 0u,
+		FILTER_BILINEAR_CLAMP = 1u,
+		FILTER_TRILINEAR_CLAMP = 2u,
+		FILTER_ANISOTROPIC_CLAMP = 3u,
+		FILTER_POINT_WRAP = 4u,
+		FILTER_BILINEAR_WRAP = 5u,
+		FILTER_TRILINEAR_WRAP = 6u,
+		FILTER_ANISOTROPIC_WRAP = 7u
+	};
+
 	class DirectX12Utilities final
 	{
 	public:
@@ -28,6 +40,7 @@ namespace Graphics
 		static D3D12_DEPTH_STENCIL_DESC1 CreateDepthStencilDesc1(bool enableZTest);
 
 		static D3D12_BLEND_DESC CreateBlendDesc(DefaultBlendSetup setup);
+		static D3D12_SAMPLER_DESC CreateSamplerDesc(DefaultFilterSetup setup);
 
 	private:
 		DirectX12Utilities() = delete;

@@ -115,33 +115,6 @@ void Graphics::Assets::Loaders::OBJLoader::Load(std::filesystem::path filePath, 
 	meshDesc.verticesNumber = verticesNumber;
 	meshDesc.indicesNumber = static_cast<uint32_t>(resultIndices.size());
 
-	struct VERTEX_DATA
-	{
-	public:
-		float posX;
-		float posY;
-		float posZ;
-
-		uint16_t normX;
-		uint16_t normY;
-		uint16_t normZ;
-		uint16_t normW;
-
-		uint16_t texX;
-		uint16_t texY;
-		//DirectX::PackedVector::XMHALF4 norm;
-		//DirectX::PackedVector::XMHALF2 tex;
-	};
-
-	auto str2 = sizeof(VERTEX_DATA);
-
-	std::vector<VERTEX_DATA> testBuffer;
-	testBuffer.resize(verticesNumber);
-
-	auto startAddress = verticesData.data();
-	auto endAddress = startAddress + verticesNumber * stride;
-	std::copy(startAddress, endAddress, reinterpret_cast<uint8_t*>(testBuffer.data()));
-
 	uint32_t indexStride = verticesNumber <= std::numeric_limits<uint16_t>::max() ? 2u : 4u;
 	meshDesc.indexFormat = indexStride == 2u ? IndexFormat::UINT16_INDEX : IndexFormat::UINT32_INDEX;
 

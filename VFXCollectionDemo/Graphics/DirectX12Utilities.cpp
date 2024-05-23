@@ -252,3 +252,40 @@ D3D12_BLEND_DESC Graphics::DirectX12Utilities::CreateBlendDesc(DefaultBlendSetup
 
 	return desc;
 }
+
+D3D12_SAMPLER_DESC Graphics::DirectX12Utilities::CreateSamplerDesc(DefaultFilterSetup setup)
+{
+	D3D12_SAMPLER_DESC desc{};
+
+	if (setup == DefaultFilterSetup::FILTER_POINT_CLAMP || setup == DefaultFilterSetup::FILTER_POINT_WRAP)
+		desc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+	else if (setup == DefaultFilterSetup::FILTER_BILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_BILINEAR_WRAP)
+		desc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+	else if (setup == DefaultFilterSetup::FILTER_TRILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_TRILINEAR_WRAP)
+		desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+	else
+		desc.Filter = D3D12_FILTER_ANISOTROPIC;
+
+	if (setup == DefaultFilterSetup::FILTER_POINT_CLAMP || setup == DefaultFilterSetup::FILTER_BILINEAR_CLAMP ||
+		setup == DefaultFilterSetup::FILTER_TRILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_ANISOTROPIC_CLAMP)
+	{
+		desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	}
+	else
+	{
+		desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	}
+
+	if (setup == DefaultFilterSetup::FILTER_ANISOTROPIC_CLAMP || setup == DefaultFilterSetup::FILTER_ANISOTROPIC_WRAP)
+		desc.MaxAnisotropy = 16u;
+	else
+		desc.MaxAnisotropy = 1u;
+
+	desc.MaxLOD = 14.0f;
+
+	return desc;
+}

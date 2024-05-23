@@ -1,6 +1,7 @@
 #include "Scene_0_Lux.h"
 #include "../SceneEntity/MeshObject.h"
 #include "../../../Graphics/Assets/MaterialBuilder.h"
+#include "../../../Graphics/Assets/Loaders/DDSLoader.h"
 
 using namespace DirectX;
 using namespace Graphics::Assets;
@@ -11,7 +12,7 @@ using namespace Common::Logic::SceneEntity;
 Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	: isLoaded(false), environmentMaterial(nullptr), environmentMesh(nullptr), environmentMeshObject(nullptr),
 	camera(nullptr), viewport{}, scissorRectangle{}, mutableConstantsBuffer{}, mutableConstantsId{},
-	environmentWorld{}
+	pbrStandardVSId{}, pbrStandardPSId{}, environmentWorld{}, timer{}
 {
 	environmentPosition = float3(0.0f, 5.0f, 0.0f);
 
@@ -80,9 +81,9 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 	mutableConstantsId = resourceManager->CreateBufferResource(device, commandList, BufferResourceType::CONSTANT_BUFFER, bufferDesc);
 	
 	pbrStandardVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\PBRStandardVS.hlsl",
-		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_0);
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 	pbrStandardPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\PBRStandardPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_0);
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
 
 	auto pbrStandardVS = resourceManager->GetResource<Shader>(pbrStandardVSId);
 	auto pbrStandardPS = resourceManager->GetResource<Shader>(pbrStandardPSId);
@@ -93,18 +94,35 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 	mutableConstantsBuffer = reinterpret_cast<MutableConstants*>(mutableConstantsResource->resourceCPUAddress);
 	mutableConstantsBuffer->worldViewProjection = environmentWorld * view * projection;
 
+	TextureDesc textureDesc{};
+	DDSLoader::Load("Resources\\Textures\\LuxEnvironmentFloor_AlbedoRoughness.dds", textureDesc);
+	environmentFloorAlbedoId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
+
+	DDSLoader::Load("Resources\\Textures\\LuxEnvironmentFloor_NormalMetalness.dds", textureDesc);
+	environmentFloorNormalId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
+
+	auto samplerDesc = Graphics::DirectX12Utilities::CreateSamplerDesc(Graphics::DefaultFilterSetup::FILTER_TRILINEAR_WRAP);
+	samplerLinearId = resourceManager->CreateSamplerResource(device, samplerDesc);
+
+	auto environmentFloorAlbedoResource = resourceManager->GetResource<Texture>(environmentFloorAlbedoId);
+	auto environmentFloorNormalResource = resourceManager->GetResource<Texture>(environmentFloorNormalId);
+	auto samplerLinearResource = resourceManager->GetResource<Sampler>(samplerLinearId);
+
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
-	materialBuilder.SetCullMode(D3D12_CULL_MODE_BACK);
+	materialBuilder.SetTexture(0u, environmentFloorAlbedoResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetTexture(1u, environmentFloorNormalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
-	materialBuilder.SetDepthStencilFormat(32u, false);
+	materialBuilder.SetDepthStencilFormat(32u, true);
 	materialBuilder.SetRenderTargetFormat(0u, renderer->BACK_BUFFER_FORMAT);
 	materialBuilder.SetGeometryFormat(vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	materialBuilder.SetVertexShader(pbrStandardVS->bytecode);
 	materialBuilder.SetPixelShader(pbrStandardPS->bytecode);
 
 	environmentMaterial = materialBuilder.ComposeStandard(device);
-	environmentMesh = new Mesh("Resources\\Meshes\\LuxEnvironment.obj", device, commandList, resourceManager, false);
+	environmentMesh = new Mesh("Resources\\Meshes\\LuxEnvironmentFloor.obj", device, commandList, resourceManager, false);
 	environmentMeshObject = new MeshObject(environmentMesh, environmentMaterial);
 
 	renderer->EndCreatingResources();
@@ -150,6 +168,7 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 	cameraPosition = environmentPosition;
 	cameraPosition.x += std::cos(timer) * 5.0f;
 	cameraPosition.y += std::sin(timer) * 5.0f;
+	cameraPosition.z += 5.0f;
 
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 

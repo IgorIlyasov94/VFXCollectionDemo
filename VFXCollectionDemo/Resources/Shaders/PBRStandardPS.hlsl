@@ -15,12 +15,25 @@ struct Output
 	float4 color : SV_TARGET0;
 };
 
+Texture2D albedoRoughness : register(t0);
+Texture2D normalMetalness : register(t1);
+
+SamplerState samplerLinear : register(s0);
+
 [earlydepthstencil]
 Output main(Input input)
 {
 	Output output = (Output)0;
 	
-	output.color = float4(input.texCoord, 0.0f, 1.0f);
+	float4 texData = albedoRoughness.Sample(samplerLinear, input.texCoord);
+	float3 albedo = texData.xyz;
+	float roughness = texData.w * texData.w;
+	
+	texData = normalMetalness.Sample(samplerLinear, input.texCoord);
+	float3 normal = texData.xyz * 2.0f - 1.0f.xxx;
+	float metalness = texData.w;
+	
+	output.color = float4(albedo, 1.0f);
 	
 	return output;
 }

@@ -67,7 +67,7 @@ namespace Graphics
 
 		std::array<ID3D12Resource*, BACK_BUFFER_NUMBER> backBuffers;
 		std::array<D3D12_CPU_DESCRIPTOR_HANDLE, BACK_BUFFER_NUMBER> backBufferCPUDescriptors;
-
+		
 		IDXGISwapChain3* swapChain;
 
 		HANDLE fenceEvent;
@@ -80,6 +80,8 @@ namespace Graphics
 		CommandListID resourceCommandListId;
 		std::array<CommandAllocatorID, BACK_BUFFER_NUMBER> resourceCommandAllocators;
 		CommandQueueID resourceCommandQueueId;
+
+		Resources::ResourceID tempDepthBufferId;
 
 		CommandManager* commandManager;
 		DescriptorManager* descriptorManager;

@@ -59,6 +59,10 @@ namespace Common::Logic::Scene
 		MutableConstants* mutableConstantsBuffer;
 
 		Graphics::Resources::ResourceID mutableConstantsId;
+		Graphics::Resources::ResourceID samplerLinearId;
+		Graphics::Resources::ResourceID environmentFloorAlbedoId;
+		Graphics::Resources::ResourceID environmentFloorNormalId;
+
 		Graphics::Resources::ResourceID pbrStandardVSId;
 		Graphics::Resources::ResourceID pbrStandardPSId;
 

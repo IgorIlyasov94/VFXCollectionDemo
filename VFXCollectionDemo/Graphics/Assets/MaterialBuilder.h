@@ -157,7 +157,6 @@ namespace Graphics::Assets
 		std::vector<DescriptorTableSlot> textureSlots;
 		
 		std::vector<D3D12_ROOT_PARAMETER> rootParameters;
-		std::vector<D3D12_DESCRIPTOR_RANGE> descriptorRanges;
 
 		std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
 	};

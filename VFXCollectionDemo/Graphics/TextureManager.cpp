@@ -33,16 +33,20 @@ Graphics::TextureAllocation Graphics::TextureManager::Allocate(ID3D12Device* dev
 
 	D3D12_RESOURCE_STATES initState = D3D12_RESOURCE_STATE_COMMON;
 
+	auto clearValuePtr = &clearValue;
+
 	if ((resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) == D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)
 		initState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	else if ((resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) == D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)
 		initState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+	else
+		clearValuePtr = nullptr;
 
 	TextureAllocation allocation{};
 
 	ID3D12Resource* resource = nullptr;
 
-	device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, initState, &clearValue,
+	device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, initState, clearValuePtr,
 		IID_PPV_ARGS(&resource));
 
 	allocation.resource = new Resources::GPUResource(resource, initState);
@@ -77,6 +81,7 @@ Graphics::TextureAllocation Graphics::TextureManager::AllocateUploadBuffer(ID3D1
 
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	resourceDesc.DepthOrArraySize = 1;
+	resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
 	resourceDesc.Height = 1;
 	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	resourceDesc.MipLevels = 1;
@@ -88,7 +93,7 @@ Graphics::TextureAllocation Graphics::TextureManager::AllocateUploadBuffer(ID3D1
 
 	ID3D12Resource* resource = nullptr;
 
-	device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, initState, &clearValue,
+	device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, initState, nullptr,
 		IID_PPV_ARGS(&resource));
 
 	allocation.resource = new Resources::GPUResource(resource, initState);

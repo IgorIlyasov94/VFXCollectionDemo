@@ -26,7 +26,7 @@ Graphics::Resources::IResource* Graphics::Resources::TextureFactory::CreateResou
 
 	auto srcResource = uploadTextureAllocation.resource->GetResource();
 	auto destResource = textureAllocation.resource->GetResource();
-	UploadTexture(device, commandList, srcResource, destResource, textureDesc, textureAllocation.cpuAddress);
+	UploadTexture(device, commandList, srcResource, destResource, textureDesc, uploadTextureAllocation.cpuAddress);
 
 	textureAllocation.resource->Barrier(commandList, D3D12_RESOURCE_STATE_COMMON);
 
@@ -64,14 +64,17 @@ void Graphics::Resources::TextureFactory::UploadTexture(ID3D12Device* device, ID
 		reinterpret_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(srcLayouts.data()),
 		numRows.data(), rowSizesPerByte.data(), &requiredSize);
 
+	size_t offset = 0u;
+
 	for (uint32_t subresourceIndex = 0; subresourceIndex < numSubresources; subresourceIndex++)
 	{
 		auto srcLayout = reinterpret_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(&srcLayouts[0])[subresourceIndex];
-		auto destRowPitch = static_cast<uint64_t>(srcLayout.Footprint.RowPitch) * numRows[subresourceIndex];
+		
+		CopyRawDataToSubresource(numRows[subresourceIndex], srcLayout.Footprint.Depth,
+			rowSizesPerByte[subresourceIndex], srcLayout.Footprint.RowPitch, desc.data.data() + offset,
+			uploadBufferCPUAddress + srcLayout.Offset);
 
-		CopyRawDataToSubresource(desc, numRows[subresourceIndex], srcLayout.Footprint.Depth, srcLayout.Footprint.RowPitch,
-			destRowPitch, rowSizesPerByte[subresourceIndex], desc.data.data() + srcLayout.Offset * 0,
-			uploadBufferCPUAddress);
+		offset += rowSizesPerByte[subresourceIndex] * numRows[subresourceIndex];
 	}
 
 	for (uint32_t subresourceIndex = 0; subresourceIndex < numSubresources; subresourceIndex++)
@@ -90,18 +93,19 @@ void Graphics::Resources::TextureFactory::UploadTexture(ID3D12Device* device, ID
 	}
 }
 
-void Graphics::Resources::TextureFactory::CopyRawDataToSubresource(const TextureDesc& srcTextureDesc, uint32_t numRows, uint16_t numSlices,
-	uint64_t destRowPitch, uint64_t destSlicePitch, uint64_t rowSizeInBytes, const uint8_t* srcAddress, uint8_t* destAddress)
+void Graphics::Resources::TextureFactory::CopyRawDataToSubresource(uint32_t numRows, uint16_t numSlices,
+	uint64_t srcRowPitch, uint64_t destRowPitch, const uint8_t* srcAddress, uint8_t* destAddress)
 {
+	auto srcSlicePitch = srcRowPitch * numRows;
+	auto destSlicePitch = destRowPitch * numRows;
+
 	for (uint32_t sliceIndex = 0; sliceIndex < numSlices; sliceIndex++)
-	{
 		for (uint64_t rowIndex = 0; rowIndex < numRows; rowIndex++)
 		{
-			const uint8_t* srcBeginAddress = srcAddress + sliceIndex * srcTextureDesc.slicePitch + rowIndex * srcTextureDesc.rowPitch;
-			const uint8_t* srcEndAddress = srcBeginAddress + rowSizeInBytes;
-			uint8_t* destBeginAddress = destAddress + sliceIndex * destSlicePitch + rowIndex * destRowPitch;
+			const uint8_t* srcBeginAddress = srcAddress + rowIndex * srcRowPitch + sliceIndex * srcSlicePitch;
+			const uint8_t* srcEndAddress = srcBeginAddress + srcRowPitch;
+			uint8_t* destBeginAddress = destAddress + rowIndex * destRowPitch + sliceIndex * destSlicePitch;
 
 			std::copy(srcBeginAddress, srcEndAddress, destBeginAddress);
 		}
-	}
 }
