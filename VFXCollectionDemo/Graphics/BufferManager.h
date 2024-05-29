@@ -63,7 +63,6 @@ namespace Graphics
 		};
 
 		static constexpr uint64_t DEFAULT_BUFFER_SIZE = 2u * 1024u * 1024u;
-		static constexpr uint64_t SRV_BUFFER_SIZE = 64u * 1024u;
 		static constexpr uint64_t DEFAULT_BUFFER_ALIGNMENT = 64u * 1024u;
 
 		std::vector<BufferSpace> buffers;

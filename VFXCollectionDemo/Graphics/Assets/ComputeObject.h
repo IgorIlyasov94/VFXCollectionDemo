@@ -1,32 +1,18 @@
 #pragma once
 
 #include "../DirectX12Includes.h"
+#include "Material.h"
 
 namespace Graphics::Assets
 {
-	struct DescriptorSlot
+	class ComputeObject
 	{
 	public:
-		uint32_t shaderRegisterIndex;
-		uint32_t rootParameterIndex;
-		D3D12_GPU_VIRTUAL_ADDRESS gpuAddress;
-	};
-
-	struct DescriptorTableSlot
-	{
-	public:
-		uint32_t rootParameterIndex;
-		D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor;
-	};
-
-	class Material
-	{
-	public:
-		Material(ID3D12RootSignature* rootSignature, ID3D12PipelineState* pipelineState,
+		ComputeObject(ID3D12RootSignature* rootSignature, ID3D12PipelineState* pipelineState,
 			const std::map<uint32_t, uint32_t>& rootConstantIndices, const std::vector<DescriptorSlot>& constantBufferSlots,
 			const std::vector<DescriptorSlot>& bufferSlots, const std::vector<DescriptorSlot>& rwBufferSlots,
 			const std::vector<DescriptorTableSlot>& textureSlots);
-		~Material();
+		~ComputeObject();
 
 		void UpdateConstantBuffer(uint32_t cRegisterIndex, D3D12_GPU_VIRTUAL_ADDRESS newGPUAddress);
 		void UpdateBuffer(uint32_t tRegisterIndex, D3D12_GPU_VIRTUAL_ADDRESS newGPUAddress);
@@ -37,9 +23,10 @@ namespace Graphics::Assets
 			uint32_t constantNumber, const void* values);
 
 		void Set(ID3D12GraphicsCommandList* commandList);
+		void Dispatch(ID3D12GraphicsCommandList* commandList, uint32_t numGroupsX, uint32_t numGroupsY, uint32_t numGroupsZ);
 
 	private:
-		Material() = delete;
+		ComputeObject() = delete;
 
 		ID3D12RootSignature* _rootSignature;
 		ID3D12PipelineState* _pipelineState;

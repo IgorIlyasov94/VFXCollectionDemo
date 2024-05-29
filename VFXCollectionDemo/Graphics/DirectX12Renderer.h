@@ -36,7 +36,8 @@ namespace Graphics
 		ID3D12GraphicsCommandList* StartCreatingResources();
 		void EndCreatingResources();
 
-		void UnbindResources();
+		void FlushQueue();
+		void FlushResourcesQueue();
 
 		static const uint32_t BACK_BUFFER_NUMBER = 2u;
 		static const DXGI_FORMAT BACK_BUFFER_FORMAT = DXGI_FORMAT_R10G10B10A2_UNORM;
@@ -80,8 +81,6 @@ namespace Graphics
 		CommandListID resourceCommandListId;
 		std::array<CommandAllocatorID, BACK_BUFFER_NUMBER> resourceCommandAllocators;
 		CommandQueueID resourceCommandQueueId;
-
-		Resources::ResourceID tempDepthBufferId;
 
 		CommandManager* commandManager;
 		DescriptorManager* descriptorManager;

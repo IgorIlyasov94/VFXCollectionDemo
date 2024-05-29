@@ -13,6 +13,8 @@ namespace Graphics::Assets
 		MaterialBuilder();
 		~MaterialBuilder();
 
+		void SetRootConstants(uint32_t registerIndex, uint32_t constantsNumber,
+			D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL);
 		void SetConstantBuffer(uint32_t registerIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress,
 			D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL);
 		void SetTexture(uint32_t registerIndex, D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor,
@@ -151,6 +153,7 @@ namespace Graphics::Assets
 
 		std::array<DXGI_FORMAT, 8> renderTargetsFormat;
 
+		std::map<uint32_t, uint32_t> rootConstantIndices;
 		std::vector<DescriptorSlot> constantBufferSlots;
 		std::vector<DescriptorSlot> bufferSlots;
 		std::vector<DescriptorSlot> rwBufferSlots;

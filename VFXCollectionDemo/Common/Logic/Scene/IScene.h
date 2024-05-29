@@ -16,7 +16,7 @@ namespace Common::Logic::Scene
 		virtual void Load(Graphics::DirectX12Renderer* renderer) = 0;
 		virtual void Unload(Graphics::DirectX12Renderer* renderer) = 0;
 
-		virtual void OnResize(uint32_t newWidth, uint32_t newHeight) = 0;
+		virtual void OnResize(Graphics::DirectX12Renderer* renderer) = 0;
 
 		virtual void Update() = 0;
 		virtual void Render(ID3D12GraphicsCommandList* commandList) = 0;

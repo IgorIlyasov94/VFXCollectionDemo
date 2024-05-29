@@ -24,6 +24,8 @@
     <ClInclude Include="Common\Logic\SceneEntity\Camera.h" />
     <ClInclude Include="Common\Logic\SceneEntity\IDrawable.h" />
     <ClInclude Include="Common\Logic\SceneEntity\MeshObject.h" />
+    <ClInclude Include="Common\Logic\SceneEntity\PostProcessManager.h" />
+    <ClInclude Include="Common\Logic\SceneEntity\VFXLux.h" />
     <ClInclude Include="Common\Logic\SceneManager.h" />
     <ClInclude Include="Common\Logic\Scene\IScene.h" />
     <ClInclude Include="Common\Logic\Scene\Scene_0_Lux.h" />
@@ -31,6 +33,8 @@
     <ClInclude Include="Common\ProcessHandler.h" />
     <ClInclude Include="Common\Window.h" />
     <ClInclude Include="Common\WindowProcedure.h" />
+    <ClInclude Include="Graphics\Assets\ComputeObject.h" />
+    <ClInclude Include="Graphics\Assets\ComputeObjectBuilder.h" />
     <ClInclude Include="Graphics\Assets\GeometryUtilities.h" />
     <ClInclude Include="Graphics\Assets\Loaders\DDSLoader.h" />
     <ClInclude Include="Graphics\Assets\Loaders\HLSLLoader.h" />
@@ -68,12 +72,16 @@
     <ClCompile Include="Common\Logic\MainLogic.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\Camera.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\MeshObject.cpp" />
+    <ClCompile Include="Common\Logic\SceneEntity\PostProcessManager.cpp" />
+    <ClCompile Include="Common\Logic\SceneEntity\VFXLux.cpp" />
     <ClCompile Include="Common\Logic\SceneManager.cpp" />
     <ClCompile Include="Common\Logic\Scene\Scene_0_Lux.cpp" />
     <ClCompile Include="Common\Logic\Scene\Scene_Empty.cpp" />
     <ClCompile Include="Common\ProcessHandler.cpp" />
     <ClCompile Include="Common\Window.cpp" />
     <ClCompile Include="Common\WindowProcedure.cpp" />
+    <ClCompile Include="Graphics\Assets\ComputeObject.cpp" />
+    <ClCompile Include="Graphics\Assets\ComputeObjectBuilder.cpp" />
     <ClCompile Include="Graphics\Assets\GeometryUtilities.cpp" />
     <ClCompile Include="Graphics\Assets\Loaders\DDSLoader.cpp" />
     <ClCompile Include="Graphics\Assets\Loaders\HLSLLoader.cpp" />

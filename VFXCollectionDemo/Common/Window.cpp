@@ -19,11 +19,11 @@ Common::Window::Window(HINSTANCE instance, int cmdShow, const RECT& initialPlace
 
 	RegisterClassEx(&windowClass);
 
-	DWORD styles = WS_OVERLAPPEDWINDOW | WS_SYSMENU;
-	DWORD exStyles = WS_EX_APPWINDOW;
+	DWORD styles = WS_OVERLAPPEDWINDOW;
+	DWORD exStyles = WS_EX_APPWINDOW | WS_EX_NOREDIRECTIONBITMAP;
 
 	RECT adjustedPlacement = initialPlacement;
-	AdjustWindowRectEx(&adjustedPlacement, styles, true, exStyles);
+	AdjustWindowRectEx(&adjustedPlacement, styles, false, exStyles);
 
 	int initialX = adjustedPlacement.left;
 	int initialY = adjustedPlacement.top;

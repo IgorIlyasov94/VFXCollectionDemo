@@ -28,15 +28,15 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 
 	switch (message)
 	{
-		case WM_CREATE:
-		{
-			LPCREATESTRUCT createStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
-			SetWindowLongPtr(windowHandler, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(createStruct->lpCreateParams));
-
-			CreateMenuBar(windowHandler);
-
-			return 0;
-		}
+		//case WM_CREATE:
+		//{
+		//	LPCREATESTRUCT createStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
+		//	SetWindowLongPtr(windowHandler, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(createStruct->lpCreateParams));
+		//
+		//	CreateMenuBar(windowHandler);
+		//
+		//	return 0;
+		//}
 		case WM_KEYDOWN:
 		{
 			auto keyData = static_cast<uint8_t>(wParam);
@@ -52,6 +52,37 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 
 			return 0;
 		}
+		//case WM_EXITSIZEMOVE:
+		//{
+		//	//if (mainLogic != nullptr)
+		//	//{
+		//	//	DWORD styles = WS_OVERLAPPEDWINDOW | WS_SYSMENU;
+		//	//	DWORD exStyles = WS_EX_APPWINDOW;
+		//	//
+		//	//	RECT adjustedPlacement{};
+		//	//	GetClientRect(windowHandler, &adjustedPlacement);
+		//	//	AdjustWindowRectEx(&adjustedPlacement, styles, true, exStyles);
+		//	//
+		//	//	uint32_t newWidth = adjustedPlacement.right - adjustedPlacement.left;
+		//	//	uint32_t newHeight = adjustedPlacement.bottom - adjustedPlacement.top;
+		//	//
+		//	//	mainLogic->OnResize(newWidth, newHeight, windowHandler);
+		//	//}
+		//
+		//	DWORD styles = WS_OVERLAPPEDWINDOW | WS_SYSMENU;
+		//	DWORD exStyles = WS_EX_APPWINDOW;
+		//
+		//	RECT adjustedPlacement{};
+		//	GetClientRect(windowHandler, &adjustedPlacement);
+		//	AdjustWindowRectEx(&adjustedPlacement, styles, true, exStyles);
+		//
+		//	//InvalidateRect(windowHandler, &adjustedPlacement, true);
+		//	//UpdateWindow(windowHandler);
+		//
+		//	RedrawWindow(windowHandler, nullptr, nullptr, RDW_ERASE | RDW_INVALIDATE);
+		//
+		//	return 0;
+		//}
 		case WM_SIZE:
 		{
 			if (mainLogic != nullptr)
@@ -66,6 +97,12 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 		}
 		case WM_ERASEBKGND:
 		{
+			if (mainLogic != nullptr)
+			{
+				mainLogic->Update();
+				mainLogic->Render();
+			}
+
 			return 1;
 		}
 		case WM_PAINT:

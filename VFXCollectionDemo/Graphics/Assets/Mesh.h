@@ -19,7 +19,10 @@ namespace Graphics::Assets
 		void Release(Resources::ResourceManager* resourceManager);
 
 		void Draw(ID3D12GraphicsCommandList* commandList);
-		
+
+		void SetInputAssemblerOnly(ID3D12GraphicsCommandList* commandList);
+		void DrawOnly(ID3D12GraphicsCommandList* commandList);
+
 		const MeshDesc& GetDesc();
 
 	private:

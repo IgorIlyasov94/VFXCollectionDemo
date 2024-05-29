@@ -13,38 +13,54 @@ Graphics::Assets::MaterialBuilder::~MaterialBuilder()
 	Reset();
 }
 
-void Graphics::Assets::MaterialBuilder::SetConstantBuffer(uint32_t registerIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress,
+void Graphics::Assets::MaterialBuilder::SetRootConstants(uint32_t registerIndex, uint32_t constantsNumber,
 	D3D12_SHADER_VISIBILITY visibility)
+{
+	D3D12_ROOT_PARAMETER rootParameter{};
+	rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+	rootParameter.Constants.RegisterSpace = 0;
+	rootParameter.Constants.ShaderRegister = registerIndex;
+	rootParameter.Constants.Num32BitValues = constantsNumber;
+	rootParameter.ShaderVisibility = visibility;
+
+	auto rootParameterIndex = static_cast<uint32_t>(rootParameters.size());
+	rootConstantIndices.insert({ registerIndex, rootParameterIndex });
+
+	rootParameters.push_back(std::move(rootParameter));
+}
+
+void Graphics::Assets::MaterialBuilder::SetConstantBuffer(uint32_t registerIndex,
+	D3D12_GPU_VIRTUAL_ADDRESS gpuAddress, D3D12_SHADER_VISIBILITY visibility)
 {
 	SetDescriptorParameter(registerIndex, D3D12_ROOT_PARAMETER_TYPE_CBV, gpuAddress, visibility, constantBufferSlots);
 }
 
-void Graphics::Assets::MaterialBuilder::SetTexture(uint32_t registerIndex, D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor,
-	D3D12_SHADER_VISIBILITY visibility)
+void Graphics::Assets::MaterialBuilder::SetTexture(uint32_t registerIndex, 
+	D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor, D3D12_SHADER_VISIBILITY visibility)
 {
 	SetDescriptorTableParameter(registerIndex, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, gpuDescriptor, visibility);
 }
 
-void Graphics::Assets::MaterialBuilder::SetBuffer(uint32_t registerIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress,
-	D3D12_SHADER_VISIBILITY visibility)
+void Graphics::Assets::MaterialBuilder::SetBuffer(uint32_t registerIndex,
+	D3D12_GPU_VIRTUAL_ADDRESS gpuAddress, D3D12_SHADER_VISIBILITY visibility)
 {
 	SetDescriptorParameter(registerIndex, D3D12_ROOT_PARAMETER_TYPE_SRV, gpuAddress, visibility, bufferSlots);
 }
 
-void Graphics::Assets::MaterialBuilder::SetRWTexture(uint32_t registerIndex, D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor,
-	D3D12_SHADER_VISIBILITY visibility)
+void Graphics::Assets::MaterialBuilder::SetRWTexture(uint32_t registerIndex,
+	D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor, D3D12_SHADER_VISIBILITY visibility)
 {
 	SetDescriptorTableParameter(registerIndex, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, gpuDescriptor, visibility);
 }
 
-void Graphics::Assets::MaterialBuilder::SetRWBuffer(uint32_t registerIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress,
-	D3D12_SHADER_VISIBILITY visibility)
+void Graphics::Assets::MaterialBuilder::SetRWBuffer(uint32_t registerIndex,
+	D3D12_GPU_VIRTUAL_ADDRESS gpuAddress, D3D12_SHADER_VISIBILITY visibility)
 {
 	SetDescriptorParameter(registerIndex, D3D12_ROOT_PARAMETER_TYPE_UAV, gpuAddress, visibility, rwBufferSlots);
 }
 
-void Graphics::Assets::MaterialBuilder::SetSampler(uint32_t registerIndex, D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor,
-	D3D12_SHADER_VISIBILITY visibility)
+void Graphics::Assets::MaterialBuilder::SetSampler(uint32_t registerIndex,
+	D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor, D3D12_SHADER_VISIBILITY visibility)
 {
 	SetDescriptorTableParameter(registerIndex, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, gpuDescriptor, visibility);
 }
@@ -173,7 +189,8 @@ void Graphics::Assets::MaterialBuilder::SetRenderTargetFormat(uint32_t renderTar
 
 void Graphics::Assets::MaterialBuilder::SetDepthStencilFormat(uint32_t depthBit, bool enableZTest)
 {
-	depthStencilFormat = (depthBit == 32) ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_D24_UNORM_S8_UINT;
+	depthStencilFormat = (depthBit == 32) ? DXGI_FORMAT_D32_FLOAT : (depthBit == 16) ? DXGI_FORMAT_D24_UNORM_S8_UINT :
+		DXGI_FORMAT_UNKNOWN;
 	zTest = enableZTest;
 }
 
@@ -183,7 +200,8 @@ Graphics::Assets::Material* Graphics::Assets::MaterialBuilder::ComposeStandard(I
 	auto rootSignature = CreateRootSignature(device, rootSignatureFlags);
 	auto pipelineState = CreateGraphicsPipelineState(device, rootSignature);
 
-	auto newMaterial = new Material(rootSignature, pipelineState, constantBufferSlots, bufferSlots, rwBufferSlots, textureSlots);
+	auto newMaterial = new Material(rootSignature, pipelineState, rootConstantIndices,
+		constantBufferSlots, bufferSlots, rwBufferSlots, textureSlots);
 
 	Reset();
 
@@ -196,7 +214,8 @@ Graphics::Assets::Material* Graphics::Assets::MaterialBuilder::ComposeMeshletize
 	auto rootSignature = CreateRootSignature(device, rootSignatureFlags);
 	auto pipelineState = CreatePipelineState(device, rootSignature);
 
-	auto newMaterial = new Material(rootSignature, pipelineState, constantBufferSlots, bufferSlots, rwBufferSlots, textureSlots);
+	auto newMaterial = new Material(rootSignature, pipelineState, rootConstantIndices,
+		constantBufferSlots, bufferSlots, rwBufferSlots, textureSlots);
 
 	Reset();
 
@@ -225,6 +244,7 @@ void Graphics::Assets::MaterialBuilder::Reset()
 
 	renderTargetsFormat.fill(DXGI_FORMAT_UNKNOWN);
 
+	rootConstantIndices.clear();
 	constantBufferSlots.clear();
 	bufferSlots.clear();
 	rwBufferSlots.clear();
@@ -239,10 +259,12 @@ void Graphics::Assets::MaterialBuilder::Reset()
 	inputElements.clear();
 }
 
-void Graphics::Assets::MaterialBuilder::SetDescriptorParameter(uint32_t registerIndex, D3D12_ROOT_PARAMETER_TYPE parameterType,
-	D3D12_GPU_VIRTUAL_ADDRESS gpuAddress, D3D12_SHADER_VISIBILITY visibility, std::vector<DescriptorSlot>& slots)
+void Graphics::Assets::MaterialBuilder::SetDescriptorParameter(uint32_t registerIndex,
+	D3D12_ROOT_PARAMETER_TYPE parameterType, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress,
+	D3D12_SHADER_VISIBILITY visibility, std::vector<DescriptorSlot>& slots)
 {
 	DescriptorSlot slot{};
+	slot.shaderRegisterIndex = registerIndex;
 	slot.rootParameterIndex = static_cast<uint32_t>(rootParameters.size());
 	slot.gpuAddress = gpuAddress;
 
@@ -257,8 +279,8 @@ void Graphics::Assets::MaterialBuilder::SetDescriptorParameter(uint32_t register
 	rootParameters.push_back(std::move(rootParameter));
 }
 
-void Graphics::Assets::MaterialBuilder::SetDescriptorTableParameter(uint32_t registerIndex, D3D12_DESCRIPTOR_RANGE_TYPE rangeType,
-	D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor, D3D12_SHADER_VISIBILITY visibility)
+void Graphics::Assets::MaterialBuilder::SetDescriptorTableParameter(uint32_t registerIndex,
+	D3D12_DESCRIPTOR_RANGE_TYPE rangeType, D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor, D3D12_SHADER_VISIBILITY visibility)
 {
 	DescriptorTableSlot slot{};
 	slot.rootParameterIndex = static_cast<uint32_t>(rootParameters.size());

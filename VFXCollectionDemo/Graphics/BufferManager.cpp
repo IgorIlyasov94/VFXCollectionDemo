@@ -79,11 +79,9 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 	heapProperties.CreationNodeMask = 1u;
 	heapProperties.VisibleNodeMask = 1u;
 
-	uint64_t resourceSize = (alignedSize > DEFAULT_BUFFER_SIZE || type == BufferAllocationType::UPLOAD) ?
-		alignedSize :
-		(type == BufferAllocationType::COMMON || type == BufferAllocationType::UNORDERED_ACCESS) ?
-		SRV_BUFFER_SIZE :
-		DEFAULT_BUFFER_SIZE;
+	uint64_t resourceSize = (alignedSize < DEFAULT_BUFFER_SIZE &&
+		(type == BufferAllocationType::VERTEX_CONSTANT || type == BufferAllocationType::INDEX)) ?
+		DEFAULT_BUFFER_SIZE : alignedSize;
 
 	D3D12_RESOURCE_DESC resourceDesc{};
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -107,7 +105,7 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 		D3D12_RESOURCE_STATE_COPY_DEST;
 
 	ID3D12Resource* resource{};
-	device->CreateCommittedResource(&heapProperties, flags, &resourceDesc, state, nullptr, IID_PPV_ARGS(&resource));
+	auto hResult = device->CreateCommittedResource(&heapProperties, flags, &resourceDesc, state, nullptr, IID_PPV_ARGS(&resource));
 	allocation.resource = new Resources::GPUResource(resource, state);
 
 	if (type == BufferAllocationType::UPLOAD || type == BufferAllocationType::DYNAMIC_CONSTANT)

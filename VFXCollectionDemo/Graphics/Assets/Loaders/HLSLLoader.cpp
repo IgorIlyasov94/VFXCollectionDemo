@@ -4,20 +4,21 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 {
 	CComPtr<IDxcUtils> dxcUtils;
 	CComPtr<IDxcCompiler3> dxCompiler;
-	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
-	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxCompiler));
+	HRESULT hrStatus;
+	hrStatus = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
+	hrStatus = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxCompiler));
 
 	CComPtr<IDxcIncludeHandler> pIncludeHandler;
-	dxcUtils->CreateDefaultIncludeHandler(&pIncludeHandler);
+	hrStatus = dxcUtils->CreateDefaultIncludeHandler(&pIncludeHandler);
 
 	std::wstring shaderProfile = GetShaderProfileString(type, version);
 	const wchar_t* fileName = filePath.stem().c_str();
 
 	CComPtr<IDxcCompilerArgs> args;
-	dxcUtils->BuildArguments(fileName, L"main", shaderProfile.c_str(), nullptr, 0u, nullptr, 0u, &args);
+	hrStatus = dxcUtils->BuildArguments(fileName, L"main", shaderProfile.c_str(), nullptr, 0u, nullptr, 0u, &args);
 
 	CComPtr<IDxcBlobEncoding> shaderText = nullptr;
-	dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderText);
+	hrStatus = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderText);
 
 	DxcBuffer sourceBuffer{};
 	sourceBuffer.Ptr = shaderText->GetBufferPointer();
@@ -25,12 +26,11 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 	sourceBuffer.Encoding = DXC_CP_ACP;
 
 	CComPtr<IDxcResult> result;
-	dxCompiler->Compile(&sourceBuffer, args->GetArguments(), args->GetCount(), nullptr, IID_PPV_ARGS(&result));
+	hrStatus = dxCompiler->Compile(&sourceBuffer, args->GetArguments(), args->GetCount(), nullptr, IID_PPV_ARGS(&result));
 
 	CComPtr<IDxcBlobUtf8> errorBuffer = nullptr;
-	result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errorBuffer), nullptr);
+	hrStatus = result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errorBuffer), nullptr);
 
-	HRESULT hrStatus;
 	result->GetStatus(&hrStatus);
 
 	if (errorBuffer != nullptr && errorBuffer->GetStringLength() > 0)

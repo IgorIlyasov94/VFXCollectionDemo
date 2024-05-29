@@ -20,10 +20,10 @@ namespace Graphics::Resources
 		void EndBarrier(ID3D12GraphicsCommandList* commandList);
 		void UAVBarrier(ID3D12GraphicsCommandList* commandList);
 
-		D3D12_RESOURCE_BARRIER GetBarrier(D3D12_RESOURCE_STATES newState);
-		D3D12_RESOURCE_BARRIER GetBeginBarrier(D3D12_RESOURCE_STATES newState);
-		D3D12_RESOURCE_BARRIER GetEndBarrier();
-		D3D12_RESOURCE_BARRIER GetUAVBarrier();
+		bool GetBarrier(D3D12_RESOURCE_STATES newState, D3D12_RESOURCE_BARRIER& outBarrier);
+		bool GetBeginBarrier(D3D12_RESOURCE_STATES newState, D3D12_RESOURCE_BARRIER& outBarrier);
+		bool GetEndBarrier(D3D12_RESOURCE_BARRIER& outBarrier);
+		void GetUAVBarrier(D3D12_RESOURCE_BARRIER& outBarrier);
 
 	private:
 		GPUResource() = delete;

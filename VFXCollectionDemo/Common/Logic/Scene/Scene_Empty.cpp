@@ -20,7 +20,7 @@ void Common::Logic::Scene::Scene_Empty::Unload(Graphics::DirectX12Renderer* rend
 
 }
 
-void Common::Logic::Scene::Scene_Empty::OnResize(uint32_t newWidth, uint32_t newHeight)
+void Common::Logic::Scene::Scene_Empty::OnResize(Graphics::DirectX12Renderer* renderer)
 {
 
 }

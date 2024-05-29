@@ -32,7 +32,7 @@ Graphics::Resources::IResource* Graphics::Resources::RWBufferFactory::CreateReso
 	commandList->CopyBufferRegion(destResource, bufferAllocation.resourceOffset, srcResource,
 		uploadBufferAllocation.resourceOffset, srcResource->GetDesc().Width);
 
-	bufferAllocation.resource->Barrier(commandList, D3D12_RESOURCE_STATE_COMMON);
+	bufferAllocation.resource->Barrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	auto rwBuffer = new RWBuffer;
 	std::swap(rwBuffer->resource, bufferAllocation.resource);
@@ -45,7 +45,7 @@ Graphics::Resources::IResource* Graphics::Resources::RWBufferFactory::CreateReso
 	auto srvDesc = DirectX12Utilities::CreateSRVDesc(bufferDesc);
 	auto uavDesc = DirectX12Utilities::CreateUAVDesc(bufferDesc);
 	
-	if (bufferDesc.dataStride <= 1u)
+	if (bufferDesc.flag == BufferFlag::RAW)
 	{
 		rwBuffer->uavNonShaderVisibleDescriptor = _descriptorManager->Allocate(DescriptorType::CBV_SRV_UAV_NON_SHADER_VISIBLE);
 		device->CreateUnorderedAccessView(destResource, nullptr, &uavDesc, rwBuffer->uavNonShaderVisibleDescriptor.cpuDescriptor);

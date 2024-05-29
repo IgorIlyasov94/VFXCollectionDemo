@@ -14,7 +14,7 @@ Common::Logic::MainLogic::MainLogic(const RECT& windowPlacement, HWND windowHand
 
 Common::Logic::MainLogic::~MainLogic()
 {
-	renderer->UnbindResources();
+	renderer->FlushQueue();
 
 	delete sceneManager;
 	delete renderer;
@@ -25,7 +25,7 @@ void Common::Logic::MainLogic::OnResize(uint32_t newWidth, uint32_t newHeight, H
 	renderer->OnResize(newWidth, newHeight, windowHandler);
 
 	auto scene = sceneManager->GetCurrentScene();
-	scene->OnResize(newWidth, newHeight);
+	scene->OnResize(renderer);
 }
 
 void Common::Logic::MainLogic::OnSetFocus(HWND windowHandler)

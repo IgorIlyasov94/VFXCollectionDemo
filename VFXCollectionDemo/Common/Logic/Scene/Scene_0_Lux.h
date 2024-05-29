@@ -7,6 +7,8 @@
 #include "../../../Graphics/Assets/Mesh.h"
 #include "../../../Graphics/Assets/Material.h"
 
+#include "../../../Common/Logic/SceneEntity/PostProcessManager.h"
+
 #include "../SceneEntity/Camera.h"
 
 #include "IScene.h"
@@ -22,7 +24,7 @@ namespace Common::Logic::Scene
 		void Load(Graphics::DirectX12Renderer* renderer) override;
 		void Unload(Graphics::DirectX12Renderer* renderer) override;
 
-		void OnResize(uint32_t newWidth, uint32_t newHeight) override;
+		void OnResize(Graphics::DirectX12Renderer* renderer) override;
 
 		void Update() override;
 		void Render(ID3D12GraphicsCommandList* commandList) override;
@@ -31,6 +33,22 @@ namespace Common::Logic::Scene
 		bool IsLoaded() override;
 
 	private:
+		void LoadMeshes(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			Graphics::Resources::ResourceManager* resourceManager);
+
+		void CreateConstantBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			Graphics::Resources::ResourceManager* resourceManager, uint32_t width, uint32_t height);
+
+		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
+
+		void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			Graphics::Resources::ResourceManager* resourceManager);
+
+		void CreateSamplers(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
+		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			Graphics::DirectX12Renderer* renderer);
+		void CreateObjects();
+
 		bool isLoaded;
 		
 		static constexpr float FOV_Y = DirectX::XM_PI / 4.0f;
@@ -60,15 +78,14 @@ namespace Common::Logic::Scene
 
 		float4x4 environmentWorld;
 
-		D3D12_VIEWPORT viewport;
-		D3D12_RECT scissorRectangle;
-
 		MutableConstants* mutableConstantsBuffer;
 
 		Graphics::Resources::ResourceID mutableConstantsId;
 		Graphics::Resources::ResourceID samplerLinearId;
 		Graphics::Resources::ResourceID environmentFloorAlbedoId;
 		Graphics::Resources::ResourceID environmentFloorNormalId;
+
+		Graphics::Resources::ResourceID vfxAtlasId;
 
 		Graphics::Resources::ResourceID pbrStandardVSId;
 		Graphics::Resources::ResourceID pbrStandardPSId;
@@ -78,5 +95,9 @@ namespace Common::Logic::Scene
 		Graphics::Assets::Material* environmentMaterial;
 		Graphics::Assets::Mesh* environmentMesh;
 		SceneEntity::IDrawable* environmentMeshObject;
+
+		SceneEntity::IDrawable* vfxLux;
+
+		SceneEntity::PostProcessManager* postProcessManager;
 	};
 }

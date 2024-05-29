@@ -79,6 +79,18 @@ void Graphics::Assets::Mesh::Draw(ID3D12GraphicsCommandList* commandList)
 	commandList->DrawIndexedInstanced(_meshDesc.indicesNumber, 1, 0, 0, 0);
 }
 
+void Graphics::Assets::Mesh::SetInputAssemblerOnly(ID3D12GraphicsCommandList* commandList)
+{
+	commandList->IASetPrimitiveTopology(_meshDesc.topology);
+	commandList->IASetVertexBuffers(0u, 1u, vertexBufferView);
+	commandList->IASetIndexBuffer(indexBufferView);
+}
+
+void Graphics::Assets::Mesh::DrawOnly(ID3D12GraphicsCommandList* commandList)
+{
+	commandList->DrawIndexedInstanced(_meshDesc.indicesNumber, 1, 0, 0, 0);
+}
+
 const Graphics::Assets::MeshDesc& Graphics::Assets::Mesh::GetDesc()
 {
 	return _meshDesc;

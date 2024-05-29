@@ -2,7 +2,7 @@
 #include "DirectX12Utilities.h"
 
 Graphics::DirectX12Renderer::DirectX12Renderer(const RECT& windowPlacement, HWND windowHandler, bool _isFullscreen)
-    : commandManager(nullptr), descriptorManager(nullptr), commandQueueId{}, isFullscreen(_isFullscreen), tempDepthBufferId{}
+    : commandManager(nullptr), descriptorManager(nullptr), commandQueueId{}, isFullscreen(_isFullscreen)
 {
     currentWidth = windowPlacement.right - windowPlacement.left;
     currentHeight = windowPlacement.bottom - windowPlacement.top;
@@ -91,10 +91,6 @@ void Graphics::DirectX12Renderer::OnDeviceLost(HWND windowHandler)
     for (auto& buffer : backBuffers)
         buffer->Release();
 
-    WaitForGPU(resourceCommandQueueId);
-
-    resourceManager->DeleteResource<Resources::DepthStencilTarget>(tempDepthBufferId);
-
     fence->Release();
     swapChain->Release();
     device->Release();
@@ -147,11 +143,7 @@ void Graphics::DirectX12Renderer::SetRenderToBackBuffer(ID3D12GraphicsCommandLis
 
     commandList->ResourceBarrier(1u, &barrier);
 
-    auto depthTexture = resourceManager->GetResource<Resources::DepthStencilTarget>(tempDepthBufferId);
-
-    commandList->ClearDepthStencilView(depthTexture->dsvDescriptor.cpuDescriptor, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0u, 0u, nullptr);
-    commandList->ClearRenderTargetView(backBufferCPUDescriptors[bufferIndex], BACK_BUFFER_COLOR, 0u, nullptr);
-    commandList->OMSetRenderTargets(1u, &backBufferCPUDescriptors[bufferIndex], true, &depthTexture->dsvDescriptor.cpuDescriptor);
+    commandList->OMSetRenderTargets(1u, &backBufferCPUDescriptors[bufferIndex], true, nullptr);
 }
 
 uint32_t Graphics::DirectX12Renderer::GetWidth()
@@ -196,9 +188,14 @@ void Graphics::DirectX12Renderer::EndCreatingResources()
     textureManager->ReleaseUploadBuffers();
 }
 
-void Graphics::DirectX12Renderer::UnbindResources()
+void Graphics::DirectX12Renderer::FlushQueue()
 {
     WaitForGPU(commandQueueId);
+}
+
+void Graphics::DirectX12Renderer::FlushResourcesQueue()
+{
+    WaitForGPU(resourceCommandQueueId);
 }
 
 void Graphics::DirectX12Renderer::CreateGPUResources(uint32_t width, uint32_t height, HWND windowHandler)
@@ -279,25 +276,6 @@ void Graphics::DirectX12Renderer::CreateGPUResources(uint32_t width, uint32_t he
     }
 
     WaitForGPU(commandQueueId);
-    WaitForGPU(resourceCommandQueueId);
-
-    Resources::TextureDesc depthTextureDesc{};
-    depthTextureDesc.width = width;
-    depthTextureDesc.height = height;
-    depthTextureDesc.depth = 1u;
-    depthTextureDesc.mipLevels = 1u;
-    depthTextureDesc.dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    depthTextureDesc.format = DXGI_FORMAT_R32_FLOAT;
-    depthTextureDesc.srvDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    depthTextureDesc.depthBit = 32u;
-
-    auto resourceCommandList = commandManager->BeginRecord(resourceCommandListId, resourceCommandAllocators[bufferIndex]);
-    tempDepthBufferId = resourceManager->CreateTextureResource(device, resourceCommandList,
-        Resources::TextureResourceType::DEPTH_STENCIL_TARGET, depthTextureDesc);
-    commandManager->EndRecord(resourceCommandListId);
-    commandManager->SubmitCommandList(resourceCommandListId);
-    commandManager->ExecuteCommands(resourceCommandQueueId);
-
     WaitForGPU(resourceCommandQueueId);
 
     factory->Release();
@@ -441,25 +419,6 @@ void Graphics::DirectX12Renderer::ResetSwapChain(uint32_t width, uint32_t height
     }
 
     bufferIndex = swapChain->GetCurrentBackBufferIndex();
-
-    resourceManager->DeleteResource<Resources::DepthStencilTarget>(tempDepthBufferId);
-
-    Resources::TextureDesc depthTextureDesc{};
-    depthTextureDesc.width = width;
-    depthTextureDesc.height = height;
-    depthTextureDesc.depth = 1u;
-    depthTextureDesc.mipLevels = 1u;
-    depthTextureDesc.dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    depthTextureDesc.format = DXGI_FORMAT_R32_FLOAT;
-    depthTextureDesc.srvDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    depthTextureDesc.depthBit = 32u;
-
-    auto resourceCommandList = commandManager->BeginRecord(resourceCommandListId, resourceCommandAllocators[bufferIndex]);
-    tempDepthBufferId = resourceManager->CreateTextureResource(device, resourceCommandList,
-        Resources::TextureResourceType::DEPTH_STENCIL_TARGET, depthTextureDesc);
-    commandManager->EndRecord(resourceCommandListId);
-    commandManager->SubmitCommandList(resourceCommandListId);
-    commandManager->ExecuteCommands(resourceCommandQueueId);
 
     WaitForGPU(resourceCommandQueueId);
 }

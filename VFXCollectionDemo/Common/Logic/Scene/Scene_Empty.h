@@ -14,7 +14,7 @@ namespace Common::Logic::Scene
 		void Load(Graphics::DirectX12Renderer* renderer) override;
 		void Unload(Graphics::DirectX12Renderer* renderer) override;
 
-		void OnResize(uint32_t newWidth, uint32_t newHeight) override;
+		void OnResize(Graphics::DirectX12Renderer* renderer) override;
 
 		void Update() override;
 		void Render(ID3D12GraphicsCommandList* commandList) override;

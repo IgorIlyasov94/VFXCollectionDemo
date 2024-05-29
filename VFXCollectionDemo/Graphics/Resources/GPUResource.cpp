@@ -4,6 +4,8 @@ Graphics::Resources::GPUResource::GPUResource(ID3D12Resource* _resource, D3D12_R
 	: resource(_resource), currentState(_currentState), barrier{}
 {
 	barrier.Transition.pResource = _resource;
+	barrier.Transition.StateBefore = _currentState;
+	barrier.Transition.StateAfter = _currentState;
 }
 
 Graphics::Resources::GPUResource::~GPUResource()
@@ -49,13 +51,13 @@ void Graphics::Resources::GPUResource::Barrier(ID3D12GraphicsCommandList* comman
 
 void Graphics::Resources::GPUResource::BeginBarrier(ID3D12GraphicsCommandList* commandList, D3D12_RESOURCE_STATES newState)
 {
+	if (currentState == newState)
+		return;
+
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
 	barrier.Transition.StateBefore = currentState;
 	barrier.Transition.StateAfter = newState;
-
-	if (currentState == newState)
-		return;
 
 	currentState = newState;
 
@@ -64,9 +66,10 @@ void Graphics::Resources::GPUResource::BeginBarrier(ID3D12GraphicsCommandList* c
 
 void Graphics::Resources::GPUResource::EndBarrier(ID3D12GraphicsCommandList* commandList)
 {
-	if (barrier.Transition.StateBefore == barrier.Transition.StateAfter)
+	if (barrier.Transition.StateBefore == currentState)
 		return;
 
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_END_ONLY;
 
 	commandList->ResourceBarrier(1u, &barrier);
@@ -80,8 +83,11 @@ void Graphics::Resources::GPUResource::UAVBarrier(ID3D12GraphicsCommandList* com
 	commandList->ResourceBarrier(1u, &barrier);
 }
 
-D3D12_RESOURCE_BARRIER Graphics::Resources::GPUResource::GetBarrier(D3D12_RESOURCE_STATES newState)
+bool Graphics::Resources::GPUResource::GetBarrier(D3D12_RESOURCE_STATES newState, D3D12_RESOURCE_BARRIER& outBarrier)
 {
+	if (currentState == newState)
+		return false;
+
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	barrier.Transition.StateBefore = currentState;
@@ -89,11 +95,16 @@ D3D12_RESOURCE_BARRIER Graphics::Resources::GPUResource::GetBarrier(D3D12_RESOUR
 
 	currentState = newState;
 
-	return barrier;
+	outBarrier = barrier;
+
+	return true;
 }
 
-D3D12_RESOURCE_BARRIER Graphics::Resources::GPUResource::GetBeginBarrier(D3D12_RESOURCE_STATES newState)
+bool Graphics::Resources::GPUResource::GetBeginBarrier(D3D12_RESOURCE_STATES newState, D3D12_RESOURCE_BARRIER& outBarrier)
 {
+	if (currentState == newState)
+		return false;
+	
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
 	barrier.Transition.StateBefore = currentState;
@@ -101,20 +112,28 @@ D3D12_RESOURCE_BARRIER Graphics::Resources::GPUResource::GetBeginBarrier(D3D12_R
 
 	currentState = newState;
 
-	return barrier;
+	outBarrier = barrier;
+
+	return true;
 }
 
-D3D12_RESOURCE_BARRIER Graphics::Resources::GPUResource::GetEndBarrier()
+bool Graphics::Resources::GPUResource::GetEndBarrier(D3D12_RESOURCE_BARRIER& outBarrier)
 {
+	if (barrier.Transition.StateBefore == currentState)
+		return false;
+
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_END_ONLY;
 
-	return barrier;
+	outBarrier = barrier;
+
+	return true;
 }
 
-D3D12_RESOURCE_BARRIER Graphics::Resources::GPUResource::GetUAVBarrier()
+void Graphics::Resources::GPUResource::GetUAVBarrier(D3D12_RESOURCE_BARRIER& outBarrier)
 {
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 
-	return barrier;
+	outBarrier = barrier;
 }

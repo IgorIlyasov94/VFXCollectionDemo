@@ -116,8 +116,11 @@ void CalculateLighting(LightingDesc lightingDesc, float3 viewDir, out float3 lig
 {
 	float3 position = lightingDesc.surface.position;
 	float3 normal = lightingDesc.surface.normal;
-	float3 lightDir = normalize(position - lightingDesc.pointLight.position);
+	float3 lightVec = position - lightingDesc.pointLight.position;
+	float3 lightDir = normalize(lightVec);
 	float3 albedo = lerp(lightingDesc.material.albedo, 0.0f.xxx, lightingDesc.material.metalness);
+	
+	float attenuation = 1.0f / (dot(lightVec, lightVec) + 0.01f);
 	
 	float3 F;
 	float3 F0 = lightingDesc.material.f0;
@@ -127,7 +130,7 @@ void CalculateLighting(LightingDesc lightingDesc, float3 viewDir, out float3 lig
 	float3 specular = max(GGX_Specular(normal, viewDir, lightDir, roughness, F0, F90, F), 0.0f.xxx);
 	float3 diffuse = max(GGX_Diffuse(normal, lightDir, F), 0.0f.xxx);
 	
-	light = (albedo * diffuse + specular) * lightingDesc.pointLight.color;
+	light = (albedo * diffuse + specular) * lightingDesc.pointLight.color * attenuation;
 }
 
 [earlydepthstencil]
@@ -149,13 +152,13 @@ Output main(Input input)
 	surface.normal = normal;
 	
 	PointLight pointLight;
-	pointLight.position = float3(0.0f, 0.0f, 2.0f);
-	pointLight.color = float3(0.93f, 0.97f, 1.0f) * 1.0f;
+	pointLight.position = float3(2.0f, 2.0f, 2.0f);
+	pointLight.color = float3(0.93f, 0.9f, 0.6f) * 150.0f;
 	
 	Material material;
 	material.albedo = albedo;
-	material.f0 = 0.01f.xxx;
-	material.f90 = 1.0f.xxx;
+	material.f0 = float3(0.0609f, 0.0617f, 0.0634f);
+	material.f90 = 1.00f.xxx;
 	material.metalness = metalness;
 	material.roughness = roughness;
 	
@@ -169,7 +172,7 @@ Output main(Input input)
 	
 	float3 ambient = lerp(float3(0.4f, 0.35f, 0.1f), float3(0.5f, 0.6f, 0.65f), saturate(normal.z * 0.5f + 0.5f));
 	
-	output.color = float4(light + albedo * ambient, 1.0f);
+	output.color = float4(light + albedo * ambient * 0.0f, 1.0f);
 	
 	return output;
 }
