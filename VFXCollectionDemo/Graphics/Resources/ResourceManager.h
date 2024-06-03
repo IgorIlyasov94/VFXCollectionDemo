@@ -52,6 +52,8 @@ namespace Graphics::Resources
 		ResourceID CreateShaderResource(ID3D12Device* device, std::filesystem::path filePath,
 			Assets::Loaders::ShaderType type, Assets::Loaders::ShaderVersion version);
 
+		Sampler* GetDefaultSampler(ID3D12Device* device, Graphics::DefaultFilterSetup filter);
+
 		template<ResourceType T>
 		T* GetResource(ResourceID id)
 		{
@@ -117,6 +119,8 @@ namespace Graphics::Resources
 
 		std::vector<IResource*> resources;
 		std::queue<ResourceID> freeSlots;
+
+		std::map<Graphics::DefaultFilterSetup, ResourceID> defaultSamplers;
 
 		std::array<IResourceFactory*, BUFFER_RESOURCE_TYPES_NUMBER> bufferFactories;
 		std::array<IResourceFactory*, TEXTURE_RESOURCE_TYPES_NUMBER> textureFactories;

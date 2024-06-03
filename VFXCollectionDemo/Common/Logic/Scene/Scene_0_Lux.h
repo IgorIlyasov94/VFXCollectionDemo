@@ -44,10 +44,9 @@ namespace Common::Logic::Scene
 		void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager);
 
-		void CreateSamplers(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
 		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			Graphics::DirectX12Renderer* renderer);
-		void CreateObjects();
+		void CreateObjects(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer);
 
 		bool isLoaded;
 		
@@ -61,6 +60,8 @@ namespace Common::Logic::Scene
 			float4x4 world;
 			float4x4 viewProjection;
 			float4 cameraDirection;
+			float time;
+			float3 padding;
 		};
 
 		float3 cameraPosition;
@@ -68,6 +69,7 @@ namespace Common::Logic::Scene
 		float3 cameraUpVector;
 		
 		float timer;
+		float _deltaTime;
 		float fps;
 		uint32_t frameCounter;
 		uint64_t cpuTimeCounter;
@@ -81,22 +83,25 @@ namespace Common::Logic::Scene
 		MutableConstants* mutableConstantsBuffer;
 
 		Graphics::Resources::ResourceID mutableConstantsId;
-		Graphics::Resources::ResourceID samplerLinearId;
 		Graphics::Resources::ResourceID environmentFloorAlbedoId;
 		Graphics::Resources::ResourceID environmentFloorNormalId;
-
 		Graphics::Resources::ResourceID vfxAtlasId;
+		Graphics::Resources::ResourceID perlinNoiseId;
 
 		Graphics::Resources::ResourceID pbrStandardVSId;
 		Graphics::Resources::ResourceID pbrStandardPSId;
+
+		Graphics::Resources::ResourceID particleSimulationCSId;
 
 		SceneEntity::Camera* camera;
 
 		Graphics::Assets::Material* environmentMaterial;
 		Graphics::Assets::Mesh* environmentMesh;
+
 		SceneEntity::IDrawable* environmentMeshObject;
 
 		SceneEntity::IDrawable* vfxLux;
+		SceneEntity::IDrawable* vfxLuxSparkles;
 
 		SceneEntity::PostProcessManager* postProcessManager;
 	};

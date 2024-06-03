@@ -45,9 +45,16 @@ void main(Input input)
 	uint2 texCoord;
 	texCoord.x = bufferIndex % width;
 	texCoord.y = min(bufferIndex, area - 1) / width;
+	texCoord *= 2u;
+	
+	uint2 texCoordAdj = texCoord + uint2(1u, 1u);
 	
 	float3 color = sceneColor[texCoord].xyz;
-	color = max(color - brightThreshold, 0.0f.xxx);
+	color += sceneColor[uint2(texCoord.x, texCoordAdj.y)].xyz;
+	color += sceneColor[uint2(texCoordAdj.x, texCoord.y)].xyz;
+	color += sceneColor[texCoordAdj].xyz;
+	
+	color = max(color - brightThreshold, 0.0f.xxx) * 0.25f;
 	color *= middleGray / (luminance + 0.001f);
 	color *= 1.0f.xxx + color / whiteCutoff;
 	color /= 1.0f.xxx + color;

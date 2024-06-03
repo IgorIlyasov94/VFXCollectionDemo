@@ -32,7 +32,7 @@ namespace Graphics::Resources
 		BufferDesc(const T* dataPtr, uint32_t size)
 			: flag(BufferFlag::NONE), format(DXGI_FORMAT_UNKNOWN)
 		{
-			dataStride = static_cast<uint32_t>(sizeof(T));
+			dataStride = static_cast<uint32_t>(sizeof(dataPtr[0]));
 			numElements = size / dataStride;
 			data.resize(size);
 

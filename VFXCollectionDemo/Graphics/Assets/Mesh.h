@@ -18,10 +18,10 @@ namespace Graphics::Assets
 
 		void Release(Resources::ResourceManager* resourceManager);
 
-		void Draw(ID3D12GraphicsCommandList* commandList);
+		void Draw(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber = 1u);
 
 		void SetInputAssemblerOnly(ID3D12GraphicsCommandList* commandList);
-		void DrawOnly(ID3D12GraphicsCommandList* commandList);
+		void DrawOnly(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber = 1u);
 
 		const MeshDesc& GetDesc();
 

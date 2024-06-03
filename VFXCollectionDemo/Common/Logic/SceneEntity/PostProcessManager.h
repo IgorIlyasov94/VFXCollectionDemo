@@ -87,8 +87,8 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID quadVSId;
 		Graphics::Resources::ResourceID luminanceCSId;
 		Graphics::Resources::ResourceID luminanceIterationCSId;
-		Graphics::Resources::ResourceID brightPassCSId;
-		Graphics::Resources::ResourceID verticalBlurCSId;
+		Graphics::Resources::ResourceID bloomHorizontalCSId;
+		Graphics::Resources::ResourceID bloomVerticalCSId;
 		Graphics::Resources::ResourceID toneMappingPSId;
 
 		Graphics::Resources::ResourceID samplerPointId;
@@ -96,8 +96,8 @@ namespace Common::Logic::SceneEntity
 		Graphics::Assets::Mesh* quadMesh;
 		Graphics::Assets::ComputeObject* luminanceComputeObject;
 		Graphics::Assets::ComputeObject* luminanceIterationComputeObject;
-		Graphics::Assets::ComputeObject* brightPassObject;
-		Graphics::Assets::ComputeObject* verticalBlurObject;
+		Graphics::Assets::ComputeObject* bloomHorizontalObject;
+		Graphics::Assets::ComputeObject* bloomVerticalObject;
 		Graphics::Assets::Material* toneMappingMaterial;
 	};
 }

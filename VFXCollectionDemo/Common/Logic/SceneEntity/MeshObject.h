@@ -13,7 +13,10 @@ namespace Common::Logic::SceneEntity
 		MeshObject(Graphics::Assets::Mesh* mesh, Graphics::Assets::Material* material);
 		~MeshObject() override;
 
-		void Draw(ID3D12GraphicsCommandList* commandList) override;
+		void OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime) override;
+		void Draw(ID3D12GraphicsCommandList* commandList, float time, float deltaTime) override;
+
+		void Release(Graphics::Resources::ResourceManager* resourceManager) override;
 
 	private:
 		MeshObject() = delete;

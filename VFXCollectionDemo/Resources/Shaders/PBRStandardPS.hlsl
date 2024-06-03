@@ -6,6 +6,8 @@ cbuffer MutableConstants : register(b0)
 	float4x4 world;
 	float4x4 viewProj;
 	float4 cameraDirection;
+	float time;
+	float3 padding;
 };
 
 struct Input
@@ -151,10 +153,6 @@ Output main(Input input)
 	surface.position = input.worldPosition;
 	surface.normal = normal;
 	
-	PointLight pointLight;
-	pointLight.position = float3(2.0f, 2.0f, 2.0f);
-	pointLight.color = float3(0.93f, 0.9f, 0.6f) * 150.0f;
-	
 	Material material;
 	material.albedo = albedo;
 	material.f0 = float3(0.0609f, 0.0617f, 0.0634f);
@@ -162,17 +160,29 @@ Output main(Input input)
 	material.metalness = metalness;
 	material.roughness = roughness;
 	
-	LightingDesc lightingDesc;
-	lightingDesc.surface = surface;
-	lightingDesc.pointLight = pointLight;
-	lightingDesc.material = material;
+	float3 lightSum = 0.0f.xxx;
 	
-	float3 light;
-	CalculateLighting(lightingDesc, cameraDirection.xyz, light);
+	for (int i = 0; i < 8; i++)
+	{
+		PointLight pointLight;
+		pointLight.position = float3(sin(time * 3.0f + i * 1.28f) * 0.3f * i, 0.0f, 0.686f * i + 0.2f);
+		pointLight.color = lerp(float3(0.93f, 0.074f, 0.074f), float3(0.1f, 0.044f, 0.3f), i / 7.0f);
+		pointLight.color *= saturate(cos(time * 3.0f + i * 1.28f) * 0.25f * i + 0.75f);
+		
+		LightingDesc lightingDesc;
+		lightingDesc.surface = surface;
+		lightingDesc.pointLight = pointLight;
+		lightingDesc.material = material;
+		
+		float3 light;
+		CalculateLighting(lightingDesc, cameraDirection.xyz, light);
+		
+		lightSum += light;
+	}
 	
 	float3 ambient = lerp(float3(0.4f, 0.35f, 0.1f), float3(0.5f, 0.6f, 0.65f), saturate(normal.z * 0.5f + 0.5f));
 	
-	output.color = float4(light + albedo * ambient * 0.0f, 1.0f);
+	output.color = float4(lightSum + albedo * ambient * 1.0f, 1.0f);
 	
 	return output;
 }

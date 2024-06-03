@@ -11,8 +11,18 @@ Common::Logic::SceneEntity::MeshObject::~MeshObject()
 
 }
 
-void Common::Logic::SceneEntity::MeshObject::Draw(ID3D12GraphicsCommandList* commandList)
+void Common::Logic::SceneEntity::MeshObject::OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
+{
+
+}
+
+void Common::Logic::SceneEntity::MeshObject::Draw(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
 {
 	_material->Set(commandList);
 	_mesh->Draw(commandList);
+}
+
+void Common::Logic::SceneEntity::MeshObject::Release(Graphics::Resources::ResourceManager* resourceManager)
+{
+
 }

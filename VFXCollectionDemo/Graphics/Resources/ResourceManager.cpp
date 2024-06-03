@@ -8,6 +8,7 @@
 #include "RWTextureFactory.h"
 #include "TextureFactory.h"
 #include "VertexBufferFactory.h"
+#include "../DirectX12Utilities.h"
 
 Graphics::Resources::ResourceManager::ResourceManager(DescriptorManager* descriptorManager, BufferManager* bufferManager,
 	TextureManager* textureManager)
@@ -117,4 +118,21 @@ Graphics::Resources::ResourceID Graphics::Resources::ResourceManager::CreateShad
 	}
 
 	return id;
+}
+
+Graphics::Resources::Sampler* Graphics::Resources::ResourceManager::GetDefaultSampler(ID3D12Device* device,
+	Graphics::DefaultFilterSetup filter)
+{
+	auto samplerIdIt = defaultSamplers.find(filter);
+	ResourceID samplerId;
+
+	if (samplerIdIt == defaultSamplers.end())
+	{
+		samplerId = CreateSamplerResource(device, DirectX12Utilities::CreateSamplerDesc(filter));
+		defaultSamplers.insert({ filter, samplerId });
+	}
+	else
+		samplerId = samplerIdIt->second;
+
+	return GetResource<Sampler>(samplerId);
 }

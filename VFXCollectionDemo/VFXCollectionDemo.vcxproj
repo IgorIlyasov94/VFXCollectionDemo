@@ -24,13 +24,16 @@
     <ClInclude Include="Common\Logic\SceneEntity\Camera.h" />
     <ClInclude Include="Common\Logic\SceneEntity\IDrawable.h" />
     <ClInclude Include="Common\Logic\SceneEntity\MeshObject.h" />
+    <ClInclude Include="Common\Logic\SceneEntity\ParticleSystem.h" />
     <ClInclude Include="Common\Logic\SceneEntity\PostProcessManager.h" />
     <ClInclude Include="Common\Logic\SceneEntity\VFXLux.h" />
+    <ClInclude Include="Common\Logic\SceneEntity\VFXLuxSparkles.h" />
     <ClInclude Include="Common\Logic\SceneManager.h" />
     <ClInclude Include="Common\Logic\Scene\IScene.h" />
     <ClInclude Include="Common\Logic\Scene\Scene_0_Lux.h" />
     <ClInclude Include="Common\Logic\Scene\Scene_Empty.h" />
     <ClInclude Include="Common\ProcessHandler.h" />
+    <ClInclude Include="Common\Utilities.h" />
     <ClInclude Include="Common\Window.h" />
     <ClInclude Include="Common\WindowProcedure.h" />
     <ClInclude Include="Graphics\Assets\ComputeObject.h" />
@@ -72,8 +75,10 @@
     <ClCompile Include="Common\Logic\MainLogic.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\Camera.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\MeshObject.cpp" />
+    <ClCompile Include="Common\Logic\SceneEntity\ParticleSystem.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\PostProcessManager.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\VFXLux.cpp" />
+    <ClCompile Include="Common\Logic\SceneEntity\VFXLuxSparkles.cpp" />
     <ClCompile Include="Common\Logic\SceneManager.cpp" />
     <ClCompile Include="Common\Logic\Scene\Scene_0_Lux.cpp" />
     <ClCompile Include="Common\Logic\Scene\Scene_Empty.cpp" />

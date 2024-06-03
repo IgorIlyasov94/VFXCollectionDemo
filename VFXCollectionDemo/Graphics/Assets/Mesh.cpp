@@ -70,13 +70,13 @@ void Graphics::Assets::Mesh::Release(Resources::ResourceManager* resourceManager
 	resourceManager->DeleteResource<IndexBuffer>(_indexBufferId);
 }
 
-void Graphics::Assets::Mesh::Draw(ID3D12GraphicsCommandList* commandList)
+void Graphics::Assets::Mesh::Draw(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber)
 {
 	commandList->IASetPrimitiveTopology(_meshDesc.topology);
 	commandList->IASetVertexBuffers(0u, 1u, vertexBufferView);
 	commandList->IASetIndexBuffer(indexBufferView);
 
-	commandList->DrawIndexedInstanced(_meshDesc.indicesNumber, 1, 0, 0, 0);
+	commandList->DrawIndexedInstanced(_meshDesc.indicesNumber, instancesNumber, 0, 0, 0);
 }
 
 void Graphics::Assets::Mesh::SetInputAssemblerOnly(ID3D12GraphicsCommandList* commandList)
@@ -86,9 +86,9 @@ void Graphics::Assets::Mesh::SetInputAssemblerOnly(ID3D12GraphicsCommandList* co
 	commandList->IASetIndexBuffer(indexBufferView);
 }
 
-void Graphics::Assets::Mesh::DrawOnly(ID3D12GraphicsCommandList* commandList)
+void Graphics::Assets::Mesh::DrawOnly(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber)
 {
-	commandList->DrawIndexedInstanced(_meshDesc.indicesNumber, 1, 0, 0, 0);
+	commandList->DrawIndexedInstanced(_meshDesc.indicesNumber, instancesNumber, 0, 0, 0);
 }
 
 const Graphics::Assets::MeshDesc& Graphics::Assets::Mesh::GetDesc()

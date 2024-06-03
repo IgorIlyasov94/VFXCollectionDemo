@@ -9,6 +9,7 @@ namespace Graphics
 	{
 		BLEND_OPAQUE = 0u,
 		BLEND_TRANSPARENT = 1u,
+		BLEND_ADDITIVE = 2u,
 	};
 
 	enum class DefaultFilterSetup

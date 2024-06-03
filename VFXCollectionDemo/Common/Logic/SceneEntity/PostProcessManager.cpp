@@ -61,8 +61,8 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 
 	delete luminanceComputeObject;
 	delete luminanceIterationComputeObject;
-	delete brightPassObject;
-	delete verticalBlurObject;
+	delete bloomHorizontalObject;
+	delete bloomVerticalObject;
 
 	quadMesh->Release(resourceManager);
 	delete quadMesh;
@@ -76,8 +76,8 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 	resourceManager->DeleteResource<Shader>(quadVSId);
 	resourceManager->DeleteResource<Shader>(luminanceCSId);
 	resourceManager->DeleteResource<Shader>(luminanceIterationCSId);
-	resourceManager->DeleteResource<Shader>(brightPassCSId);
-	resourceManager->DeleteResource<Shader>(verticalBlurCSId);
+	resourceManager->DeleteResource<Shader>(bloomHorizontalCSId);
+	resourceManager->DeleteResource<Shader>(bloomVerticalCSId);
 	resourceManager->DeleteResource<Shader>(toneMappingPSId);
 
 	resourceManager->DeleteResource<Sampler>(samplerPointId);
@@ -114,10 +114,10 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	luminanceComputeObject->UpdateRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
 	luminanceIterationComputeObject->UpdateRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
 
-	brightPassObject->UpdateBuffer(1u, luminanceBufferResource->resourceGPUAddress);
-	brightPassObject->UpdateRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
+	bloomHorizontalObject->UpdateBuffer(1u, luminanceBufferResource->resourceGPUAddress);
+	bloomHorizontalObject->UpdateRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
 
-	verticalBlurObject->UpdateRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
+	bloomVerticalObject->UpdateRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
 
 	toneMappingMaterial->UpdateBuffer(1u, luminanceBufferResource->resourceGPUAddress);
 	toneMappingMaterial->UpdateBuffer(2u, bloomBufferResource->resourceGPUAddress);
@@ -149,6 +149,9 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 	luminanceComputeObject->SetRootConstants(commandList, 0u, 2u, &hdrConstants);
 	luminanceComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 
+	if (numGroupsX > 1u)
+		luminanceIterationComputeObject->Set(commandList);
+
 	while (numGroupsX > 1u)
 	{
 		hdrConstants.area = std::max(numGroupsX + remain, 1u);
@@ -157,7 +160,6 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 		
 		luminanceBufferGPUResource->UAVBarrier(commandList);
 
-		luminanceIterationComputeObject->Set(commandList);
 		luminanceIterationComputeObject->SetRootConstant(commandList, 0u, &hdrConstants.area);
 		luminanceIterationComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 	}
@@ -169,12 +171,12 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 
 	numGroupsX = std::max(_width * _height / (THREADS_PER_GROUP - HALF_BLUR_SAMPLES_NUMBER * 2u), 1u);
 
-	hdrConstants.width = _width;
-	hdrConstants.area = _width * _height;
+	hdrConstants.width = _width / 2u;
+	hdrConstants.area = _width * _height / 4u;
 
-	brightPassObject->Set(commandList);
-	brightPassObject->SetRootConstants(commandList, 0u, 5u, &hdrConstants);
-	brightPassObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+	bloomHorizontalObject->Set(commandList);
+	bloomHorizontalObject->SetRootConstants(commandList, 0u, 5u, &hdrConstants);
+	bloomHorizontalObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 
 	sceneColorTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	luminanceBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -182,14 +184,14 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 
 	uint32_t verticalBlurConstants[3]
 	{
-		_width,
-		_height,
+		_width / 2u,
+		_height / 2u,
 		hdrConstants.area
 	};
 
-	verticalBlurObject->Set(commandList);
-	verticalBlurObject->SetRootConstants(commandList, 0u, 3u, &verticalBlurConstants);
-	verticalBlurObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+	bloomVerticalObject->Set(commandList);
+	bloomVerticalObject->SetRootConstants(commandList, 0u, 3u, &verticalBlurConstants);
+	bloomVerticalObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 
 	quadMesh->SetInputAssemblerOnly(commandList);
 
@@ -254,7 +256,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 	Graphics::Resources::ResourceManager* resourceManager, uint32_t width, uint32_t height)
 {
 	TextureDesc sceneTargetDesc{};
-	sceneTargetDesc.format = DXGI_FORMAT_R11G11B10_FLOAT;
+	sceneTargetDesc.format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	sceneTargetDesc.width = width;
 	sceneTargetDesc.height = height;
 	sceneTargetDesc.depth = 1u;
@@ -293,7 +295,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device*
 	BufferDesc bloomBufferDesc{};
 	bloomBufferDesc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	bloomBufferDesc.dataStride = sizeof(float) * 4u;
-	bloomBufferDesc.numElements = width * height;
+	bloomBufferDesc.numElements = width * height / 4u;
 	bloomBufferDesc.data.resize(static_cast<uint64_t>(bloomBufferDesc.dataStride) * bloomBufferDesc.numElements, 0u);
 	
 	bloomBufferId = resourceManager->CreateBufferResource(device, commandList,
@@ -315,9 +317,9 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
 	luminanceIterationCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\LuminanceIterationCS.hlsl",
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
-	brightPassCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\BrightPassCS.hlsl",
+	bloomHorizontalCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\BloomHorizontalCS.hlsl",
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
-	verticalBlurCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VerticalBlurCS.hlsl",
+	bloomVerticalCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\BloomVerticalCS.hlsl",
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
 
 	toneMappingPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\ToneMappingPS.hlsl",
@@ -367,8 +369,8 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 
 	auto luminanceCS = resourceManager->GetResource<Shader>(luminanceCSId);
 	auto luminanceIterationCS = resourceManager->GetResource<Shader>(luminanceIterationCSId);
-	auto brightPassCS = resourceManager->GetResource<Shader>(brightPassCSId);
-	auto verticalBlurCS = resourceManager->GetResource<Shader>(verticalBlurCSId);
+	auto bloomHorizontalCS = resourceManager->GetResource<Shader>(bloomHorizontalCSId);
+	auto bloomVerticalCS = resourceManager->GetResource<Shader>(bloomVerticalCSId);
 
 	ComputeObjectBuilder computeObjectBuilder{};
 	computeObjectBuilder.SetRootConstants(0u, 2u);
@@ -388,13 +390,13 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 	computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
 	computeObjectBuilder.SetBuffer(1u, luminanceBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
-	computeObjectBuilder.SetShader(brightPassCS->bytecode);
+	computeObjectBuilder.SetShader(bloomHorizontalCS->bytecode);
 
-	brightPassObject = computeObjectBuilder.Compose(device);
+	bloomHorizontalObject = computeObjectBuilder.Compose(device);
 
 	computeObjectBuilder.SetRootConstants(0u, 3u);
 	computeObjectBuilder.SetRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
-	computeObjectBuilder.SetShader(verticalBlurCS->bytecode);
+	computeObjectBuilder.SetShader(bloomVerticalCS->bytecode);
 
-	verticalBlurObject = computeObjectBuilder.Compose(device);
+	bloomVerticalObject = computeObjectBuilder.Compose(device);
 }

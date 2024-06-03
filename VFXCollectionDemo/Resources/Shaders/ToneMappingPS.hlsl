@@ -35,14 +35,15 @@ Output main(Input input)
 	
 	float gray = dot(color, LUMINANCE_VECTOR);
 	float3 rodColor = float3(0.95f, 1.1f, 1.4f);
+	float colorShiftFactor = saturate(luminance / 4.0f);
 	
-	color = lerp(gray * rodColor, color, luminance);
+	//color = lerp(gray * rodColor, color, colorShiftFactor);
 	
 	color *= middleGray / (luminance + 0.001f);
 	color *= 1.0f + color / whiteCutoff;
 	color /= 1.0f + color;
 	
-	uint2 bufferCoord = (uint2)input.position.xy;
+	uint2 bufferCoord = ((uint2)input.position.xy) / 2u;
 	
 	float3 bloom = bloomBuffer[clamp(bufferCoord.x + bufferCoord.y * width, 0, area)].xyz;
 	

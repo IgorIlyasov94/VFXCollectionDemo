@@ -242,6 +242,13 @@ D3D12_BLEND_DESC Graphics::DirectX12Utilities::CreateBlendDesc(DefaultBlendSetup
 		desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_SRC_ALPHA;
 		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
 	}
+	else if (setup == DefaultBlendSetup::BLEND_ADDITIVE)
+	{
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_SRC_ALPHA;
+		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+	}
 	else
 	{
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
