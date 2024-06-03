@@ -3,8 +3,8 @@ struct Particle
 	float3 position;
 	float rotation;
 	
-	float3 previousPosition;
-	float previousRotation;
+	float3 velocity;
+	float rotationSpeed;
 	
 	float2 size;
 	float life;

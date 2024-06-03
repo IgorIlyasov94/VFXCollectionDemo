@@ -122,7 +122,14 @@ void Common::Logic::SceneEntity::ParticleSystem::CreateBuffers(ID3D12Device* dev
 	ID3D12GraphicsCommandList* commandList, Graphics::Resources::ResourceManager* resourceManager)
 {
 	auto particles = new Particle[_desc.maxParticlesNumber];
-	std::fill(&particles[0], &particles[0] + _desc.maxParticlesNumber, Particle{});
+	auto lifeDenominator = _desc.maxLifeSec / static_cast<float>(_desc.maxParticlesNumber);
+
+	for (uint32_t particleIndex = 0u; particleIndex < _desc.maxParticlesNumber; particleIndex++)
+	{
+		particles[particleIndex] = {};
+		particles[particleIndex].startLife = static_cast<float>(particleIndex) * lifeDenominator;
+		particles[particleIndex].life = particles[particleIndex].startLife;
+	}
 
 	BufferDesc particleBufferDesc(particles, sizeof(Particle) * _desc.maxParticlesNumber);
 	

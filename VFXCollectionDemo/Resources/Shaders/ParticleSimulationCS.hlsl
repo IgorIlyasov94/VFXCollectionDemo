@@ -12,8 +12,8 @@ struct Particle
 	float3 position;
 	float rotation;
 	
-	float3 previousPosition;
-	float previousRotation;
+	float3 velocity;
+	float rotationSpeed;
 	
 	float2 size;
 	float life;
@@ -86,23 +86,22 @@ float3 RandomSpherePoint(float3 random)
 	return random * 2.0f - 1.0f.xxx;
 }
 
-Particle EmitParticle()
+Particle EmitParticle(float3 oldPosition, float index)
 {
+	uint2 texCoord = (uint2)(frac(oldPosition.xy + float2(index / maxParticlesNumber, 0.0f)) * perlinNoiseSize);
+	float4 randomModifier = perlinNoise[texCoord];
+	float4 random0_0 = frac(random0 + randomModifier);
+	float4 random1_0 = frac(random1 + randomModifier);
+	
 	Particle newParticle = (Particle)0;
-	newParticle.position = emitterOrigin + RandomSpherePoint(random0.xyz) * emitterRadius;
+	newParticle.position = emitterOrigin + RandomSpherePoint(random0_0.xyz) * emitterRadius;
+	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, random0_0.zwx);
 	
-	float3 velocity = lerp(minParticleVelocity, maxParticleVelocity, random0.zwx);
+	newParticle.rotation = lerp(minRotation, maxRotation, random1_0.x);
+	newParticle.rotationSpeed = lerp(minRotationSpeed, maxRotationSpeed, random1_0.y);
 	
-	newParticle.previousPosition = newParticle.position - velocity;
-	
-	newParticle.rotation = lerp(minRotation, maxRotation, random1.x);
-	
-	float rotationSpeed = lerp(minRotationSpeed, maxRotationSpeed, random1.y);
-	
-	newParticle.previousRotation = newParticle.rotation - rotationSpeed;
-	
-	newParticle.size = lerp(minSize, maxSize, random1.zw);
-	newParticle.startLife = lerp(minLifeSec, maxLifeSec, random1.y);
+	newParticle.size = lerp(minSize, maxSize, random1_0.zw);
+	newParticle.startLife = lerp(minLifeSec, maxLifeSec, random1_0.y);
 	
 	newParticle.life = newParticle.startLife;
 	
@@ -125,7 +124,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float emitProbability = averageParticleEmit * deltaTime;
 		
 		if (random0.z <= emitProbability)
-			particle = EmitParticle();
+			particle = EmitParticle(particle.position, (float)(particleIndex) + time);
 	}
 	else
 	{
@@ -139,16 +138,15 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 		
 		displacement = (displacement * 2.0f / 3.0f - 1.0f.xxx) * particleTurbulence;
 		
-		float3 velocity = particle.position - particle.previousPosition + displacement;
+		float3 velocity = particle.velocity;
 		float3 acceleration = SumAccelerations(particle.position);
 		
-		particle.previousPosition = particle.position;
-		particle.position += (velocity * particleDamping + acceleration * deltaTime) * deltaTime;
+		particle.position += velocity * deltaTime;
+		particle.velocity += acceleration * deltaTime * deltaTime + displacement;
+		particle.velocity *= particleDamping;
 		
-		float angularSpeed = particle.rotation - particle.previousRotation;
-		
-		particle.previousRotation = particle.rotation;
-		particle.rotation += angularSpeed * deltaTime;
+		particle.rotation += particle.rotationSpeed * deltaTime;
+		particle.rotationSpeed *= particleDamping;
 		
 		particle.life -= deltaTime;
 	}

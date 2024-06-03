@@ -33,8 +33,8 @@ Output main(Input input)
 	float mask = vfxAtlas.Sample(samplerLinear, input.texCoord).x;
 	
 	float4 color = input.color;
-	color.xyz *= colorIntensity;
-	color.w = mask;
+	color.xyz *= colorIntensity * float3(1.5f, 0.3f, 0.9f);
+	color.w *= mask * mask;
 	
 	output.color = color;
 	
