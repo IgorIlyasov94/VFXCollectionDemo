@@ -2,6 +2,21 @@
 
 D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::filesystem::path& filePath, ShaderType type, ShaderVersion version)
 {
+	std::filesystem::path filePathCache(filePath);
+	filePathCache.replace_filename(filePath.filename().generic_string() + "CACHE");
+	auto loadCache = std::filesystem::exists(filePathCache);
+
+	if (loadCache)
+	{
+		auto mainFileTimestamp = std::filesystem::last_write_time(filePath);
+		auto cacheFileTimestamp = std::filesystem::last_write_time(filePathCache);
+
+		loadCache = cacheFileTimestamp >= mainFileTimestamp;
+	}
+
+	if (loadCache)
+		return LoadCache(filePathCache);
+
 	CComPtr<IDxcUtils> dxcUtils;
 	CComPtr<IDxcCompiler3> dxCompiler;
 	HRESULT hrStatus;
@@ -68,6 +83,8 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 		bufferSize
 	};
 
+	SaveCache(filePathCache, bytecode);
+
 	return bytecode;
 }
 
@@ -105,4 +122,33 @@ std::wstring Graphics::Assets::Loaders::HLSLLoader::GetShaderProfileString(Shade
 	}
 
 	return profile;
+}
+
+D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::LoadCache(const std::filesystem::path& filePath)
+{
+	std::ifstream hlslFile(filePath, std::ios::binary);
+	hlslFile.seekg(0, std::ios::end);
+
+	auto bufferSize = static_cast<size_t>(hlslFile.tellg());
+
+	hlslFile.seekg(0, std::ios::beg);
+
+	uint8_t* bytecodeBuffer = new uint8_t[bufferSize];
+
+	hlslFile.read(reinterpret_cast<char*>(bytecodeBuffer), bufferSize);
+
+	D3D12_SHADER_BYTECODE bytecode
+	{
+		bytecodeBuffer,
+		bufferSize
+	};
+
+	return bytecode;
+}
+
+void Graphics::Assets::Loaders::HLSLLoader::SaveCache(const std::filesystem::path& filePath,
+	D3D12_SHADER_BYTECODE bytecode)
+{
+	std::ofstream hlslFile(filePath, std::ios::binary);
+	hlslFile.write(reinterpret_cast<const char*>(bytecode.pShaderBytecode), bytecode.BytecodeLength);
 }

@@ -14,7 +14,7 @@ struct Input
 	uint groupIndex : SV_GroupIndex;
 };
 
-Texture2D sceneColor : register(t0);
+StructuredBuffer<float4> sceneBuffer : register(t0);
 RWStructuredBuffer<float> luminanceBuffer : register(u0);
 
 groupshared float groupBuffer[NUM_THREADS];
@@ -24,8 +24,8 @@ void main(Input input)
 {
 	if (input.dispatchThreadId.x < area)
 	{
-		uint3 texCoord = uint3(input.dispatchThreadId.x % width, input.dispatchThreadId.x / width, 0);
-		groupBuffer[input.groupIndex] = dot(sceneColor.Load(texCoord).xyz, LUMINANCE_VECTOR);
+		uint bufferIndex = min(input.dispatchThreadId.x, area - 1);
+		groupBuffer[input.groupIndex] = dot(sceneBuffer[bufferIndex].xyz, LUMINANCE_VECTOR);
 	}
 	else
 		groupBuffer[input.groupIndex] = 0.0f;

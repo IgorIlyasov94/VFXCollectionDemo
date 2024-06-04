@@ -166,8 +166,8 @@ Output main(Input input)
 	{
 		PointLight pointLight;
 		pointLight.position = float3(sin(time * 3.0f + i * 1.28f) * 0.3f * i, 0.0f, 0.686f * i + 0.2f);
-		pointLight.color = lerp(float3(0.93f, 0.074f, 0.074f), float3(0.1f, 0.044f, 0.3f), i / 7.0f);
-		pointLight.color *= saturate(cos(time * 3.0f + i * 1.28f) * 0.25f * i + 0.75f);
+		pointLight.color = lerp(float3(1.2f, 0.9f, 0.074f), float3(0.1f, 0.044f, 0.3f), i / 7.0f);
+		pointLight.color *= saturate(cos(time * 3.0f + i * 1.28f) * 0.1f * i + 0.1f);
 		
 		LightingDesc lightingDesc;
 		lightingDesc.surface = surface;
@@ -182,7 +182,7 @@ Output main(Input input)
 	
 	float3 ambient = lerp(float3(0.4f, 0.35f, 0.1f), float3(0.5f, 0.6f, 0.65f), saturate(normal.z * 0.5f + 0.5f));
 	
-	output.color = float4(lightSum + albedo * ambient * 1.0f, 1.0f);
+	output.color = float4(lightSum + albedo * ambient * 0.2f, 1.0f);
 	
 	return output;
 }

@@ -84,7 +84,9 @@ namespace Common::Logic::Scene
 
 		Graphics::Resources::ResourceID mutableConstantsId;
 		Graphics::Resources::ResourceID environmentFloorAlbedoId;
+		Graphics::Resources::ResourceID environmentWallsAlbedoId;
 		Graphics::Resources::ResourceID environmentFloorNormalId;
+		Graphics::Resources::ResourceID environmentWallsNormalId;
 		Graphics::Resources::ResourceID vfxAtlasId;
 		Graphics::Resources::ResourceID perlinNoiseId;
 
@@ -96,12 +98,16 @@ namespace Common::Logic::Scene
 		SceneEntity::Camera* camera;
 
 		Graphics::Assets::Material* environmentMaterial;
+		Graphics::Assets::Material* wallsMaterial;
 		Graphics::Assets::Mesh* environmentMesh;
+		Graphics::Assets::Mesh* wallsMesh;
 
 		SceneEntity::IDrawable* environmentMeshObject;
+		SceneEntity::IDrawable* wallsMeshObject;
 
 		SceneEntity::IDrawable* vfxLux;
 		SceneEntity::IDrawable* vfxLuxSparkles;
+		SceneEntity::IDrawable* vfxLuxDistorters;
 
 		SceneEntity::PostProcessManager* postProcessManager;
 	};

@@ -2,6 +2,7 @@
 #include "../SceneEntity/MeshObject.h"
 #include "../SceneEntity/VFXLux.h"
 #include "../SceneEntity/VFXLuxSparkles.h"
+#include "../SceneEntity/VFXLuxDistorters.h"
 #include "../../../Graphics/Assets/MaterialBuilder.h"
 #include "../../../Graphics/Assets/Loaders/DDSLoader.h"
 
@@ -95,6 +96,9 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 	vfxLuxSparkles->Release(resourceManager);
 	delete vfxLuxSparkles;
 
+	vfxLuxDistorters->Release(resourceManager);
+	delete vfxLuxDistorters;
+
 	isLoaded = false;
 }
 
@@ -151,12 +155,19 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* commandList)
 {
 	vfxLuxSparkles->OnCompute(commandList, timer, _deltaTime);
+	vfxLuxDistorters->OnCompute(commandList, timer, _deltaTime);
 
 	postProcessManager->SetGBuffer(commandList);
 
+	wallsMeshObject->Draw(commandList, timer, _deltaTime);
 	environmentMeshObject->Draw(commandList, timer, _deltaTime);
+
 	vfxLux->Draw(commandList, timer, _deltaTime);
 	vfxLuxSparkles->Draw(commandList, timer, _deltaTime);
+
+	postProcessManager->SetDistortBuffer(commandList);
+
+	vfxLuxDistorters->Draw(commandList, timer, _deltaTime);
 
 	postProcessManager->Render(commandList);
 }
@@ -175,6 +186,7 @@ void Common::Logic::Scene::Scene_0_Lux::LoadMeshes(ID3D12Device* device, ID3D12G
 	Graphics::Resources::ResourceManager* resourceManager)
 {
 	environmentMesh = new Mesh("Resources\\Meshes\\LuxEnvironmentFloor.obj", device, commandList, resourceManager, false, true);
+	wallsMesh = new Mesh("Resources\\Meshes\\LuxEnvironmentWalls.obj", device, commandList, resourceManager, false, true);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::CreateConstantBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -229,9 +241,13 @@ void Common::Logic::Scene::Scene_0_Lux::LoadTextures(ID3D12Device* device, ID3D1
 	TextureDesc textureDesc{};
 	DDSLoader::Load("Resources\\Textures\\LuxEnvironmentFloor_AlbedoRoughness.dds", textureDesc);
 	environmentFloorAlbedoId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
+	DDSLoader::Load("Resources\\Textures\\LuxEnvironmentWalls_AlbedoRoughness.dds", textureDesc);
+	environmentWallsAlbedoId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
 
 	DDSLoader::Load("Resources\\Textures\\LuxEnvironmentFloor_NormalMetalness.dds", textureDesc);
 	environmentFloorNormalId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
+	DDSLoader::Load("Resources\\Textures\\LuxEnvironmentWalls_NormalMetalness.dds", textureDesc);
+	environmentWallsNormalId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
 
 	DDSLoader::Load("Resources\\Textures\\VFXAtlas.dds", textureDesc);
 	vfxAtlasId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
@@ -245,7 +261,9 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 {
 	auto mutableConstantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
 	auto environmentFloorAlbedoResource = resourceManager->GetResource<Texture>(environmentFloorAlbedoId);
+	auto environmentWallsAlbedoResource = resourceManager->GetResource<Texture>(environmentWallsAlbedoId);
 	auto environmentFloorNormalResource = resourceManager->GetResource<Texture>(environmentFloorNormalId);
+	auto environmentWallsNormalResource = resourceManager->GetResource<Texture>(environmentWallsNormalId);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
 		Graphics::DefaultFilterSetup::FILTER_TRILINEAR_WRAP);
 
@@ -257,7 +275,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 	materialBuilder.SetTexture(0u, environmentFloorAlbedoResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(1u, environmentFloorNormalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
+	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
 	materialBuilder.SetDepthStencilFormat(32u, true);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
@@ -266,15 +284,33 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 	materialBuilder.SetPixelShader(pbrStandardPS->bytecode);
 
 	environmentMaterial = materialBuilder.ComposeStandard(device);
+
+	materialBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress);
+	materialBuilder.SetTexture(0u, environmentWallsAlbedoResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetTexture(1u, environmentWallsNormalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
+	materialBuilder.SetDepthStencilFormat(32u, true);
+	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
+	materialBuilder.SetGeometryFormat(environmentMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	materialBuilder.SetVertexShader(pbrStandardVS->bytecode);
+	materialBuilder.SetPixelShader(pbrStandardPS->bytecode);
+
+	wallsMaterial = materialBuilder.ComposeStandard(device);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer)
 {
 	environmentMeshObject = new MeshObject(environmentMesh, environmentMaterial);
+	wallsMeshObject = new MeshObject(wallsMesh, wallsMaterial);
 
 	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer);
 	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, camera);
 	vfxLuxSparkles = new SceneEntity::VFXLuxSparkles(commandList, renderer,
+		perlinNoiseId, vfxAtlasId, particleSimulationCSId, camera);
+
+	vfxLuxDistorters = new SceneEntity::VFXLuxDistorters(commandList, renderer,
 		perlinNoiseId, vfxAtlasId, particleSimulationCSId, camera);
 }

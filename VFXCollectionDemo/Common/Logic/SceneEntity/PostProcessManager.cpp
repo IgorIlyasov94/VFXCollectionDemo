@@ -33,6 +33,19 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 	hdrConstants.whiteCutoff = 0.8f;
 	hdrConstants.brightThreshold = 0.5f;
 
+	distortionConstants.widthU = width;
+	distortionConstants.area = hdrConstants.area;
+	distortionConstants.width = static_cast<float>(width);
+	distortionConstants.height = static_cast<float>(height);
+
+	toneMappingConstants.width = width;
+	toneMappingConstants.area = hdrConstants.area;
+	toneMappingConstants.halfWidth = width / 2u;
+	toneMappingConstants.quartArea = hdrConstants.area / 4u;
+	toneMappingConstants.middleGray = hdrConstants.middleGray;
+	toneMappingConstants.whiteCutoff = hdrConstants.whiteCutoff;
+	toneMappingConstants.brightThreshold = hdrConstants.brightThreshold;
+
 	_width = width;
 	_height = height;
 
@@ -42,7 +55,6 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 	CreateQuad(device, commandList, resourceManager);
 	CreateTargets(device, commandList, resourceManager, width, height);
 	CreateBuffers(device, commandList, resourceManager, width, height);
-	CreateSamplers(device, resourceManager);
 
 	LoadShaders(device, resourceManager);
 
@@ -59,6 +71,7 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 {
 	delete toneMappingMaterial;
 
+	delete distortionComputeObject;
 	delete luminanceComputeObject;
 	delete luminanceIterationComputeObject;
 	delete bloomHorizontalObject;
@@ -70,17 +83,19 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
 	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
 
+	resourceManager->DeleteResource<RenderTarget>(sceneDistortionTargetId);
+
+	resourceManager->DeleteResource<RWBuffer>(sceneBufferId);
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
 
 	resourceManager->DeleteResource<Shader>(quadVSId);
+	resourceManager->DeleteResource<Shader>(distortionCSId);
 	resourceManager->DeleteResource<Shader>(luminanceCSId);
 	resourceManager->DeleteResource<Shader>(luminanceIterationCSId);
 	resourceManager->DeleteResource<Shader>(bloomHorizontalCSId);
 	resourceManager->DeleteResource<Shader>(bloomVerticalCSId);
 	resourceManager->DeleteResource<Shader>(toneMappingPSId);
-
-	resourceManager->DeleteResource<Sampler>(samplerPointId);
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX12Renderer* renderer)
@@ -100,6 +115,8 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	auto resourceManager = renderer->GetResourceManager();
 	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
 	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
+	resourceManager->DeleteResource<RenderTarget>(sceneDistortionTargetId);
+	resourceManager->DeleteResource<RWBuffer>(sceneBufferId);
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
 
@@ -108,17 +125,24 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	CreateBuffers(renderer->GetDevice(), commandList, resourceManager, width, height);
 	renderer->EndCreatingResources();
 
+	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 
+	distortionComputeObject->UpdateRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
+
+	luminanceComputeObject->UpdateBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	luminanceComputeObject->UpdateRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
+
 	luminanceIterationComputeObject->UpdateRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
 
+	bloomHorizontalObject->UpdateBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	bloomHorizontalObject->UpdateBuffer(1u, luminanceBufferResource->resourceGPUAddress);
 	bloomHorizontalObject->UpdateRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
 
 	bloomVerticalObject->UpdateRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
 
+	toneMappingMaterial->UpdateBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	toneMappingMaterial->UpdateBuffer(1u, luminanceBufferResource->resourceGPUAddress);
 	toneMappingMaterial->UpdateBuffer(2u, bloomBufferResource->resourceGPUAddress);
 }
@@ -135,16 +159,40 @@ void Common::Logic::SceneEntity::PostProcessManager::SetGBuffer(ID3D12GraphicsCo
 	commandList->OMSetRenderTargets(1u, &sceneColorTargetDescriptor, true, &sceneDepthTargetDescriptor);
 }
 
+void Common::Logic::SceneEntity::PostProcessManager::SetDistortBuffer(ID3D12GraphicsCommandList* commandList)
+{
+	sceneColorTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	sceneDistortionTargetGPUResource->EndBarrier(commandList);
+
+	commandList->ClearRenderTargetView(sceneDistortionTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
+	commandList->OMSetRenderTargets(1u, &sceneDistortionTargetDescriptor, true, nullptr);
+}
+
 void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsCommandList* commandList)
 {
-	sceneColorTargetGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	sceneColorTargetGPUResource->EndBarrier(commandList);
+	sceneDistortionTargetGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	sceneBufferGPUResource->EndBarrier(commandList);
+
+	distortionConstants.widthU = _width;
+	distortionConstants.area = _width * _height;
+	distortionConstants.width = static_cast<float>(_width);
+	distortionConstants.height = static_cast<float>(_height);
+
+	uint32_t numGroupsX = std::max(distortionConstants.area / THREADS_PER_GROUP, 1u);
+
+	distortionComputeObject->Set(commandList);
+	distortionComputeObject->SetRootConstants(commandList, 0u, 4u, &distortionConstants);
+	distortionComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+
+	sceneBufferGPUResource->UAVBarrier(commandList);
+	sceneBufferGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	luminanceBufferGPUResource->EndBarrier(commandList);
 
 	hdrConstants.width = _width;
-	hdrConstants.area = _width * _height;
+	hdrConstants.area = distortionConstants.area;
 	uint32_t remain = hdrConstants.area % THREADS_PER_GROUP;
-	uint32_t numGroupsX = std::max(hdrConstants.area / THREADS_PER_GROUP, 1u);
-
+	
 	luminanceComputeObject->Set(commandList);
 	luminanceComputeObject->SetRootConstants(commandList, 0u, 2u, &hdrConstants);
 	luminanceComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
@@ -169,24 +217,26 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 	luminanceBufferGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	bloomBufferGPUResource->EndBarrier(commandList);
 
-	numGroupsX = std::max(_width * _height / (THREADS_PER_GROUP - HALF_BLUR_SAMPLES_NUMBER * 2u), 1u);
+	toneMappingConstants.width = _width;
+	toneMappingConstants.area = _width * _height;
+	toneMappingConstants.halfWidth = _width / 2u;
+	toneMappingConstants.quartArea = _width * _height / 4u;
 
-	hdrConstants.width = _width / 2u;
-	hdrConstants.area = _width * _height / 4u;
+	numGroupsX = std::max(toneMappingConstants.quartArea / (THREADS_PER_GROUP - HALF_BLUR_SAMPLES_NUMBER * 2u), 1u);
 
 	bloomHorizontalObject->Set(commandList);
-	bloomHorizontalObject->SetRootConstants(commandList, 0u, 5u, &hdrConstants);
+	bloomHorizontalObject->SetRootConstants(commandList, 0u, 7u, &toneMappingConstants);
 	bloomHorizontalObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 
-	sceneColorTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	sceneBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	luminanceBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	bloomBufferGPUResource->UAVBarrier(commandList);
 
 	uint32_t verticalBlurConstants[3]
 	{
-		_width / 2u,
+		toneMappingConstants.halfWidth,
 		_height / 2u,
-		hdrConstants.area
+		toneMappingConstants.quartArea
 	};
 
 	bloomVerticalObject->Set(commandList);
@@ -203,15 +253,17 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 	luminanceBufferGPUResource->UAVBarrier(commandList);
 	bloomBufferGPUResource->UAVBarrier(commandList);
 
-	sceneColorTargetGPUResource->EndBarrier(commandList);
+	sceneBufferGPUResource->EndBarrier(commandList);
 	luminanceBufferGPUResource->EndBarrier(commandList);
 	bloomBufferGPUResource->EndBarrier(commandList);
 
 	toneMappingMaterial->Set(commandList);
-	toneMappingMaterial->SetRootConstants(commandList, 0u, 4u, &hdrConstants);
+	toneMappingMaterial->SetRootConstants(commandList, 0u, 6u, &toneMappingConstants);
 	quadMesh->DrawOnly(commandList);
 
 	sceneColorTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	sceneDistortionTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	sceneBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	luminanceBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	bloomBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 }
@@ -267,22 +319,40 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 
 	sceneColorTargetId = resourceManager->CreateTextureResource(device, commandList,
 		TextureResourceType::RENDER_TARGET, sceneTargetDesc);
-
 	sceneDepthTargetId = resourceManager->CreateTextureResource(device, commandList,
 		TextureResourceType::DEPTH_STENCIL_TARGET, sceneTargetDesc);
+
+	sceneTargetDesc.format = DXGI_FORMAT_R16G16_FLOAT;
+
+	sceneDistortionTargetId = resourceManager->CreateTextureResource(device, commandList,
+		TextureResourceType::RENDER_TARGET, sceneTargetDesc);
 
 	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
 	auto sceneDepthTargetResource = resourceManager->GetResource<DepthStencilTarget>(sceneDepthTargetId);
 
+	auto sceneDistortionTargetResource = resourceManager->GetResource<RenderTarget>(sceneDistortionTargetId);
+
 	sceneColorTargetGPUResource = sceneColorTargetResource->resource;
+	sceneDistortionTargetGPUResource = sceneDistortionTargetResource->resource;
 
 	sceneColorTargetDescriptor = sceneColorTargetResource->rtvDescriptor.cpuDescriptor;
 	sceneDepthTargetDescriptor = sceneDepthTargetResource->dsvDescriptor.cpuDescriptor;
+
+	sceneDistortionTargetDescriptor = sceneDistortionTargetResource->rtvDescriptor.cpuDescriptor;
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	Graphics::Resources::ResourceManager* resourceManager, uint32_t width, uint32_t height)
 {
+	BufferDesc sceneBufferDesc{};
+	sceneBufferDesc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	sceneBufferDesc.dataStride = sizeof(float) * 4u;
+	sceneBufferDesc.numElements = width * height;
+	sceneBufferDesc.data.resize(static_cast<uint64_t>(sceneBufferDesc.dataStride) * sceneBufferDesc.numElements, 0u);
+
+	sceneBufferId = resourceManager->CreateBufferResource(device, commandList,
+		BufferResourceType::RW_BUFFER, sceneBufferDesc);
+
 	BufferDesc luminanceBufferDesc{};
 	luminanceBufferDesc.format = DXGI_FORMAT_R32_FLOAT;
 	luminanceBufferDesc.dataStride = sizeof(float);
@@ -301,9 +371,11 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device*
 	bloomBufferId = resourceManager->CreateBufferResource(device, commandList,
 		BufferResourceType::RW_BUFFER, bloomBufferDesc);
 
+	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 
+	sceneBufferGPUResource = sceneBufferResource->resource;
 	luminanceBufferGPUResource = luminanceBufferResource->resource;
 	bloomBufferGPUResource = bloomBufferResource->resource;
 }
@@ -313,6 +385,8 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 	quadVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\QuadVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
+	distortionCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\DistortionCS.hlsl",
+		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
 	luminanceCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\LuminanceCS.hlsl",
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
 	luminanceIterationCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\LuminanceIterationCS.hlsl",
@@ -326,30 +400,21 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
 }
 
-void Common::Logic::SceneEntity::PostProcessManager::CreateSamplers(ID3D12Device* device,
-	Graphics::Resources::ResourceManager* resourceManager)
-{
-	samplerPointId = resourceManager->CreateSamplerResource(device,
-		Graphics::DirectX12Utilities::CreateSamplerDesc(Graphics::DefaultFilterSetup::FILTER_POINT_CLAMP));
-}
-
 void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Device* device, ResourceManager* resourceManager,
 	Graphics::DirectX12Renderer* renderer)
 {
-	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
+	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
-	auto samplerPointResource = resourceManager->GetResource<Sampler>(samplerPointId);
-
+	
 	auto quadVS = resourceManager->GetResource<Shader>(quadVSId);
 	auto toneMappingPS = resourceManager->GetResource<Shader>(toneMappingPSId);
 
 	MaterialBuilder materialBuilder{};
-	materialBuilder.SetRootConstants(0u, 4u);
-	materialBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetRootConstants(0u, 6u);
+	materialBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetBuffer(1u, luminanceBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetBuffer(2u, bloomBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetSampler(0u, samplerPointResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
 	materialBuilder.SetDepthStencilFormat(0u, false);
@@ -364,17 +429,31 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12Device* device, ResourceManager* resourceManager)
 {
 	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
+	auto sceneDistortionTargetResource = resourceManager->GetResource<RenderTarget>(sceneDistortionTargetId);
+	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 
+	auto samplerLinearResource = resourceManager->GetDefaultSampler(device, Graphics::DefaultFilterSetup::FILTER_BILINEAR_CLAMP);
+
+	auto distortionCS = resourceManager->GetResource<Shader>(distortionCSId);
 	auto luminanceCS = resourceManager->GetResource<Shader>(luminanceCSId);
 	auto luminanceIterationCS = resourceManager->GetResource<Shader>(luminanceIterationCSId);
 	auto bloomHorizontalCS = resourceManager->GetResource<Shader>(bloomHorizontalCSId);
 	auto bloomVerticalCS = resourceManager->GetResource<Shader>(bloomVerticalCSId);
 
 	ComputeObjectBuilder computeObjectBuilder{};
-	computeObjectBuilder.SetRootConstants(0u, 2u);
+	computeObjectBuilder.SetRootConstants(0u, 4u);
 	computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+	computeObjectBuilder.SetTexture(1u, sceneDistortionTargetResource->srvDescriptor.gpuDescriptor);
+	computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
+	computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+	computeObjectBuilder.SetShader(distortionCS->bytecode);
+
+	distortionComputeObject = computeObjectBuilder.Compose(device);
+
+	computeObjectBuilder.SetRootConstants(0u, 2u);
+	computeObjectBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetShader(luminanceCS->bytecode);
 
@@ -386,8 +465,8 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 
 	luminanceIterationComputeObject = computeObjectBuilder.Compose(device);
 
-	computeObjectBuilder.SetRootConstants(0u, 5u);
-	computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+	computeObjectBuilder.SetRootConstants(0u, 7u);
+	computeObjectBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetBuffer(1u, luminanceBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetShader(bloomHorizontalCS->bytecode);

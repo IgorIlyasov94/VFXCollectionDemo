@@ -82,17 +82,17 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateConstantBuffers(ID3D12Dev
 	sparklesConstants->viewProjection = _camera->GetViewProjection();
 	sparklesConstants->atlasElementOffset = float2(0.25f, 0.0f);
 	sparklesConstants->atlasElementSize = float2(1.0f / 8.0f, 1.0f / 8.0f);
-	sparklesConstants->colorIntensity = 1.0f;
+	sparklesConstants->colorIntensity = 0.5f;
 	sparklesConstants->padding = {};
 }
 
 void Common::Logic::SceneEntity::VFXLuxSparkles::LoadShaders(ID3D12Device* device,
 	Graphics::Resources::ResourceManager* resourceManager)
 {
-	vfxLuxSparklesVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxSparklesVS.hlsl",
+	vfxLuxSparklesVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\ParticleStandardVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
-	vfxLuxSparklesPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxSparklesPS.hlsl",
+	vfxLuxSparklesPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\ParticleStandardPS.hlsl",
 		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
 }
 
@@ -116,6 +116,8 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateMaterials(ID3D12Device* d
 	auto vfxLuxSparklesVS = resourceManager->GetResource<Shader>(vfxLuxSparklesVSId);
 	auto vfxLuxSparklesPS = resourceManager->GetResource<Shader>(vfxLuxSparklesPSId);
 
+	auto blendSetup = Graphics::DefaultBlendSetup::BLEND_PREMULT_ALPHA_ADDITIVE;
+
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetConstantBuffer(0u, sparklesConstantsResource->resourceGPUAddress);
 	materialBuilder.SetBuffer(0u, {}, D3D12_SHADER_VISIBILITY_VERTEX);
@@ -123,7 +125,7 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateMaterials(ID3D12Device* d
 	materialBuilder.SetTexture(2u, vfxAtlasResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_ALL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
-	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_ADDITIVE));
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
 	materialBuilder.SetDepthStencilFormat(32u, false);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
 

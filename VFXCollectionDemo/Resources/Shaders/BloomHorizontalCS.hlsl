@@ -11,6 +11,8 @@ cbuffer RootConstants : register(b0)
 {
 	uint width;
 	uint area;
+	uint halfWidth;
+	uint quartArea;
 	float middleGray;
 	float whiteCutoff;
 	float brightThreshold;
@@ -23,7 +25,7 @@ struct Input
 	uint groupIndex : SV_GroupIndex;
 };
 
-Texture2D sceneColor : register(t0);
+StructuredBuffer<float4> sceneBuffer : register(t0);
 StructuredBuffer<float> luminanceBuffer : register(t1);
 
 RWStructuredBuffer<float4> bloomBuffer : register(u0);
@@ -41,20 +43,24 @@ void main(Input input)
 	float luminance = luminanceBuffer[0] / area;
 	
 	uint bufferIndex = max(input.groupIndex + TEXTURE_BLOCK_WIDTH * input.groupId.x - HALF_SAMPLES_NUMBER, 0);
-	
 	uint2 texCoord;
-	texCoord.x = bufferIndex % width;
-	texCoord.y = min(bufferIndex, area - 1) / width;
+	texCoord.x = bufferIndex % halfWidth;
+	texCoord.y = bufferIndex / halfWidth;
 	texCoord *= 2u;
 	
-	uint2 texCoordAdj = texCoord + uint2(1u, 1u);
+	uint4 texIndex = (texCoord.x + texCoord.y * width).xxxx;
+	texIndex.y += width;
+	texIndex.z += 1u;
+	texIndex.w += width + 1u;
 	
-	float3 color = sceneColor[texCoord].xyz;
-	color += sceneColor[uint2(texCoord.x, texCoordAdj.y)].xyz;
-	color += sceneColor[uint2(texCoordAdj.x, texCoord.y)].xyz;
-	color += sceneColor[texCoordAdj].xyz;
+	texIndex = min(texIndex, area - 1);
 	
-	color = max(color - brightThreshold, 0.0f.xxx) * 0.25f;
+	float3 color = sceneBuffer[texIndex.x].xyz;
+	//color += sceneBuffer[texIndex.y].xyz;
+	//color += sceneBuffer[texIndex.z].xyz;
+	//color += sceneBuffer[texIndex.w].xyz;
+	
+	color = max(color - brightThreshold, 0.0f.xxx);// * 0.25f;
 	color *= middleGray / (luminance + 0.001f);
 	color *= 1.0f.xxx + color / whiteCutoff;
 	color /= 1.0f.xxx + color;
@@ -66,7 +72,7 @@ void main(Input input)
 	bool isValidRange = input.groupIndex >= (uint)HALF_SAMPLES_NUMBER;
 	isValidRange = isValidRange && (input.groupIndex < (NUM_THREADS - HALF_SAMPLES_NUMBER));
 	
-	isValidRange = isValidRange && (bufferIndex < area);
+	isValidRange = isValidRange && (bufferIndex < quartArea);
 	
 	if (!isValidRange)
 		return;

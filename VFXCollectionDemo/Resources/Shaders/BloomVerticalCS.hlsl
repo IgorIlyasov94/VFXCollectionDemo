@@ -21,7 +21,7 @@ struct Input
 	uint groupIndex : SV_GroupIndex;
 };
 
-RWStructuredBuffer<float4> textureBuffer : register(u0);
+RWStructuredBuffer<float4> bloomBuffer : register(u0);
 
 groupshared float3 groupBuffer[NUM_THREADS];
 
@@ -41,7 +41,7 @@ void main(Input input)
 	
 	bufferIndex = texCoord.x + texCoord.y * width;
 	
-	float3 color = textureBuffer[clamp(bufferIndex, 0, area - 1)].xyz;
+	float3 color = bloomBuffer[clamp(bufferIndex, 0, area - 1)].xyz;
 	groupBuffer[input.groupIndex] = color;
 	
 	GroupMemoryBarrierWithGroupSync();
@@ -59,5 +59,5 @@ void main(Input input)
 	for (int sampleIndex = -HALF_SAMPLES_NUMBER; sampleIndex <= HALF_SAMPLES_NUMBER; sampleIndex++)
 		resultColor += groupBuffer[input.groupIndex + sampleIndex] * Weight(sampleIndex, NORMAL_DISTRIBUTION_SIGMA);
 	
-	textureBuffer[bufferIndex] = float4(resultColor, 1.0f);
+	bloomBuffer[bufferIndex] = float4(resultColor, 1.0f);
 }

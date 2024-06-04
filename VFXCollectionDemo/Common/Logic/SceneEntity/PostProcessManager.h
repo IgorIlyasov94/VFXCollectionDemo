@@ -21,6 +21,8 @@ namespace Common::Logic::SceneEntity
 
 		void SetGBuffer(ID3D12GraphicsCommandList* commandList);
 
+		void SetDistortBuffer(ID3D12GraphicsCommandList* commandList);
+
 		void Render(ID3D12GraphicsCommandList* commandList);
 		void RenderToBackBuffer(ID3D12GraphicsCommandList* commandList);
 
@@ -37,7 +39,6 @@ namespace Common::Logic::SceneEntity
 			Graphics::Resources::ResourceManager* resourceManager, uint32_t width, uint32_t height);
 
 		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
-		void CreateSamplers(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
 		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			Graphics::DirectX12Renderer* renderer);
 		void CreateComputeObjects(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
@@ -47,6 +48,15 @@ namespace Common::Logic::SceneEntity
 		public:
 			float3 position;
 			DirectX::PackedVector::XMHALF2 texCoord;
+		};
+
+		struct DistortionConstants
+		{
+		public:
+			uint32_t widthU;
+			uint32_t area;
+			float width;
+			float height;
 		};
 
 		struct HDRConstants
@@ -59,11 +69,25 @@ namespace Common::Logic::SceneEntity
 			float brightThreshold;
 		};
 
+		struct ToneMappingConstants
+		{
+		public:
+			uint32_t width;
+			uint32_t area;
+			uint32_t halfWidth;
+			uint32_t quartArea;
+			float middleGray;
+			float whiteCutoff;
+			float brightThreshold;
+		};
+
 		static constexpr float CLEAR_COLOR[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
 
+		DistortionConstants distortionConstants;
 		HDRConstants hdrConstants;
+		ToneMappingConstants toneMappingConstants;
 
 		uint32_t _width;
 		uint32_t _height;
@@ -74,26 +98,32 @@ namespace Common::Logic::SceneEntity
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneColorTargetDescriptor;
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneDepthTargetDescriptor;
 
+		D3D12_CPU_DESCRIPTOR_HANDLE sceneDistortionTargetDescriptor;
+
 		Graphics::Resources::GPUResource* sceneColorTargetGPUResource;
+		Graphics::Resources::GPUResource* sceneDistortionTargetGPUResource;
+		Graphics::Resources::GPUResource* sceneBufferGPUResource;
 		Graphics::Resources::GPUResource* luminanceBufferGPUResource;
 		Graphics::Resources::GPUResource* bloomBufferGPUResource;
 
 		Graphics::Resources::ResourceID sceneColorTargetId;
 		Graphics::Resources::ResourceID sceneDepthTargetId;
 
+		Graphics::Resources::ResourceID sceneDistortionTargetId;
+		Graphics::Resources::ResourceID sceneBufferId;
 		Graphics::Resources::ResourceID luminanceBufferId;
 		Graphics::Resources::ResourceID bloomBufferId;
 
 		Graphics::Resources::ResourceID quadVSId;
+		Graphics::Resources::ResourceID distortionCSId;
 		Graphics::Resources::ResourceID luminanceCSId;
 		Graphics::Resources::ResourceID luminanceIterationCSId;
 		Graphics::Resources::ResourceID bloomHorizontalCSId;
 		Graphics::Resources::ResourceID bloomVerticalCSId;
 		Graphics::Resources::ResourceID toneMappingPSId;
 
-		Graphics::Resources::ResourceID samplerPointId;
-
 		Graphics::Assets::Mesh* quadMesh;
+		Graphics::Assets::ComputeObject* distortionComputeObject;
 		Graphics::Assets::ComputeObject* luminanceComputeObject;
 		Graphics::Assets::ComputeObject* luminanceIterationComputeObject;
 		Graphics::Assets::ComputeObject* bloomHorizontalObject;

@@ -81,7 +81,7 @@ void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* dev
 	pillarConstants->scrollSpeed1 = float2(-0.12f, -0.09f);
 	pillarConstants->displacementStrength = float4(-0.15f, 0.09f, -0.25f, 1.06f);
 	pillarConstants->color0 = float4(1.0f, 0.1239f, 0.0f, 1.0f);
-	pillarConstants->color1 = float4(4.2f, 0.7405f, 0.7512f, 1.0f);
+	pillarConstants->color1 = float4(2.2f, 1.7405f, 0.7512f, 1.0f);
 	pillarConstants->alphaIntensity = 1.4f;
 	pillarConstants->colorIntensity = 0.5f;
 	pillarConstants->time = 0.0f;
@@ -207,12 +207,14 @@ void Common::Logic::SceneEntity::VFXLux::CreateMaterials(ID3D12Device* device, R
 	auto vfxLuxPillarVS = resourceManager->GetResource<Shader>(vfxLuxPillarVSId);
 	auto vfxLuxPillarPS = resourceManager->GetResource<Shader>(vfxLuxPillarPSId);
 
+	auto blendSetup = Graphics::DefaultBlendSetup::BLEND_PREMULT_ALPHA_ADDITIVE;
+
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetConstantBuffer(0u, pillarConstantsResource->resourceGPUAddress);
 	materialBuilder.SetTexture(0u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_ALL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_ALL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
-	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_ADDITIVE));
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
 	materialBuilder.SetDepthStencilFormat(32u, false);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
 	materialBuilder.SetGeometryFormat(pillarMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);

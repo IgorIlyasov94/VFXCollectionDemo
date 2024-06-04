@@ -19,14 +19,14 @@ namespace Graphics::Assets::Loaders
 	{
 		UNDEFINED = 0u,
 		VERTEX_SHADER = 1u,
-		HULL_SHADER = 1u << 1u,
-		DOMAIN_SHADER = 1u << 2u,
-		GEOMETRY_SHADER = 1u << 3u,
-		MESH_SHADER = 1u << 4u,
-		AMPLIFICATION_SHADER = 1u << 5u,
-		PIXEL_SHADER = 1u << 6u,
-		RAYTRACING_SHADER = 1u << 7u,
-		COMPUTE_SHADER = 1u << 8u
+		HULL_SHADER = 2u,
+		DOMAIN_SHADER = 3u,
+		GEOMETRY_SHADER = 4u,
+		MESH_SHADER = 5u,
+		AMPLIFICATION_SHADER = 6u,
+		PIXEL_SHADER = 7u,
+		RAYTRACING_SHADER = 8u,
+		COMPUTE_SHADER = 9u
 	};
 
 	class HLSLLoader final
@@ -43,5 +43,8 @@ namespace Graphics::Assets::Loaders
 		HLSLLoader& operator=(HLSLLoader&&) = delete;
 
 		static std::wstring GetShaderProfileString(ShaderType type, ShaderVersion version);
+
+		static D3D12_SHADER_BYTECODE LoadCache(const std::filesystem::path& filePath);
+		static void SaveCache(const std::filesystem::path& filePath, D3D12_SHADER_BYTECODE bytecode);
 	};
 }

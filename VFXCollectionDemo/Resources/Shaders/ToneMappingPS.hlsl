@@ -4,6 +4,8 @@ cbuffer RootConstants : register(b0)
 {
 	uint width;
 	uint area;
+	uint halfWidth;
+	uint quartArea;
 	float middleGray;
 	float whiteCutoff;
 };
@@ -19,17 +21,20 @@ struct Output
 	float4 color : SV_TARGET0;
 };
 
-Texture2D sceneColor : register(t0);
+StructuredBuffer<float4> sceneBuffer : register(t0);
 StructuredBuffer<float> luminanceBuffer : register(t1);
 StructuredBuffer<float4> bloomBuffer : register(t2);
-
-SamplerState samplerLinear : register(s0);
 
 Output main(Input input)
 {
 	Output output = (Output)0;
 	
-	float3 color = sceneColor.SampleLevel(samplerLinear, input.texCoord, 0.0f).xyz;
+	uint maxCoordValue = area - 1;
+	
+	uint2 bufferCoord = (uint2)input.position.xy;
+	uint bufferIndex = min(bufferCoord.x + bufferCoord.y * width, maxCoordValue);
+	
+	float3 color = sceneBuffer[bufferIndex].xyz;
 	
 	float luminance = luminanceBuffer[0u] / area;
 	
@@ -43,9 +48,12 @@ Output main(Input input)
 	color *= 1.0f + color / whiteCutoff;
 	color /= 1.0f + color;
 	
-	uint2 bufferCoord = ((uint2)input.position.xy) / 2u;
+	maxCoordValue = quartArea - 1;
 	
-	float3 bloom = bloomBuffer[clamp(bufferCoord.x + bufferCoord.y * width, 0, area)].xyz;
+	bufferCoord = bufferCoord / 2u;
+	bufferIndex = min(bufferCoord.x + bufferCoord.y * halfWidth, maxCoordValue);
+	
+	float3 bloom = bloomBuffer[bufferIndex].xyz;
 	
 	output.color = float4(saturate(color + bloom), 1.0f);
 	

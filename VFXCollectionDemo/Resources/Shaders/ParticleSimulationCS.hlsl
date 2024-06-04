@@ -86,13 +86,8 @@ float3 RandomSpherePoint(float3 random)
 	return random * 2.0f - 1.0f.xxx;
 }
 
-Particle EmitParticle(float3 oldPosition, float index)
+Particle EmitParticle(float4 random0_0, float4 random1_0)
 {
-	uint2 texCoord = (uint2)(frac(oldPosition.xy + float2(index / maxParticlesNumber, 0.0f)) * perlinNoiseSize);
-	float4 randomModifier = perlinNoise[texCoord];
-	float4 random0_0 = frac(random0 + randomModifier);
-	float4 random1_0 = frac(random1 + randomModifier);
-	
 	Particle newParticle = (Particle)0;
 	newParticle.position = emitterOrigin + RandomSpherePoint(random0_0.xyz) * emitterRadius;
 	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, random0_0.zwx);
@@ -118,13 +113,19 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 	
 	Particle particle = particleBuffer[particleIndex];
 	
+	float2 swizzledCoord = ((float)(particleIndex) + time) / maxParticlesNumber;
+	uint2 texCoord = (uint2)(frac(particle.position.xy + swizzledCoord) * perlinNoiseSize);
+	float4 randomModifier = perlinNoise[texCoord];
+	float4 random0_0 = frac(random0 + randomModifier);
+	float4 random1_0 = frac(random1 + randomModifier);
+	
 	[branch]
 	if (particle.life <= 0.0f)
 	{
 		float emitProbability = averageParticleEmit * deltaTime;
 		
-		if (random0.z <= emitProbability)
-			particle = EmitParticle(particle.position, (float)(particleIndex) + time);
+		if (random0_0.z <= emitProbability)
+			particle = EmitParticle(random0_0, random1_0);
 	}
 	else
 	{

@@ -239,15 +239,18 @@ D3D12_BLEND_DESC Graphics::DirectX12Utilities::CreateBlendDesc(DefaultBlendSetup
 	{
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-		desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_SRC_ALPHA;
-		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+		desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 	}
-	else if (setup == DefaultBlendSetup::BLEND_ADDITIVE)
+	else if (setup == DefaultBlendSetup::BLEND_ADDITIVE ||
+		setup == DefaultBlendSetup::BLEND_PREMULT_ALPHA_ADDITIVE)
 	{
-		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		desc.RenderTarget[0].SrcBlend = setup == DefaultBlendSetup::BLEND_PREMULT_ALPHA_ADDITIVE ?
+			D3D12_BLEND_SRC_ALPHA : D3D12_BLEND_ONE;
+
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
-		desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_SRC_ALPHA;
-		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+		desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 	}
 	else
 	{
