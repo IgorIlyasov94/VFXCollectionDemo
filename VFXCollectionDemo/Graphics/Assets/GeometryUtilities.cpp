@@ -29,6 +29,24 @@ float3 Graphics::Assets::GeometryUtilities::CalculateNormal(const float3& point0
 	return result;
 }
 
+float3 Graphics::Assets::GeometryUtilities::CalculateTangent(const float3& normal) noexcept
+{
+	float3 v0(0.0f, 0.0f, 1.0f);
+	float3 v1(0.0f, 1.0f, 0.0f);
+
+	floatN t0 = XMVector3Cross(XMLoadFloat3(&normal), XMLoadFloat3(&v0));
+	floatN t1 = XMVector3Cross(XMLoadFloat3(&normal), XMLoadFloat3(&v1));
+
+	float3 tangent{};
+
+	if (XMVector3Length(t0).m128_f32[0] > XMVector3Length(t1).m128_f32[0])
+		XMStoreFloat3(&tangent, XMVector3Normalize(t0));
+	else
+		XMStoreFloat3(&tangent, XMVector3Normalize(t1));
+
+	return tangent;
+}
+
 float3 Graphics::Assets::GeometryUtilities::CalculateBarycentric(float3 point0, float3 point1, float3 point2, float3 point) noexcept
 {
 	float triangleArea = CalculateTriangleArea(point0, point1, point2);
@@ -203,19 +221,7 @@ void Graphics::Assets::GeometryUtilities::CalculateTangents(size_t stride, std::
 		normal.y = DirectX::PackedVector::XMConvertHalfToFloat(half4Normal.y);
 		normal.z = DirectX::PackedVector::XMConvertHalfToFloat(half4Normal.z);
 
-		float3 v0(0.0f, 0.0f, 1.0f);
-		float3 v1(0.0f, 1.0f, 0.0f);
-
-		floatN t0 = XMVector3Cross(XMLoadFloat3(&normal), XMLoadFloat3(&v0));
-		floatN t1 = XMVector3Cross(XMLoadFloat3(&normal), XMLoadFloat3(&v1));
-
-		float3 tangent{};
-
-		if (XMVector3Length(t0).m128_f32[0] > XMVector3Length(t1).m128_f32[0])
-			XMStoreFloat3(&tangent, XMVector3Normalize(t0));
-		else
-			XMStoreFloat3(&tangent, XMVector3Normalize(t1));
-
+		auto tangent = CalculateTangent(normal);
 		DirectX::PackedVector::XMHALF4 half4Tangent{};
 		half4Tangent.x = DirectX::PackedVector::XMConvertFloatToHalf(tangent.x);
 		half4Tangent.y = DirectX::PackedVector::XMConvertFloatToHalf(tangent.y);

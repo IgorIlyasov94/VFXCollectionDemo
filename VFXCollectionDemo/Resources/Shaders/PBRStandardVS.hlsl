@@ -2,7 +2,8 @@ cbuffer MutableConstants : register(b0)
 {
 	float4x4 world;
 	float4x4 viewProj;
-	float4 cameraDirection;
+	float3 cameraDirection;
+	float time;
 };
 
 struct Input

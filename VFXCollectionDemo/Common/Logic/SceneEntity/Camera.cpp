@@ -24,6 +24,11 @@ void Common::Logic::SceneEntity::Camera::Update(const float3& position, const fl
 	viewProjection = view * projection;
 	invView = XMMatrixInverse(nullptr, view);
 	invViewProjection = XMMatrixInverse(nullptr, viewProjection);
+
+	auto _direction = _lookAt - _position;
+	_direction = XMVector3Normalize(_direction);
+
+	XMStoreFloat3(&direction, _direction);
 }
 
 void Common::Logic::SceneEntity::Camera::UpdateProjection(float fovY, float aspectRatio, float zNear, float zFar)
@@ -35,32 +40,37 @@ void Common::Logic::SceneEntity::Camera::UpdateProjection(float fovY, float aspe
 	invViewProjection = XMMatrixInverse(nullptr, viewProjection);
 }
 
-const float4x4& Common::Logic::SceneEntity::Camera::GetView()
+const float4x4& Common::Logic::SceneEntity::Camera::GetView() const
 {
 	return view;
 }
 
-const float4x4& Common::Logic::SceneEntity::Camera::GetProjection()
+const float4x4& Common::Logic::SceneEntity::Camera::GetProjection() const
 {
 	return projection;
 }
 
-const float4x4& Common::Logic::SceneEntity::Camera::GetViewProjection()
+const float4x4& Common::Logic::SceneEntity::Camera::GetViewProjection() const
 {
 	return viewProjection;
 }
 
-const float4x4& Common::Logic::SceneEntity::Camera::GetInvView()
+const float4x4& Common::Logic::SceneEntity::Camera::GetInvView() const
 {
 	return invView;
 }
 
-const float4x4& Common::Logic::SceneEntity::Camera::GetInvProjection()
+const float4x4& Common::Logic::SceneEntity::Camera::GetInvProjection() const
 {
 	return invProjection;
 }
 
-const float4x4& Common::Logic::SceneEntity::Camera::GetInvViewProjection()
+const float4x4& Common::Logic::SceneEntity::Camera::GetInvViewProjection() const
 {
 	return invViewProjection;
+}
+
+const float3& Common::Logic::SceneEntity::Camera::GetDirection() const
+{
+	return direction;
 }

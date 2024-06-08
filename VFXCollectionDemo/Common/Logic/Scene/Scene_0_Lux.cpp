@@ -17,7 +17,8 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	camera(nullptr), postProcessManager(nullptr), mutableConstantsBuffer{}, mutableConstantsId{},
 	environmentFloorAlbedoId{}, environmentFloorNormalId{}, vfxAtlasId{}, perlinNoiseId{}, pbrStandardVSId{},
 	pbrStandardPSId{}, particleSimulationCSId{}, environmentWorld{}, timer{}, _deltaTime{}, fps(60.0f),
-	cpuTimeCounter{}, prevTimePoint{}, frameCounter{}, vfxLux{}, vfxLuxSparkles{}
+	cpuTimeCounter{}, prevTimePoint{}, frameCounter{}, vfxLux{}, vfxLuxSparkles{}, environmentWallsAlbedoId{},
+	environmentWallsNormalId{}, wallsMaterial{}, wallsMesh{}, wallsMeshObject{}, vfxLuxDistorters{}
 {
 	environmentPosition = float3(0.0f, 0.0f, 0.0f);
 	cameraPosition = float3(0.0f, 0.0f, 5.0f);
@@ -68,15 +69,21 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 	auto resourceManager = renderer->GetResourceManager();
 
 	delete environmentMaterial;
+	delete wallsMaterial;
 
 	environmentMesh->Release(resourceManager);
 	delete environmentMesh;
+
+	wallsMesh->Release(resourceManager);
+	delete wallsMesh;
 
 	delete environmentMeshObject;
 
 	resourceManager->DeleteResource<ConstantBuffer>(mutableConstantsId);
 	resourceManager->DeleteResource<Texture>(environmentFloorAlbedoId);
 	resourceManager->DeleteResource<Texture>(environmentFloorNormalId);
+	resourceManager->DeleteResource<Texture>(environmentWallsAlbedoId);
+	resourceManager->DeleteResource<Texture>(environmentWallsNormalId);
 	resourceManager->DeleteResource<Texture>(vfxAtlasId);
 	resourceManager->DeleteResource<Texture>(perlinNoiseId);
 
@@ -125,13 +132,8 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 
 	mutableConstantsBuffer->viewProjection = camera->GetViewProjection();
+	mutableConstantsBuffer->cameraDirection = camera->GetDirection();
 	mutableConstantsBuffer->time = timer;
-
-	auto cameraDirection = XMLoadFloat3(&cameraLookAt);
-	cameraDirection -= XMLoadFloat3(&cameraPosition);
-	cameraDirection = XMVector3Normalize(cameraDirection);
-
-	XMStoreFloat4(&mutableConstantsBuffer->cameraDirection, cameraDirection);
 
 	auto currentTimePoint = std::chrono::high_resolution_clock::now();
 	auto deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(currentTimePoint - prevTimePoint);
@@ -213,14 +215,8 @@ void Common::Logic::Scene::Scene_0_Lux::CreateConstantBuffers(ID3D12Device* devi
 	mutableConstantsBuffer = reinterpret_cast<MutableConstants*>(mutableConstantsResource->resourceCPUAddress);
 	mutableConstantsBuffer->world = environmentWorld;
 	mutableConstantsBuffer->viewProjection = camera->GetViewProjection();
+	mutableConstantsBuffer->cameraDirection = camera->GetDirection();
 	mutableConstantsBuffer->time = 0.0f;
-	mutableConstantsBuffer->padding = float3(0.0f, 0.0f, 0.0f);
-
-	auto cameraDirection = XMLoadFloat3(&cameraLookAt);
-	cameraDirection -= XMLoadFloat3(&cameraPosition);
-	cameraDirection = XMVector3Normalize(cameraDirection);
-
-	XMStoreFloat4(&mutableConstantsBuffer->cameraDirection, cameraDirection);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager)

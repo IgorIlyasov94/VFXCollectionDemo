@@ -15,13 +15,15 @@ namespace Common::Logic::SceneEntity
 		void Update(const float3& position, const float3& lookAt, const float3& upVector);
 		void UpdateProjection(float fovY, float aspectRatio, float zNear, float zFar);
 
-		const float4x4& GetView();
-		const float4x4& GetProjection();
-		const float4x4& GetViewProjection();
+		const float4x4& GetView() const;
+		const float4x4& GetProjection() const;
+		const float4x4& GetViewProjection() const;
 
-		const float4x4& GetInvView();
-		const float4x4& GetInvProjection();
-		const float4x4& GetInvViewProjection();
+		const float4x4& GetInvView() const;
+		const float4x4& GetInvProjection() const;
+		const float4x4& GetInvViewProjection() const;
+
+		const float3& GetDirection() const;
 
 	private:
 		Camera() = delete;
@@ -33,5 +35,7 @@ namespace Common::Logic::SceneEntity
 		float4x4 invView;
 		float4x4 invProjection;
 		float4x4 invViewProjection;
+
+		float3 direction;
 	};
 }

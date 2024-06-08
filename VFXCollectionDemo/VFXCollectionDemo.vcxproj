@@ -26,6 +26,8 @@
     <ClInclude Include="Common\Logic\SceneEntity\MeshObject.h" />
     <ClInclude Include="Common\Logic\SceneEntity\ParticleSystem.h" />
     <ClInclude Include="Common\Logic\SceneEntity\PostProcessManager.h" />
+    <ClInclude Include="Common\Logic\SceneEntity\Terrain.h" />
+    <ClInclude Include="Common\Logic\SceneEntity\VegetationSystem.h" />
     <ClInclude Include="Common\Logic\SceneEntity\VFXLux.h" />
     <ClInclude Include="Common\Logic\SceneEntity\VFXLuxDistorters.h" />
     <ClInclude Include="Common\Logic\SceneEntity\VFXLuxSparkles.h" />
@@ -78,6 +80,8 @@
     <ClCompile Include="Common\Logic\SceneEntity\MeshObject.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\ParticleSystem.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\PostProcessManager.cpp" />
+    <ClCompile Include="Common\Logic\SceneEntity\Terrain.cpp" />
+    <ClCompile Include="Common\Logic\SceneEntity\VegetationSystem.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\VFXLux.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\VFXLuxDistorters.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\VFXLuxSparkles.cpp" />

@@ -189,6 +189,12 @@
     <ClCompile Include="Common\Logic\SceneEntity\VFXLuxDistorters.cpp">
       <Filter>Исходные файлы\Common\Logic\SceneEntity</Filter>
     </ClCompile>
+    <ClCompile Include="Common\Logic\SceneEntity\VegetationSystem.cpp">
+      <Filter>Исходные файлы\Common\Logic\SceneEntity</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Logic\SceneEntity\Terrain.cpp">
+      <Filter>Исходные файлы\Common\Logic\SceneEntity</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Includes.h">
@@ -342,6 +348,12 @@
       <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
     </ClInclude>
     <ClInclude Include="Common\Logic\SceneEntity\VFXLuxDistorters.h">
+      <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\SceneEntity\VegetationSystem.h">
+      <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\SceneEntity\Terrain.h">
       <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
     </ClInclude>
   </ItemGroup>

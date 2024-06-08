@@ -10,6 +10,7 @@ namespace Graphics::Assets
 		static float CalculateTriangleArea(float3 point0, float3 point1, float3 point2) noexcept;
 
 		static float3 CalculateNormal(const float3& point0, const float3& point1, const float3& point2) noexcept;
+		static float3 CalculateTangent(const float3& normal) noexcept;
 		static float3 CalculateBarycentric(float3 point0, float3 point1, float3 point2, float3 point) noexcept;
 
 		static bool PointInTriangle(const float3& point0, const float3& point1, const float3& point2, const float3& point) noexcept;

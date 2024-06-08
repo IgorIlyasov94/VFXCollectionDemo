@@ -90,13 +90,13 @@ Particle EmitParticle(float4 random0_0, float4 random1_0)
 {
 	Particle newParticle = (Particle)0;
 	newParticle.position = emitterOrigin + RandomSpherePoint(random0_0.xyz) * emitterRadius;
-	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, random0_0.zwx);
+	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, random0_0.w);
 	
 	newParticle.rotation = lerp(minRotation, maxRotation, random1_0.x);
 	newParticle.rotationSpeed = lerp(minRotationSpeed, maxRotationSpeed, random1_0.y);
 	
-	newParticle.size = lerp(minSize, maxSize, random1_0.zw);
-	newParticle.startLife = lerp(minLifeSec, maxLifeSec, random1_0.y);
+	newParticle.size = lerp(minSize, maxSize, random1_0.z);
+	newParticle.startLife = lerp(minLifeSec, maxLifeSec, random1_0.w);
 	
 	newParticle.life = newParticle.startLife;
 	

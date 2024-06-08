@@ -82,7 +82,7 @@ void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* dev
 	pillarConstants->displacementStrength = float4(-0.15f, 0.09f, -0.25f, 1.06f);
 	pillarConstants->color0 = float4(1.0f, 0.1239f, 0.0f, 1.0f);
 	pillarConstants->color1 = float4(2.2f, 1.7405f, 0.7512f, 1.0f);
-	pillarConstants->alphaIntensity = 1.4f;
+	pillarConstants->alphaIntensity = 5.4f;
 	pillarConstants->colorIntensity = 0.5f;
 	pillarConstants->time = 0.0f;
 }

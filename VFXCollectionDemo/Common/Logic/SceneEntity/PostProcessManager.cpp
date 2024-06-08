@@ -382,21 +382,31 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device*
 
 void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager)
 {
-	quadVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\QuadVS.hlsl",
-		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
+	quadVSId = resourceManager->CreateShaderResource(device,
+		"Resources\\Shaders\\PostProcess\\QuadVS.hlsl", ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
-	distortionCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\DistortionCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
-	luminanceCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\LuminanceCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
-	luminanceIterationCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\LuminanceIterationCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
-	bloomHorizontalCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\BloomHorizontalCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
-	bloomVerticalCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\BloomVerticalCS.hlsl",
+	distortionCSId = resourceManager->CreateShaderResource(device,
+		"Resources\\Shaders\\PostProcess\\DistortionCS.hlsl",
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
 
-	toneMappingPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\ToneMappingPS.hlsl",
+	luminanceCSId = resourceManager->CreateShaderResource(device,
+		"Resources\\Shaders\\PostProcess\\LuminanceCS.hlsl",
+		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
+
+	luminanceIterationCSId = resourceManager->CreateShaderResource(device,
+		"Resources\\Shaders\\PostProcess\\LuminanceIterationCS.hlsl",
+		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
+
+	bloomHorizontalCSId = resourceManager->CreateShaderResource(device,
+		"Resources\\Shaders\\PostProcess\\BloomHorizontalCS.hlsl",
+		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
+
+	bloomVerticalCSId = resourceManager->CreateShaderResource(device,
+		"Resources\\Shaders\\PostProcess\\BloomVerticalCS.hlsl",
+		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
+
+	toneMappingPSId = resourceManager->CreateShaderResource(device,
+		"Resources\\Shaders\\PostProcess\\ToneMappingPS.hlsl",
 		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
 }
 

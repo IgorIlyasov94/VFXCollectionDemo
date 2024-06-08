@@ -59,9 +59,8 @@ namespace Common::Logic::Scene
 		public:
 			float4x4 world;
 			float4x4 viewProjection;
-			float4 cameraDirection;
+			float3 cameraDirection;
 			float time;
-			float3 padding;
 		};
 
 		float3 cameraPosition;

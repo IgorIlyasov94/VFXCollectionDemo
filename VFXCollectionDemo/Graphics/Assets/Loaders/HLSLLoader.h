@@ -46,5 +46,24 @@ namespace Graphics::Assets::Loaders
 
 		static D3D12_SHADER_BYTECODE LoadCache(const std::filesystem::path& filePath);
 		static void SaveCache(const std::filesystem::path& filePath, D3D12_SHADER_BYTECODE bytecode);
+
+		class CustomIncludeHandler : public IDxcIncludeHandler
+		{
+		public:
+			CustomIncludeHandler(const std::filesystem::path& filePath, IDxcUtils* utils);
+
+			HRESULT STDMETHODCALLTYPE LoadSource(_In_ LPCWSTR pFilename,
+				_COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource) override;
+
+			HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,
+				_COM_Outptr_ void __RPC_FAR* __RPC_FAR* ppvObject) override;
+
+			ULONG STDMETHODCALLTYPE AddRef(void) override;
+			ULONG STDMETHODCALLTYPE Release(void) override;
+
+			IDxcUtils* _utils;
+			const std::filesystem::path& _filePath;
+			std::unordered_set<std::filesystem::path> includedFiles;
+		};
 	};
 }
