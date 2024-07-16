@@ -74,7 +74,7 @@ Output main(Input input)
 	
 	float3 ambient = lerp(float3(0.4f, 0.35f, 0.1f), float3(0.5f, 0.6f, 0.65f), saturate(normal.z * 0.5f + 0.5f));
 	
-	output.color = float4(lightSum + albedo * ambient * 0.01f, 1.0f);
+	output.color = float4(lightSum + albedo * ambient, 1.0f);
 	
 	return output;
 }

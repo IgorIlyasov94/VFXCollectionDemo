@@ -17,7 +17,9 @@ Common::Logic::SceneEntity::VegatationSystem::VegatationSystem(ID3D12GraphicsCom
 	Graphics::DirectX12Renderer* renderer, const VegetationSystemDesc& desc, const Camera* camera)
 {
 	_camera = camera;
-	randomEngine = desc.randomEngine;
+
+	std::random_device randomDevice;
+	randomEngine = std::mt19937(randomDevice());
 
 	auto device = renderer->GetDevice();
 	auto resourceManager = renderer->GetResourceManager();
@@ -45,8 +47,10 @@ void Common::Logic::SceneEntity::VegatationSystem::Draw(ID3D12GraphicsCommandLis
 	float time, float deltaTime)
 {
 	mutableConstantsBuffer->viewProjection = _camera->GetViewProjection();
-	mutableConstantsBuffer->cameraDirection = _camera->GetDirection();
+	mutableConstantsBuffer->cameraPosition = _camera->GetPosition();
 	mutableConstantsBuffer->time = time;
+	mutableConstantsBuffer->windDirection = *windDirection;
+	mutableConstantsBuffer->windStrength = *windStrength;
 
 	_material->Set(commandList);
 	_mesh->Draw(commandList, instancesNumber);
@@ -127,10 +131,16 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateConstantBuffers(ID3D12D
 	auto mutableConstantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
 	mutableConstantsBuffer = reinterpret_cast<MutableConstants*>(mutableConstantsResource->resourceCPUAddress);
 	mutableConstantsBuffer->viewProjection = _camera->GetViewProjection();
-	mutableConstantsBuffer->cameraDirection = _camera->GetDirection();
+	mutableConstantsBuffer->cameraPosition = _camera->GetPosition();
 	mutableConstantsBuffer->time = 0.0f;
 	mutableConstantsBuffer->atlasElementSize.x = 1.0f / desc.atlasRows;
 	mutableConstantsBuffer->atlasElementSize.y = 1.0f / desc.atlasColumns;
+	mutableConstantsBuffer->perlinNoiseTiling = desc.perlinNoiseTiling;
+	mutableConstantsBuffer->windDirection = *desc.windDirection;
+	mutableConstantsBuffer->windStrength = *desc.windStrength;
+
+	windDirection = desc.windDirection;
+	windStrength = desc.windStrength;
 }
 
 void Common::Logic::SceneEntity::VegatationSystem::CreateBuffers(ID3D12Device* device,
@@ -160,22 +170,42 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateBuffers(ID3D12Device* d
 		DDSLoader::Load(desc.vegetationMapFileName, vegetationMapDesc);
 
 		XMUBYTE4 mask{};
-		mask.x = 255u;
-
-		FillVegetationBuffer(bufferDesc.data.data(), vegetationMapDesc, desc, smallGrassInstanceNumber,
-			0u, QUADS_PER_SMALL_GRASS, mask);
-
-		mask.x = 0u;
-		mask.y = 255u;
-
-		FillVegetationBuffer(bufferDesc.data.data(), vegetationMapDesc, desc, mediumGrassInstanceNumber,
-			smallGrassInstanceNumber, QUADS_PER_MEDIUM_GRASS, mask);
-
-		mask.y = 0u;
 		mask.z = 255u;
 
-		FillVegetationBuffer(bufferDesc.data.data(), vegetationMapDesc, desc, largeGrassInstanceNumber,
-			largeGrassInstanceStartIndex, QUADS_PER_LARGE_GRASS, mask);
+		VegetationBufferDesc vbDesc
+		{
+			bufferDesc.data.data(),
+			vegetationMapDesc,
+			desc,
+			smallGrassInstanceNumber,
+			0u,
+			QUADS_PER_SMALL_GRASS,
+			mask,
+			desc.smallGrassSize,
+			SMALL_GRASS_TILT_AMPLITUDE
+		};
+
+		FillVegetationBuffer(vbDesc);
+
+		vbDesc.elementNumber = mediumGrassInstanceNumber;
+		vbDesc.offset = smallGrassInstanceNumber;
+		vbDesc.quadNumber = QUADS_PER_MEDIUM_GRASS;
+		vbDesc.mask.z = 0u;
+		vbDesc.mask.y = 255u;
+		vbDesc.grassSize = desc.mediumGrassSize;
+		vbDesc.tiltAmplitude = MEDIUM_GRASS_TILT_AMPLITUDE;
+
+		FillVegetationBuffer(vbDesc);
+
+		vbDesc.elementNumber = largeGrassInstanceNumber;
+		vbDesc.offset = largeGrassInstanceStartIndex;
+		vbDesc.quadNumber = QUADS_PER_LARGE_GRASS;
+		vbDesc.mask.y = 0u;
+		vbDesc.mask.x = 255u;
+		vbDesc.grassSize = desc.largeGrassSize;
+		vbDesc.tiltAmplitude = LARGE_GRASS_TILT_AMPLITUDE;
+
+		FillVegetationBuffer(vbDesc);
 
 		SaveCache(desc.vegetationCacheFileName, bufferDesc.data.data(), bufferDesc.data.size());
 	}
@@ -236,15 +266,13 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterial(ID3D12Device* 
 	_material = materialBuilder.ComposeStandard(device);
 }
 
-void Common::Logic::SceneEntity::VegatationSystem::FillVegetationBuffer(uint8_t* buffer,
-	const TextureDesc& vegetationMapDesc, const VegetationSystemDesc& desc, uint32_t elementNumber,
-	uint32_t offset, uint32_t quadNumber, XMUBYTE4 mask)
+void Common::Logic::SceneEntity::VegatationSystem::FillVegetationBuffer(const VegetationBufferDesc& desc)
 {
-	auto vegetations = reinterpret_cast<Vegetation*>(buffer);
+	auto vegetations = reinterpret_cast<Vegetation*>(desc.buffer);
 
 	auto origin = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
 	auto identityQuaternion = XMQuaternionIdentity();
-	auto scale = XMVectorSet(1.0f, 1.0f, 1.0f, 0.0f);
+	auto scale = XMLoadFloat3(&desc.grassSize);
 	auto upVector = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
 	floatN position{};
@@ -253,70 +281,92 @@ void Common::Logic::SceneEntity::VegatationSystem::FillVegetationBuffer(uint8_t*
 	floatN rotation{};
 	float2 atlasElementOffset{};
 
-	for (uint32_t grassIndex = 0u; grassIndex < elementNumber; grassIndex++)
+	for (uint32_t grassIndex = 0u; grassIndex < desc.elementNumber; grassIndex++)
 	{
-		auto& vegetation = vegetations[grassIndex + offset];
+		auto& vegetation = vegetations[grassIndex + desc.offset];
 
-		if (grassIndex % quadNumber == 0u)
+		if (grassIndex % desc.quadNumber == 0u)
 		{
-			GetRandomData(vegetationMapDesc, desc, mask, position, upVectorTarget, atlasElementOffset);
+			GetRandomData(desc, position, upVectorTarget, atlasElementOffset);
 			rotation = CalculateRotation(upVector, upVectorTarget);
-			rolling = XMQuaternionRotationNormal(upVectorTarget, static_cast<float>(std::numbers::pi * 2.0 / 3.0));
+			rolling = XMQuaternionRotationAxis(upVectorTarget, static_cast<float>(std::numbers::pi * 2.0 / 3.0));
 		}
 		else
 			rotation = XMQuaternionMultiply(rotation, rolling);
 
 		vegetation.world = XMMatrixTransformation(origin, identityQuaternion, scale, origin, rotation, position);
 		vegetation.atlasElementOffset = atlasElementOffset;
-		vegetation.padding = {};
+		vegetation.tiltAmplitude = desc.tiltAmplitude;
+		vegetation.height = desc.grassSize.z;
 	}
 }
 
-void Common::Logic::SceneEntity::VegatationSystem::GetRandomData(const Graphics::Resources::TextureDesc& vegetationMapDesc,
-	const VegetationSystemDesc& desc, XMUBYTE4 mask, floatN& position, floatN& upVector, float2& atlasOffset)
+void Common::Logic::SceneEntity::VegatationSystem::GetRandomData(const VegetationBufferDesc& desc,
+	floatN& position, floatN& upVector, float2& atlasOffset)
 {
-	auto mapSize = static_cast<uint32_t>(vegetationMapDesc.width * vegetationMapDesc.height);
+	auto mapSize = static_cast<uint32_t>(desc.vegetationMapDesc.width * desc.vegetationMapDesc.height);
 	auto random = Utilities::Random(randomEngine);
+
+	auto absoluteUpVector = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
 	auto startIndex = std::min(static_cast<uint32_t>(random * mapSize), mapSize - 1u);
 
-	auto vegetationDataPtr = reinterpret_cast<const XMUBYTE4*>(vegetationMapDesc.data.data());
+	auto vegetationDataPtr = reinterpret_cast<const XMUBYTE4*>(desc.vegetationMapDesc.data.data());
 
-	auto terrain = desc.terrain;
+	auto terrain = desc.vegetationSystemDesc.terrain;
 	auto& minCorner = terrain->GetMinCorner();
 	auto& size = terrain->GetSize();
 
 	for (uint32_t pixelIndex = 0; pixelIndex < mapSize; pixelIndex++)
 	{
-		auto fetchedIndex = (pixelIndex + startIndex) % mapSize;
+		auto fetchedIndex = (pixelIndex * 32u + startIndex) % mapSize;
 
 		auto vegetationDataV = *(vegetationDataPtr + fetchedIndex);
-		int32_t vegetationData = vegetationDataV.x & mask.x + vegetationDataV.y & mask.y + vegetationDataV.z & mask.z;
+
+		int32_t vegetationData = (vegetationDataV.x & desc.mask.x) | (vegetationDataV.y & desc.mask.y) |
+			(vegetationDataV.z & desc.mask.z);
 
 		if (vegetationData > 0)
 		{
-			atlasOffset.x = ((vegetationData - 1) % desc.atlasRows) / static_cast<float>(desc.atlasRows);
-			atlasOffset.y = static_cast<float>((vegetationData - 1) / desc.atlasRows) / desc.atlasColumns;
+			atlasOffset.x = ((vegetationData - 1) % desc.vegetationSystemDesc.atlasRows) /
+				static_cast<float>(desc.vegetationSystemDesc.atlasRows);
 
-			auto xCoeff = static_cast<float>(fetchedIndex % static_cast<uint32_t>(vegetationMapDesc.width));
-			xCoeff /= vegetationMapDesc.width;
+			atlasOffset.y = static_cast<float>((vegetationData - 1) / desc.vegetationSystemDesc.atlasRows) /
+				desc.vegetationSystemDesc.atlasColumns;
 
-			auto yCoeff = static_cast<float>(fetchedIndex / static_cast<uint32_t>(vegetationMapDesc.width));
-			yCoeff /= vegetationMapDesc.height;
+			auto xCoeff = static_cast<float>(fetchedIndex % static_cast<uint32_t>(desc.vegetationMapDesc.width));
+			xCoeff /= desc.vegetationMapDesc.width;
+
+			auto yCoeff = static_cast<float>(fetchedIndex / static_cast<uint32_t>(desc.vegetationMapDesc.width));
+			yCoeff /= desc.vegetationMapDesc.height;
 
 			auto planarPosition = float2(minCorner.x + size.x * xCoeff, minCorner.y + size.y * yCoeff);
 			auto height = terrain->GetHeight(planarPosition);
 			auto normal = terrain->GetNormal(planarPosition);
 
+			auto normalV = XMLoadFloat3(&normal);
+			normalV = XMVectorLerp(normalV, absoluteUpVector, 0.75f);
+			normalV = XMVector3Normalize(normalV);
+			
+			XMStoreFloat3(&normal, normalV);
+
+			if (XMVector3Dot(normalV, normalV).m128_f32[0u] < std::numeric_limits<float>::epsilon())
+				normal = float3(0.0f, 0.0f, 1.0f);
+
 			position = XMVectorSet(planarPosition.x, planarPosition.y, height, 0.0f);
 			upVector = XMLoadFloat3(&normal);
+
+			return;
 		}
 	}
+
+	position = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+	upVector = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 }
 
 floatN Common::Logic::SceneEntity::VegatationSystem::CalculateRotation(const floatN& upVector, const floatN& upVectorTarget)
 {
-	auto rotation = XMQuaternionRotationNormal(upVector,
+	auto rotation = XMQuaternionRotationAxis(upVector,
 		Utilities::Random(randomEngine) * static_cast<float>(std::numbers::pi * 2.0));
 	
 	auto angle = XMVector3Dot(upVectorTarget, upVector);
@@ -324,6 +374,10 @@ floatN Common::Logic::SceneEntity::VegatationSystem::CalculateRotation(const flo
 	if (std::abs(angle.m128_f32[0u] - 1.0f) < std::numeric_limits<float>::epsilon())
 	{
 		auto rotationAxis = XMVector3Cross(upVectorTarget, upVector);
+
+		if (XMVector3Dot(rotationAxis, rotationAxis).m128_f32[0u] < std::numeric_limits<float>::epsilon())
+			rotationAxis = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+
 		auto pitch = XMQuaternionRotationAxis(rotationAxis, angle.m128_f32[0u]);
 
 		rotation = XMQuaternionMultiply(rotation, pitch);

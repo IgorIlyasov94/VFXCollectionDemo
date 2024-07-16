@@ -3,7 +3,7 @@
 D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::filesystem::path& filePath, ShaderType type, ShaderVersion version)
 {
 	std::filesystem::path filePathCache(filePath);
-	filePathCache.replace_filename(filePath.filename().generic_string() + "CACHE");
+	filePathCache.replace_extension(".hlslCACHE");
 	auto loadCache = std::filesystem::exists(filePathCache);
 
 	if (loadCache)
@@ -23,19 +23,28 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 	hrStatus = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
 	hrStatus = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxCompiler));
 
-	//CComPtr<IDxcIncludeHandler> pIncludeHandler;
-	//hrStatus = dxcUtils->CreateDefaultIncludeHandler(&pIncludeHandler);
-
 	std::wstring shaderProfile = GetShaderProfileString(type, version);
 	const wchar_t* fileName = filePath.stem().c_str();
 
 	std::vector<LPCWSTR> arguments;
+
+#ifdef _DEBUG
+	std::filesystem::path filePathPDB(filePath);
+	filePathPDB.replace_extension(L".pdb");
+	std::wstring filePathPDBString = L"-Fd " + std::filesystem::absolute(filePathPDB).generic_wstring();
+
+	arguments.push_back(DXC_ARG_DEBUG);
+	arguments.push_back(DXC_ARG_DEBUG_NAME_FOR_SOURCE);
+	arguments.push_back(DXC_ARG_SKIP_OPTIMIZATIONS);
+	arguments.push_back(filePathPDBString.c_str());
+#else
 	arguments.push_back(DXC_ARG_OPTIMIZATION_LEVEL3);
+#endif
 
 	CComPtr<IDxcCompilerArgs> args;
 	hrStatus = dxcUtils->BuildArguments(fileName, L"main", shaderProfile.c_str(), arguments.data(),
 		static_cast<uint32_t>(arguments.size()), nullptr, 0u, &args);
-
+	
 	CComPtr<IDxcBlobEncoding> shaderText = nullptr;
 	hrStatus = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderText);
 
@@ -73,7 +82,7 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 		return {};
 	}
 
-	CComPtr<IDxcBlob> shaderBytecode = nullptr;
+	CComPtr<IDxcBlob> shaderBytecode;
 	result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBytecode), nullptr);
 
 	auto bufferSize = shaderBytecode->GetBufferSize();
@@ -81,7 +90,7 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 	auto addressEnd = reinterpret_cast<const uint8_t*>(addressStart) + bufferSize;
 
 	auto bytecodeBuffer = new uint8_t[bufferSize];
-	std::copy(addressStart, addressEnd, bytecodeBuffer);;
+	std::copy(addressStart, addressEnd, bytecodeBuffer);
 
 	D3D12_SHADER_BYTECODE bytecode
 	{
@@ -90,6 +99,10 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 	};
 
 	SaveCache(filePathCache, bytecode);
+
+#ifdef _DEBUG
+	SavePDB(filePath, result.p);
+#endif
 
 	return bytecode;
 }
@@ -157,6 +170,16 @@ void Graphics::Assets::Loaders::HLSLLoader::SaveCache(const std::filesystem::pat
 {
 	std::ofstream hlslFile(filePath, std::ios::binary);
 	hlslFile.write(reinterpret_cast<const char*>(bytecode.pShaderBytecode), bytecode.BytecodeLength);
+}
+
+void Graphics::Assets::Loaders::HLSLLoader::SavePDB(const std::filesystem::path& shaderPath, IDxcResult* result)
+{
+	CComPtr<IDxcBlob> debugData;
+	CComPtr<IDxcBlobUtf16> debugDataPath;
+	result->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(&debugData), &debugDataPath);
+
+	std::ofstream hlslFile(debugDataPath->GetStringPointer(), std::ios::binary);
+	hlslFile.write(reinterpret_cast<const char*>(debugData->GetBufferPointer()), debugData->GetBufferSize());
 }
 
 Graphics::Assets::Loaders::HLSLLoader::CustomIncludeHandler::CustomIncludeHandler(const std::filesystem::path& filePath,

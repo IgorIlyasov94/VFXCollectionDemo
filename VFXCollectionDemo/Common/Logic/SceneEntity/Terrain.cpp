@@ -20,7 +20,6 @@ Common::Logic::SceneEntity::Terrain::Terrain(ID3D12GraphicsCommandList* commandL
 	minCorner = desc.origin;
 	minCorner.x -= desc.size.x * 0.5f;
 	minCorner.y -= desc.size.y * 0.5f;
-	minCorner.z -= desc.size.z * 0.5f;
 
 	mapSize = desc.size;
 
@@ -62,7 +61,7 @@ float Common::Logic::SceneEntity::Terrain::GetHeight(const float2& position) con
 	height += normalHeightData[index01].m128_f32[3u] * barycentric.z;
 	height += normalHeightData[index11].m128_f32[3u] * barycentric.w;
 
-	return height;
+	return height + minCorner.z;
 }
 
 float3 Common::Logic::SceneEntity::Terrain::GetNormal(const float2& position) const
@@ -101,7 +100,7 @@ void Common::Logic::SceneEntity::Terrain::Draw(ID3D12GraphicsCommandList* comman
 	float time)
 {
 	mutableConstantsBuffer->viewProjection = camera->GetViewProjection();
-	mutableConstantsBuffer->cameraDirection = camera->GetDirection();
+	mutableConstantsBuffer->cameraPosition = camera->GetPosition();
 	mutableConstantsBuffer->time = time;
 
 	material->Set(commandList);
@@ -134,34 +133,64 @@ void Common::Logic::SceneEntity::Terrain::LoadNormalHeightData(const std::filesy
 	DDSLoader::Load(heightMapFileName, desc);
 
 	auto pixelNumber = static_cast<uint32_t>(desc.width * desc.height);
+	auto verticesNumber = static_cast<uint32_t>(static_cast<uint64_t>(verticesPerWidth) * verticesPerHeight);
 
-	normalHeightData.resize(pixelNumber);
+	normalHeightData.resize(verticesNumber);
+	
+	auto lastPtr = reinterpret_cast<const uint8_t*>(desc.data.data() + pixelNumber - 1);
+	auto heightPtr = reinterpret_cast<const uint8_t*>(desc.data.data());
+	auto cellSize = float2(mapSize.x / verticesPerWidth, mapSize.y / verticesPerHeight);
 
-	auto lastPtr = reinterpret_cast<const float*>(desc.data.data() + pixelNumber - 1);
-	auto heightPtr = reinterpret_cast<const float*>(desc.data.data());
-	auto cellSize = float2(mapSize.x / desc.width, mapSize.y / desc.height);
-
-	for (uint32_t pixelIndex = 0u; pixelIndex < pixelNumber; pixelIndex++)
+	auto incrementX = static_cast<uint32_t>(std::ceil(static_cast<float>(desc.width) / verticesPerWidth));
+	auto incrementY = static_cast<uint32_t>(std::ceil(static_cast<float>(desc.height) / verticesPerHeight));
+	incrementY *= static_cast<uint32_t>(desc.width);
+	
+	for (uint32_t indexY = 0u; indexY < verticesPerHeight; indexY++)
 	{
-		auto height = *heightPtr;
-		height *= mapSize.z;
+		for (uint32_t indexX = 0u; indexX < verticesPerWidth; indexX++)
+		{
+			auto offset = static_cast<uint32_t>(static_cast<float>(indexX * desc.width) / verticesPerWidth);
+			offset += static_cast<uint32_t>(desc.width * static_cast<uint64_t>(static_cast<float>(indexY * desc.height) / verticesPerHeight));
+			auto height = *std::min(heightPtr + offset, lastPtr) * mapSize.z / 255.0f;
 
-		auto heightX = *(std::min(heightPtr + 1, lastPtr));
-		auto heightY = *(heightPtr + ((heightPtr + desc.width) <= lastPtr ? desc.width : 0u));
+			auto heightX = *(std::min(heightPtr + offset + incrementX, lastPtr)) * mapSize.z / 255.0f;
+			auto heightY = *(std::min(heightPtr + offset + ((heightPtr + incrementY) <= lastPtr ? incrementY : 0u), lastPtr)) * mapSize.z / 255.0f;
 
-		float dx = (heightX - height) / cellSize.x;
-		float dy = (heightY - height) / cellSize.y;
+			auto position = XMVectorSet
+			(
+				cellSize.x * indexX + minCorner.x,
+				cellSize.y * indexY + minCorner.y,
+				height + minCorner.y,
+				0.0f
+			);
 
-		auto normal = XMVectorSet(-dx, -dy, 1.0f, 0.0f);
-		normal = XMVector3Normalize(normal);
+			auto positionX = XMVectorSet
+			(
+				position.m128_f32[0u] + cellSize.x,
+				position.m128_f32[1u],
+				heightX + minCorner.y,
+				0.0f
+			);
 
-		normalHeightData[pixelIndex] = XMVectorSet(normal.m128_f32[0u], normal.m128_f32[1u], normal.m128_f32[2u], height);
+			auto positionY = XMVectorSet
+			(
+				position.m128_f32[0u],
+				position.m128_f32[1u] + cellSize.y,
+				heightY + minCorner.y,
+				0.0f
+			);
 
-		heightPtr++;
+			auto Vx = positionX - position;
+			auto Vy = positionY - position;
+
+			auto normal = XMVector3Cross(Vx, Vy);
+			normal = XMVector3Normalize(normal);
+
+			auto dataIndex = indexX + indexY * verticesPerWidth;
+
+			normalHeightData[dataIndex] = XMVectorSet(normal.m128_f32[0u], normal.m128_f32[1u], normal.m128_f32[2u], height);
+		}
 	}
-
-	mapWidth = static_cast<uint32_t>(desc.width);
-	mapHeight = desc.height;
 }
 
 void Common::Logic::SceneEntity::Terrain::GenerateMesh(const std::filesystem::path& terrainFileName,
@@ -173,16 +202,11 @@ void Common::Logic::SceneEntity::Terrain::GenerateMesh(const std::filesystem::pa
 	BufferDesc vbDesc{};
 	vbDesc.dataStride = sizeof(TerrainVertex);
 	vbDesc.numElements = verticesNumber;
-	vbDesc.data.resize(static_cast<size_t>(vbDesc.numElements) * vbDesc.dataStride);
+	vbDesc.data.resize(static_cast<size_t>(vbDesc.numElements) * vbDesc.dataStride, 0u);
 	
 	auto cellSize = float2(mapSize.x / (verticesPerWidth - 1), mapSize.y / (verticesPerHeight - 1));
 
 	auto vertices = reinterpret_cast<TerrainVertex*>(vbDesc.data.data());
-	
-	TextureDesc blendMapDesc{};
-	DDSLoader::Load(blendMapFileName, blendMapDesc);
-
-	auto blendDataPtr = reinterpret_cast<const uint32_t*>(blendMapDesc.data.data());
 	
 	for (uint32_t vertexIndexY = 0u; vertexIndexY < verticesPerHeight; vertexIndexY++)
 	{
@@ -193,6 +217,8 @@ void Common::Logic::SceneEntity::Terrain::GenerateMesh(const std::filesystem::pa
 			auto& vertex = vertices[vertexIndex];
 
 			auto positionXY = float2(vertexIndexX * cellSize.x, vertexIndexY * cellSize.y);
+			positionXY.x += minCorner.x;
+			positionXY.y += minCorner.y;
 
 			vertex.position.x = positionXY.x;
 			vertex.position.y = positionXY.y;
@@ -220,16 +246,6 @@ void Common::Logic::SceneEntity::Terrain::GenerateMesh(const std::filesystem::pa
 
 			vertex.texCoordX = XMConvertFloatToHalf(texCoord.x);
 			vertex.texCoordY = XMConvertFloatToHalf(texCoord.y);
-
-			size_t blendDataOffset = static_cast<size_t>(std::lroundf(texCoord.x * (blendMapDesc.width - 1)));
-			blendDataOffset += static_cast<size_t>(std::lroundf(texCoord.y * (blendMapDesc.height - 1))) * blendMapDesc.width;
-
-			vertex.blendWeight = *(blendDataPtr + blendDataOffset);
-
-			uint32_t R = (vertex.blendWeight & 0xFF000000) >> 16;
-			uint32_t B = (vertex.blendWeight & 0x0000FF00) << 16;
-
-			vertex.blendWeight = (vertex.blendWeight & 0x00FF00FF) | R | B;
 		}
 	}
 
@@ -319,11 +335,15 @@ void Common::Logic::SceneEntity::Terrain::LoadTextures(ID3D12Device* device,
 	normal2Id = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
 	DDSLoader::Load(desc.map3NormalFileName, textureDesc);
 	normal3Id = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
+
+	DDSLoader::Load(desc.blendMapFileName, textureDesc);
+	blendMapId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
 }
 
 void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, ResourceManager* resourceManager)
 {
 	auto constantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
+	auto blendMapResource = resourceManager->GetResource<Texture>(blendMapId);
 	auto albedo0Resource = resourceManager->GetResource<Texture>(albedo0Id);
 	auto albedo1Resource = resourceManager->GetResource<Texture>(albedo1Id);
 	auto albedo2Resource = resourceManager->GetResource<Texture>(albedo2Id);
@@ -350,8 +370,9 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 	materialBuilder.SetTexture(5u, normal1Resource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(6u, normal2Resource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(7u, normal3Resource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetTexture(8u, blendMapResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetCullMode(D3D12_CULL_MODE_BACK);
+	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
 	materialBuilder.SetDepthStencilFormat(32u, true);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
@@ -425,27 +446,45 @@ void Common::Logic::SceneEntity::Terrain::FetchCoord(const float2& position, uin
 		(position.y - minCorner.y) / mapSize.y
 	};
 
-	auto positionMin = float2(std::floor(fetchedPosition.x * mapWidth), std::floor(fetchedPosition.y * mapHeight));
-	auto positionMax = float2(std::ceil(fetchedPosition.x * mapWidth), std::ceil(fetchedPosition.y * mapHeight));
+	auto positionAverage = float3(fetchedPosition.x * verticesPerWidth, fetchedPosition.y * verticesPerHeight, 0.0f);
+	
+	auto positionMin = float2(std::floor(positionAverage.x), std::floor(positionAverage.y));
+	auto positionMax = float2(positionMin.x + 1.0f, positionMin.y + 1.0f);
 
-	index00 = static_cast<uint32_t>(std::lroundf(positionMin.x + positionMin.y * mapWidth));
-	index10 = static_cast<uint32_t>(std::lroundf(positionMax.x + positionMax.y * mapWidth));
+	index00 = std::min(static_cast<uint32_t>(std::lroundf(std::min(positionMin.x, verticesPerWidth - 1.0f) +
+		positionMin.y * verticesPerWidth)), static_cast<uint32_t>(normalHeightData.size()) - 1u);
 
-	index01 = std::min(index00 + mapWidth, static_cast<uint32_t>(normalHeightData.size()) - 1u);
-	index11 = std::min(index10 + mapWidth, static_cast<uint32_t>(normalHeightData.size()) - 1u);
+	index10 = std::min(static_cast<uint32_t>(std::lroundf(std::min(positionMax.x, verticesPerWidth - 1.0f) +
+		positionMax.y * verticesPerWidth)), static_cast<uint32_t>(normalHeightData.size()) - 1u);
+
+	index01 = std::min(index00 + verticesPerWidth, static_cast<uint32_t>(normalHeightData.size()) - 1u);
+	index11 = std::min(index10 + verticesPerWidth, static_cast<uint32_t>(normalHeightData.size()) - 1u);
 
 	auto cellSize = float2(positionMax.x - positionMin.x, positionMax.y - positionMin.y);
-	auto area = std::max(cellSize.x * cellSize.y, 0.0001f);
+	
+	auto position00 = float3(positionMin.x, positionMin.y, 0.0f);
+	auto position01 = float3(positionMin.x, positionMax.y, 0.0f);
+	auto position11 = float3(positionMax.x, positionMax.y, 0.0f);
+	auto position10 = float3(positionMax.x, positionMin.y, 0.0f);
+	
+	auto linearY = (positionAverage.x - positionMin.x) * cellSize.y / cellSize.x + positionMin.y;
 
-	auto positionAverage = XMVectorSet(fetchedPosition.x * mapWidth, fetchedPosition.y * mapHeight, 0.0f, 0.0f);
+	if (positionAverage.y > linearY)
+	{
+		auto barycentrics = GeometryUtilities::CalculateBarycentric(position00, position01, position11, positionAverage);
 
-	auto position00 = XMLoadFloat2(&positionMin);
-	auto position10 = XMVectorSet(positionMax.x, positionMin.y, 0.0f, 0.0f);
-	auto position01 = XMVectorSet(positionMin.x, positionMax.y, 0.0f, 0.0f);
-	auto position11 = XMLoadFloat2(&positionMax);
+		barycentricCoord.x = barycentrics.x;
+		barycentricCoord.y = barycentrics.y;
+		barycentricCoord.z = barycentrics.z;
+		barycentricCoord.w = 0.0f;
+	}
+	else
+	{
+		auto barycentrics = GeometryUtilities::CalculateBarycentric(position11, position10, position00, positionAverage);
 
-	barycentricCoord.x = XMVector2Length(positionAverage - position00).m128_f32[0u] / area;
-	barycentricCoord.y = XMVector2Length(positionAverage - position10).m128_f32[0u] / area;
-	barycentricCoord.z = XMVector2Length(positionAverage - position01).m128_f32[0u] / area;
-	barycentricCoord.w = XMVector2Length(positionAverage - position11).m128_f32[0u] / area;
+		barycentricCoord.x = barycentrics.z;
+		barycentricCoord.y = 0.0f;
+		barycentricCoord.z = barycentrics.x;
+		barycentricCoord.w = barycentrics.y;
+	}
 }

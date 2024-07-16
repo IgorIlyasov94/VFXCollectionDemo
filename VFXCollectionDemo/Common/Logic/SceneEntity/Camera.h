@@ -23,6 +23,7 @@ namespace Common::Logic::SceneEntity
 		const float4x4& GetInvProjection() const;
 		const float4x4& GetInvViewProjection() const;
 
+		const float3& GetPosition() const;
 		const float3& GetDirection() const;
 
 	private:
@@ -36,6 +37,7 @@ namespace Common::Logic::SceneEntity
 		float4x4 invProjection;
 		float4x4 invViewProjection;
 
+		float3 _position;
 		float3 direction;
 	};
 }

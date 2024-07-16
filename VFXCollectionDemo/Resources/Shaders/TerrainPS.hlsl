@@ -4,7 +4,7 @@ cbuffer MutableConstants : register(b0)
 {
 	float4x4 viewProj;
 	
-	float3 cameraDirection;
+	float3 cameraPosition;
 	float time;
 	
 	float2 mapTiling0;
@@ -19,10 +19,10 @@ struct Input
 	float3 normal : NORMAL;
 	float3 binormal : BINORMAL;
 	float3 tangent : TANGENT;
-	float4 texCoord01 : TEXCOORD0;
-	float4 texCoord23 : TEXCOORD1;
-	float3 worldPosition : TEXCOORD2;
-	float4 blendFactor : TEXCOORD3;
+	float2 texCoord : TEXCOORD0;
+	float4 texCoord01 : TEXCOORD1;
+	float4 texCoord23 : TEXCOORD2;
+	float3 worldPosition : TEXCOORD3;
 };
 
 struct Output
@@ -38,6 +38,7 @@ Texture2D normalMetalness0 : register(t4);
 Texture2D normalMetalness1 : register(t5);
 Texture2D normalMetalness2 : register(t6);
 Texture2D normalMetalness3 : register(t7);
+Texture2D blendMap : register(t8);
 
 SamplerState samplerLinear : register(s0);
 
@@ -46,18 +47,22 @@ Output main(Input input)
 {
 	Output output = (Output)0;
 	
-	float4 texData = albedoRoughness0.Sample(samplerLinear, input.texCoord01.xy) * input.blendFactor.x;
-	texData += albedoRoughness1.Sample(samplerLinear, input.texCoord01.zw) * input.blendFactor.y;
-	texData += albedoRoughness2.Sample(samplerLinear, input.texCoord23.xy) * input.blendFactor.z;
-	texData += albedoRoughness3.Sample(samplerLinear, input.texCoord23.zw) * input.blendFactor.w;
+	float4 blendFactor = blendMap.Sample(samplerLinear, input.texCoord);
+	blendFactor = blendFactor + float4(0.001f, 0.0f, 0.0f, 0.0f);
+	blendFactor /= blendFactor.x + blendFactor.y + blendFactor.z + blendFactor.w;
+	
+	float4 texData = albedoRoughness0.Sample(samplerLinear, input.texCoord01.xy) * blendFactor.x;
+	texData += albedoRoughness1.Sample(samplerLinear, input.texCoord01.zw) * blendFactor.y;
+	texData += albedoRoughness2.Sample(samplerLinear, input.texCoord23.xy) * blendFactor.z;
+	texData += albedoRoughness3.Sample(samplerLinear, input.texCoord23.zw) * blendFactor.w;
 	
 	float3 albedo = texData.xyz;
 	float roughness = texData.w * texData.w;
 	
-	texData = normalMetalness0.Sample(samplerLinear, input.texCoord01.xy) * input.blendFactor.x;
-	texData += normalMetalness1.Sample(samplerLinear, input.texCoord01.zw) * input.blendFactor.y;
-	texData += normalMetalness2.Sample(samplerLinear, input.texCoord23.xy) * input.blendFactor.z;
-	texData += normalMetalness3.Sample(samplerLinear, input.texCoord23.zw) * input.blendFactor.w;
+	texData = normalMetalness0.Sample(samplerLinear, input.texCoord01.xy) * blendFactor.x;
+	texData += normalMetalness1.Sample(samplerLinear, input.texCoord01.zw) * blendFactor.y;
+	texData += normalMetalness2.Sample(samplerLinear, input.texCoord23.xy) * blendFactor.z;
+	texData += normalMetalness3.Sample(samplerLinear, input.texCoord23.zw) * blendFactor.w;
 	
 	float3 normal = texData.xyz * 2.0f - 1.0f.xxx;
 	normal = BumpMapping(normal, input.normal, input.binormal, input.tangent);
@@ -74,25 +79,24 @@ Output main(Input input)
 	material.metalness = metalness;
 	material.roughness = roughness;
 	
+	float3 view = normalize(input.worldPosition - cameraPosition);
+	
 	float3 lightSum = 0.0f.xxx;
 	
-	for (int i = 0; i < 8; i++)
-	{
-		PointLight pointLight;
-		pointLight.position = float3(sin(time * 3.0f + i * 1.28f) * 0.3f * i, 0.0f, 0.686f * i + 0.2f);
-		pointLight.color = lerp(float3(4.2f, 3.9f, 2.774f), float3(4.1f, 3.9f, 2.8f), i / 7.0f);
-		pointLight.color *= saturate(cos(time * 3.0f + i * 1.28f) * 0.1f * i + 0.1f);
-		
-		LightingDesc lightingDesc;
-		lightingDesc.surface = surface;
-		lightingDesc.pointLight = pointLight;
-		lightingDesc.material = material;
-		
-		float3 light;
-		CalculateLighting(lightingDesc, cameraDirection, light);
-		
-		lightSum += light;
-	}
+	PointLight pointLight;
+	pointLight.position = float3(sin(time * 3.0f) * 0.3f, 0.0f, 3.0f);
+	pointLight.color = lerp(float3(4.2f, 3.9f, 2.774f), float3(4.1f, 3.9f, 2.8f), 0.0f) * 1.0f;
+	pointLight.color *= saturate(cos(time * 3.0f) * 0.2f + 0.8f);
+	
+	LightingDesc lightingDesc;
+	lightingDesc.surface = surface;
+	lightingDesc.pointLight = pointLight;
+	lightingDesc.material = material;
+	
+	float3 light;
+	CalculateLighting(lightingDesc, view, light);
+	
+	lightSum += max(light, 0.0f.xxx);
 	
 	float3 ambient = lerp(float3(0.4f, 0.35f, 0.1f), float3(0.5f, 0.6f, 0.65f), saturate(normal.z * 0.5f + 0.5f));
 	

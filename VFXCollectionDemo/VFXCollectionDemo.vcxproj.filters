@@ -195,6 +195,12 @@
     <ClCompile Include="Common\Logic\SceneEntity\Terrain.cpp">
       <Filter>Исходные файлы\Common\Logic\SceneEntity</Filter>
     </ClCompile>
+    <ClCompile Include="Graphics\Assets\RaytracingObject.cpp">
+      <Filter>Исходные файлы\Graphics\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Assets\RaytracingObjectBuilder.cpp">
+      <Filter>Исходные файлы\Graphics\Assets</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Includes.h">
@@ -355,6 +361,12 @@
     </ClInclude>
     <ClInclude Include="Common\Logic\SceneEntity\Terrain.h">
       <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Assets\RaytracingObjectBuilder.h">
+      <Filter>Файлы заголовков\Graphics\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Assets\RaytracingObject.h">
+      <Filter>Файлы заголовков\Graphics\Assets</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

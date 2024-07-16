@@ -13,7 +13,7 @@ using namespace Graphics::Assets::Loaders;
 using namespace Common::Logic::SceneEntity;
 
 Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
-	: isLoaded(false), environmentMaterial(nullptr), environmentMesh(nullptr), environmentMeshObject(nullptr),
+	: isLoaded(false), terrain(nullptr), vegetationSystem(nullptr),
 	camera(nullptr), postProcessManager(nullptr), mutableConstantsBuffer{}, mutableConstantsId{},
 	environmentFloorAlbedoId{}, environmentFloorNormalId{}, vfxAtlasId{}, perlinNoiseId{}, pbrStandardVSId{},
 	pbrStandardPSId{}, particleSimulationCSId{}, environmentWorld{}, timer{}, _deltaTime{}, fps(60.0f),
@@ -22,6 +22,8 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 {
 	environmentPosition = float3(0.0f, 0.0f, 0.0f);
 	cameraPosition = float3(0.0f, 0.0f, 5.0f);
+	windDirection = float3(0.45f, 0.0f, 0.0f);
+	windStrength = 4.5f;
 
 	XMStoreFloat3(&cameraLookAt, DirectX::XMLoadFloat3(&environmentPosition));
 	cameraLookAt.z = 1.0f;
@@ -68,16 +70,18 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 {
 	auto resourceManager = renderer->GetResourceManager();
 
-	delete environmentMaterial;
 	delete wallsMaterial;
 
-	environmentMesh->Release(resourceManager);
-	delete environmentMesh;
+	terrain->Release(resourceManager);
+	delete terrain;
+
+	vegetationSystem->Release(resourceManager);
+	delete vegetationSystem;
 
 	wallsMesh->Release(resourceManager);
 	delete wallsMesh;
 
-	delete environmentMeshObject;
+	delete wallsMeshObject;
 
 	resourceManager->DeleteResource<ConstantBuffer>(mutableConstantsId);
 	resourceManager->DeleteResource<Texture>(environmentFloorAlbedoId);
@@ -161,8 +165,9 @@ void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* comman
 
 	postProcessManager->SetGBuffer(commandList);
 
-	wallsMeshObject->Draw(commandList, timer, _deltaTime);
-	environmentMeshObject->Draw(commandList, timer, _deltaTime);
+	//wallsMeshObject->Draw(commandList, timer, _deltaTime);
+	terrain->Draw(commandList, camera, timer);
+	vegetationSystem->Draw(commandList, timer, _deltaTime);
 
 	vfxLux->Draw(commandList, timer, _deltaTime);
 	vfxLuxSparkles->Draw(commandList, timer, _deltaTime);
@@ -187,7 +192,6 @@ bool Common::Logic::Scene::Scene_0_Lux::IsLoaded()
 void Common::Logic::Scene::Scene_0_Lux::LoadMeshes(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	Graphics::Resources::ResourceManager* resourceManager)
 {
-	environmentMesh = new Mesh("Resources\\Meshes\\LuxEnvironmentFloor.obj", device, commandList, resourceManager, false, true);
 	wallsMesh = new Mesh("Resources\\Meshes\\LuxEnvironmentWalls.obj", device, commandList, resourceManager, false, true);
 }
 
@@ -256,9 +260,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 	Graphics::DirectX12Renderer* renderer)
 {
 	auto mutableConstantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
-	auto environmentFloorAlbedoResource = resourceManager->GetResource<Texture>(environmentFloorAlbedoId);
 	auto environmentWallsAlbedoResource = resourceManager->GetResource<Texture>(environmentWallsAlbedoId);
-	auto environmentFloorNormalResource = resourceManager->GetResource<Texture>(environmentFloorNormalId);
 	auto environmentWallsNormalResource = resourceManager->GetResource<Texture>(environmentWallsNormalId);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
 		Graphics::DefaultFilterSetup::FILTER_TRILINEAR_WRAP);
@@ -268,20 +270,6 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress);
-	materialBuilder.SetTexture(0u, environmentFloorAlbedoResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetTexture(1u, environmentFloorNormalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
-	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
-	materialBuilder.SetDepthStencilFormat(32u, true);
-	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
-	materialBuilder.SetGeometryFormat(environmentMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	materialBuilder.SetVertexShader(pbrStandardVS->bytecode);
-	materialBuilder.SetPixelShader(pbrStandardPS->bytecode);
-
-	environmentMaterial = materialBuilder.ComposeStandard(device);
-
-	materialBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress);
 	materialBuilder.SetTexture(0u, environmentWallsAlbedoResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(1u, environmentWallsNormalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -289,7 +277,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
 	materialBuilder.SetDepthStencilFormat(32u, true);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
-	materialBuilder.SetGeometryFormat(environmentMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	materialBuilder.SetGeometryFormat(wallsMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	materialBuilder.SetVertexShader(pbrStandardVS->bytecode);
 	materialBuilder.SetPixelShader(pbrStandardPS->bytecode);
 
@@ -299,11 +287,54 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer)
 {
-	environmentMeshObject = new MeshObject(environmentMesh, environmentMaterial);
+	TerrainDesc terrainDesc{};
+	terrainDesc.origin = {};
+	terrainDesc.verticesPerWidth = 256u;
+	terrainDesc.verticesPerHeight = 256u;
+	terrainDesc.size = float3(20.0f, 20.0f, 2.5f);
+	terrainDesc.map0Tiling = float2(10.0f, 10.0f);
+	terrainDesc.map1Tiling = float2(11.0f, 11.0f);
+	terrainDesc.map2Tiling = float2(8.0f, 8.0f);
+	terrainDesc.map3Tiling = float2(12.0f, 12.0f);
+	terrainDesc.terrainFileName = "Resources\\Meshes\\Lux_Terrain.bin";
+	terrainDesc.heightMapFileName = "Resources\\Textures\\Terrain\\Lux_HeightMap.dds";
+	terrainDesc.blendMapFileName = "Resources\\Textures\\Terrain\\Lux_BlendWeights.dds";
+	terrainDesc.map0AlbedoFileName = "Resources\\Textures\\Terrain\\GrassAlbedo.dds";
+	terrainDesc.map1AlbedoFileName = "Resources\\Textures\\Terrain\\MossAlbedo.dds";
+	terrainDesc.map2AlbedoFileName = "Resources\\Textures\\Terrain\\OreAlbedo.dds";
+	terrainDesc.map3AlbedoFileName = "Resources\\Textures\\Terrain\\StoneAlbedo.dds";
+	terrainDesc.map0NormalFileName = "Resources\\Textures\\Terrain\\GrassNormal.dds";
+	terrainDesc.map1NormalFileName = "Resources\\Textures\\Terrain\\MossNormal.dds";
+	terrainDesc.map2NormalFileName = "Resources\\Textures\\Terrain\\OreNormal.dds";
+	terrainDesc.map3NormalFileName = "Resources\\Textures\\Terrain\\StoneNormal.dds";
+
+	terrain = new Terrain(commandList, renderer, terrainDesc);
+	
+	VegetationSystemDesc vegetationSystemDesc{};
+	vegetationSystemDesc.smallGrassNumber = 0;
+	vegetationSystemDesc.mediumGrassNumber = 10000;
+	vegetationSystemDesc.largeGrassNumber = 300;
+	vegetationSystemDesc.atlasRows = 4u;
+	vegetationSystemDesc.atlasColumns = 4u;
+	vegetationSystemDesc.smallGrassSize = float3(0.2f, 0.2f, 0.1f);
+	vegetationSystemDesc.mediumGrassSize = float3(0.4f, 0.4f, 0.8f);
+	vegetationSystemDesc.largeGrassSize = float3(0.4f, 0.4f, 1.5f);
+	vegetationSystemDesc.terrain = terrain;
+	vegetationSystemDesc.windDirection = &windDirection;
+	vegetationSystemDesc.windStrength = &windStrength;
+	vegetationSystemDesc.perlinNoiseTiling = float2(0.1f, 0.1f);
+	vegetationSystemDesc.perlinNoiseId = perlinNoiseId;
+	vegetationSystemDesc.vegetationCacheFileName = "Resources\\Meshes\\Lux_Vegetation.bin";
+	vegetationSystemDesc.vegetationMapFileName = "Resources\\Textures\\Terrain\\Lux_VegetationMap.dds";
+	vegetationSystemDesc.albedoMapFileName = "Resources\\Textures\\Terrain\\VegetationAlbedoAtlas.dds";
+	vegetationSystemDesc.normalMapFileName = "Resources\\Textures\\Terrain\\VegetationNormalAtlas.dds";
+
+	vegetationSystem = new VegatationSystem(commandList, renderer, vegetationSystemDesc, camera);
+
 	wallsMeshObject = new MeshObject(wallsMesh, wallsMaterial);
 
 	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer);
-	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, camera);
+	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, camera, float3(0.0f, 0.0f, 1.25f));
 	vfxLuxSparkles = new SceneEntity::VFXLuxSparkles(commandList, renderer,
 		perlinNoiseId, vfxAtlasId, particleSimulationCSId, camera);
 

@@ -26,7 +26,7 @@ namespace Graphics
 
 		void Deallocate(Resources::GPUResource* allocatedResource);
 
-		void ReleaseUploadBuffers();
+		void ReleaseTempBuffers();
 
 	private:
 		TextureManager(const TextureManager&) = delete;

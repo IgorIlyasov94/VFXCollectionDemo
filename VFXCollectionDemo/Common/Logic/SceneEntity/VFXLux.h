@@ -13,7 +13,7 @@ namespace Common::Logic::SceneEntity
 	{
 	public:
 		VFXLux(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer,
-			Graphics::Resources::ResourceID perlinNoiseId, Camera* camera);
+			Graphics::Resources::ResourceID perlinNoiseId, Camera* camera, const float3& position);
 		~VFXLux() override;
 
 		void OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime) override;
@@ -25,7 +25,7 @@ namespace Common::Logic::SceneEntity
 		VFXLux() = delete;
 
 		void CreateConstantBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-			Graphics::Resources::ResourceManager* resourceManager);
+			Graphics::Resources::ResourceManager* resourceManager, const float3& position);
 
 		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
 
@@ -47,58 +47,67 @@ namespace Common::Logic::SceneEntity
 
 		struct VFXPillarConstants
 		{
-			float4x4 world;
+			float4x4 invView;
 			float4x4 viewProjection;
+			float4 color0;
+			float4 color1;
+			float3 worldPosition;
+			float time;
 			float2 tiling0;
 			float2 tiling1;
 			float2 scrollSpeed0;
 			float2 scrollSpeed1;
-			float4 displacementStrength;
-			float4 color0;
-			float4 color1;
-			float alphaIntensity;
 			float colorIntensity;
-			float time;
+			float alphaSharpness;
+			float distortionStrength;
 			float padding;
 		};
 
-		static constexpr uint32_t TOTAL_SEGMENT_NUMBER = 24;
-		static constexpr uint32_t VERTICES_PER_ROW = 4u;
-		static constexpr uint32_t VERTICES_NUMBER = TOTAL_SEGMENT_NUMBER * 4u + VERTICES_PER_ROW;
+		static constexpr uint32_t TOTAL_SEGMENT_NUMBER = 12u;
+		static constexpr uint32_t TOTAL_RING_NUMBER = 4u;
+		static constexpr uint32_t TOTAL_RIBBON_NUMBER = TOTAL_RING_NUMBER - 1;
+		static constexpr uint32_t VERTICES_PER_RING = TOTAL_SEGMENT_NUMBER + 1u;
+		static constexpr uint32_t VERTICES_NUMBER = TOTAL_RING_NUMBER * VERTICES_PER_RING;
 
-		static constexpr uint32_t INDICES_PER_QUAD = 6u;
-		static constexpr uint32_t INDICES_PER_SEGMENT = INDICES_PER_QUAD * 3u;
-		static constexpr uint32_t INDICES_NUMBER = TOTAL_SEGMENT_NUMBER * INDICES_PER_SEGMENT;
+		static constexpr uint32_t INDICES_PER_SEGMENT = 6u;
+		static constexpr uint32_t INDICES_PER_RIBBON = TOTAL_SEGMENT_NUMBER * INDICES_PER_SEGMENT;
+		static constexpr uint32_t INDICES_NUMBER = TOTAL_RIBBON_NUMBER * INDICES_PER_RIBBON;
 
-		static constexpr float GEOMETRY_WIDTH = 0.3f;
-		static constexpr float GEOMETRY_HEIGHT = 5.0f;
-		static constexpr float GEOMETRY_FADING_WIDTH = 0.125f;
+		static constexpr float RING_START_OFFSET = 0.4f;
+		static constexpr float RING_WIDTH = 0.5f;
+		static constexpr float RING_FADING_WIDTH = 0.3f;
+		static constexpr float CIRCLE_WIDTH = RING_WIDTH + RING_FADING_WIDTH * 2.0f;
 
-		static constexpr uint32_t INDEX_OFFSETS[INDICES_PER_QUAD] =
+		static constexpr uint32_t INDEX_OFFSETS[INDICES_PER_SEGMENT] =
 		{
-			0u, 1u, 4u, 4u, 1u, 5u
+			VERTICES_PER_RING,
+			VERTICES_PER_RING + 1u,
+			0u,
+			0u,
+			VERTICES_PER_RING + 1u,
+			1u
 		};
 
-		static constexpr float GEOMETRY_X_OFFSETS[VERTICES_PER_ROW] = 
+		static constexpr float RING_RADIUSES[TOTAL_RING_NUMBER] =
 		{
-			-GEOMETRY_WIDTH / 2.0f,
-			-GEOMETRY_WIDTH / 2.0f + GEOMETRY_FADING_WIDTH,
-			GEOMETRY_WIDTH / 2.0f - GEOMETRY_FADING_WIDTH,
-			GEOMETRY_WIDTH / 2.0f
+			RING_START_OFFSET,
+			RING_START_OFFSET + RING_FADING_WIDTH,
+			RING_START_OFFSET + RING_FADING_WIDTH + RING_WIDTH,
+			RING_START_OFFSET + CIRCLE_WIDTH
 		};
 
-		float4x4 pillarWorld;
+		float4x4 circleWorld;
 
-		VFXPillarConstants* pillarConstants;
+		VFXPillarConstants* circleConstants;
 
 		Camera* _camera;
 
-		Graphics::Resources::ResourceID pillarConstantsId;
+		Graphics::Resources::ResourceID circleConstantsId;
 		
-		Graphics::Resources::ResourceID vfxLuxPillarVSId;
-		Graphics::Resources::ResourceID vfxLuxPillarPSId;
+		Graphics::Resources::ResourceID vfxLuxCircleVSId;
+		Graphics::Resources::ResourceID vfxLuxCirclePSId;
 
-		Graphics::Assets::Mesh* pillarMesh;
-		Graphics::Assets::Material* pillarMaterial;
+		Graphics::Assets::Mesh* circleMesh;
+		Graphics::Assets::Material* circleMaterial;
 	};
 }

@@ -29,14 +29,14 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 
 	hdrConstants.width = width;
 	hdrConstants.area = width * height;
-	hdrConstants.middleGray = 0.64f;
-	hdrConstants.whiteCutoff = 0.8f;
-	hdrConstants.brightThreshold = 0.5f;
+	hdrConstants.middleGray = 0.4f;
+	hdrConstants.whiteCutoff = 0.6f;
+	hdrConstants.brightThreshold = 0.75f;
 
-	distortionConstants.widthU = width;
-	distortionConstants.area = hdrConstants.area;
-	distortionConstants.width = static_cast<float>(width);
-	distortionConstants.height = static_cast<float>(height);
+	motionBlurConstants.widthU = width;
+	motionBlurConstants.area = hdrConstants.area;
+	motionBlurConstants.width = static_cast<float>(width);
+	motionBlurConstants.height = static_cast<float>(height);
 
 	toneMappingConstants.width = width;
 	toneMappingConstants.area = hdrConstants.area;
@@ -71,7 +71,7 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 {
 	delete toneMappingMaterial;
 
-	delete distortionComputeObject;
+	delete motionBlurComputeObject;
 	delete luminanceComputeObject;
 	delete luminanceIterationComputeObject;
 	delete bloomHorizontalObject;
@@ -83,14 +83,14 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
 	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
 
-	resourceManager->DeleteResource<RenderTarget>(sceneDistortionTargetId);
+	resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
 
 	resourceManager->DeleteResource<RWBuffer>(sceneBufferId);
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
 
 	resourceManager->DeleteResource<Shader>(quadVSId);
-	resourceManager->DeleteResource<Shader>(distortionCSId);
+	resourceManager->DeleteResource<Shader>(motionBlurCSId);
 	resourceManager->DeleteResource<Shader>(luminanceCSId);
 	resourceManager->DeleteResource<Shader>(luminanceIterationCSId);
 	resourceManager->DeleteResource<Shader>(bloomHorizontalCSId);
@@ -115,7 +115,7 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	auto resourceManager = renderer->GetResourceManager();
 	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
 	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
-	resourceManager->DeleteResource<RenderTarget>(sceneDistortionTargetId);
+	resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
 	resourceManager->DeleteResource<RWBuffer>(sceneBufferId);
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
@@ -129,7 +129,7 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 
-	distortionComputeObject->UpdateRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
+	motionBlurComputeObject->UpdateRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
 
 	luminanceComputeObject->UpdateBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	luminanceComputeObject->UpdateRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
@@ -162,35 +162,35 @@ void Common::Logic::SceneEntity::PostProcessManager::SetGBuffer(ID3D12GraphicsCo
 void Common::Logic::SceneEntity::PostProcessManager::SetDistortBuffer(ID3D12GraphicsCommandList* commandList)
 {
 	sceneColorTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	sceneDistortionTargetGPUResource->EndBarrier(commandList);
+	sceneMotionTargetGPUResource->EndBarrier(commandList);
 
-	commandList->ClearRenderTargetView(sceneDistortionTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
-	commandList->OMSetRenderTargets(1u, &sceneDistortionTargetDescriptor, true, nullptr);
+	commandList->ClearRenderTargetView(sceneMotionTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
+	commandList->OMSetRenderTargets(1u, &sceneMotionTargetDescriptor, true, nullptr);
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsCommandList* commandList)
 {
 	sceneColorTargetGPUResource->EndBarrier(commandList);
-	sceneDistortionTargetGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	sceneMotionTargetGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	sceneBufferGPUResource->EndBarrier(commandList);
 
-	distortionConstants.widthU = _width;
-	distortionConstants.area = _width * _height;
-	distortionConstants.width = static_cast<float>(_width);
-	distortionConstants.height = static_cast<float>(_height);
+	motionBlurConstants.widthU = _width;
+	motionBlurConstants.area = _width * _height;
+	motionBlurConstants.width = static_cast<float>(_width);
+	motionBlurConstants.height = static_cast<float>(_height);
 
-	uint32_t numGroupsX = std::max(distortionConstants.area / THREADS_PER_GROUP, 1u);
+	uint32_t numGroupsX = std::max(motionBlurConstants.area / THREADS_PER_GROUP, 1u);
 
-	distortionComputeObject->Set(commandList);
-	distortionComputeObject->SetRootConstants(commandList, 0u, 4u, &distortionConstants);
-	distortionComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+	motionBlurComputeObject->Set(commandList);
+	motionBlurComputeObject->SetRootConstants(commandList, 0u, 4u, &motionBlurConstants);
+	motionBlurComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 
 	sceneBufferGPUResource->UAVBarrier(commandList);
 	sceneBufferGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	luminanceBufferGPUResource->EndBarrier(commandList);
 
 	hdrConstants.width = _width;
-	hdrConstants.area = distortionConstants.area;
+	hdrConstants.area = motionBlurConstants.area;
 	uint32_t remain = hdrConstants.area % THREADS_PER_GROUP;
 	
 	luminanceComputeObject->Set(commandList);
@@ -262,7 +262,7 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 	quadMesh->DrawOnly(commandList);
 
 	sceneColorTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	sceneDistortionTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	sceneMotionTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	sceneBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	luminanceBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	bloomBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -324,21 +324,21 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 
 	sceneTargetDesc.format = DXGI_FORMAT_R16G16_FLOAT;
 
-	sceneDistortionTargetId = resourceManager->CreateTextureResource(device, commandList,
+	sceneMotionTargetId = resourceManager->CreateTextureResource(device, commandList,
 		TextureResourceType::RENDER_TARGET, sceneTargetDesc);
 
 	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
 	auto sceneDepthTargetResource = resourceManager->GetResource<DepthStencilTarget>(sceneDepthTargetId);
 
-	auto sceneDistortionTargetResource = resourceManager->GetResource<RenderTarget>(sceneDistortionTargetId);
+	auto sceneDistortionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
 
 	sceneColorTargetGPUResource = sceneColorTargetResource->resource;
-	sceneDistortionTargetGPUResource = sceneDistortionTargetResource->resource;
+	sceneMotionTargetGPUResource = sceneDistortionTargetResource->resource;
 
 	sceneColorTargetDescriptor = sceneColorTargetResource->rtvDescriptor.cpuDescriptor;
 	sceneDepthTargetDescriptor = sceneDepthTargetResource->dsvDescriptor.cpuDescriptor;
 
-	sceneDistortionTargetDescriptor = sceneDistortionTargetResource->rtvDescriptor.cpuDescriptor;
+	sceneMotionTargetDescriptor = sceneDistortionTargetResource->rtvDescriptor.cpuDescriptor;
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -385,8 +385,8 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 	quadVSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\QuadVS.hlsl", ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
-	distortionCSId = resourceManager->CreateShaderResource(device,
-		"Resources\\Shaders\\PostProcess\\DistortionCS.hlsl",
+	motionBlurCSId = resourceManager->CreateShaderResource(device,
+		"Resources\\Shaders\\PostProcess\\MotionBlurCS.hlsl",
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
 
 	luminanceCSId = resourceManager->CreateShaderResource(device,
@@ -439,14 +439,14 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12Device* device, ResourceManager* resourceManager)
 {
 	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
-	auto sceneDistortionTargetResource = resourceManager->GetResource<RenderTarget>(sceneDistortionTargetId);
+	auto sceneMotionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
 	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device, Graphics::DefaultFilterSetup::FILTER_BILINEAR_CLAMP);
 
-	auto distortionCS = resourceManager->GetResource<Shader>(distortionCSId);
+	auto distortionCS = resourceManager->GetResource<Shader>(motionBlurCSId);
 	auto luminanceCS = resourceManager->GetResource<Shader>(luminanceCSId);
 	auto luminanceIterationCS = resourceManager->GetResource<Shader>(luminanceIterationCSId);
 	auto bloomHorizontalCS = resourceManager->GetResource<Shader>(bloomHorizontalCSId);
@@ -455,12 +455,12 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 	ComputeObjectBuilder computeObjectBuilder{};
 	computeObjectBuilder.SetRootConstants(0u, 4u);
 	computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
-	computeObjectBuilder.SetTexture(1u, sceneDistortionTargetResource->srvDescriptor.gpuDescriptor);
+	computeObjectBuilder.SetTexture(1u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
 	computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
 	computeObjectBuilder.SetShader(distortionCS->bytecode);
 
-	distortionComputeObject = computeObjectBuilder.Compose(device);
+	motionBlurComputeObject = computeObjectBuilder.Compose(device);
 
 	computeObjectBuilder.SetRootConstants(0u, 2u);
 	computeObjectBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress);

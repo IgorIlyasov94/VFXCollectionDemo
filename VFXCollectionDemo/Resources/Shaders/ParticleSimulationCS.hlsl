@@ -1,10 +1,20 @@
 static const uint NUM_THREADS = 64;
-static const uint MAX_ATTRACTORS_NUMBER = 8;
+static const uint MAX_FORCES_NUMBER = 4;
 
-struct ParticleSystemAttractor
+static const float PI = 3.14159265f;
+
+static const uint FORCE_TYPE_ATTRACTOR = 0;
+static const uint FORCE_TYPE_CIRCULAR = 1;
+
+struct ParticleSystemForce
 {
 	float3 position;
 	float strength;
+	float3 axis;
+	uint type;
+	float nAccelerationCoeff;
+	float tAccelerationCoeff;
+	float2 padding;
 };
 
 struct Particle
@@ -51,7 +61,7 @@ cbuffer MutableConstants : register(b0)
 	float4 random0;
 	float4 random1;
 	
-	ParticleSystemAttractor attractors[MAX_ATTRACTORS_NUMBER];
+	ParticleSystemForce forces[MAX_FORCES_NUMBER];
 };
 
 Texture2D perlinNoise : register(t0);
@@ -63,17 +73,28 @@ float3 SumAccelerations(float3 particlePosition)
 	float3 result = 0.0f.xxx;
 	
 	[unroll]
-	for (uint attractorIndex = 0; attractorIndex < MAX_ATTRACTORS_NUMBER; attractorIndex++)
+	for (uint forceIndex = 0; forceIndex < MAX_FORCES_NUMBER; forceIndex++)
 	{
-		ParticleSystemAttractor attractor = attractors[attractorIndex];
+		ParticleSystemForce force = forces[forceIndex];
 		
-		float3 acceleration = attractor.position - particlePosition;
+		float3 acceleration = force.position - particlePosition;
+		
+		float3 accelerationN = normalize(any(acceleration) ? acceleration : float3(0.0f, 0.0f, 1.0f));
+		float3 accelerationT = (force.type == FORCE_TYPE_CIRCULAR) ?
+			cross(accelerationN, force.axis) :
+			accelerationN;
+		
+		float3 accelerationDir = accelerationN * force.nAccelerationCoeff;
+		accelerationDir += accelerationT * force.tAccelerationCoeff;
+		accelerationDir = normalize(accelerationDir);
+		
+		acceleration = length(acceleration) * accelerationDir;
 		
 		float damping = dot(acceleration, acceleration) + 0.001f;
 		damping = rsqrt(damping);
 		damping *= damping * damping;
 		
-		acceleration *= attractor.strength * damping;
+		acceleration *= force.strength * damping;
 		
 		result += acceleration;
 	}
@@ -90,7 +111,7 @@ Particle EmitParticle(float4 random0_0, float4 random1_0)
 {
 	Particle newParticle = (Particle)0;
 	newParticle.position = emitterOrigin + RandomSpherePoint(random0_0.xyz) * emitterRadius;
-	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, random0_0.w);
+	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, random1_0.wxy);
 	
 	newParticle.rotation = lerp(minRotation, maxRotation, random1_0.x);
 	newParticle.rotationSpeed = lerp(minRotationSpeed, maxRotationSpeed, random1_0.y);
@@ -114,10 +135,13 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 	Particle particle = particleBuffer[particleIndex];
 	
 	float2 swizzledCoord = ((float)(particleIndex) + time) / maxParticlesNumber;
-	uint2 texCoord = (uint2)(frac(particle.position.xy + swizzledCoord) * perlinNoiseSize);
-	float4 randomModifier = perlinNoise[texCoord];
-	float4 random0_0 = frac(random0 + randomModifier);
-	float4 random1_0 = frac(random1 + randomModifier);
+	uint2 texCoord0 = (uint2)(frac(particle.position.xy + swizzledCoord) * perlinNoiseSize);
+	uint2 texCoord1 = (uint2)(frac(particle.position.zx + swizzledCoord) * perlinNoiseSize.yx);
+	
+	float4 randomModifier0 = perlinNoise[texCoord1];
+	float4 randomModifier1 = perlinNoise[texCoord0];
+	float4 random0_0 = frac(random0 + randomModifier0 + randomModifier1);
+	float4 random1_0 = frac(random1 + randomModifier0 + randomModifier1);
 	
 	[branch]
 	if (particle.life <= 0.0f)
@@ -129,21 +153,11 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 	else
 	{
-		uint2 texCoordXY = (uint2)(frac(particle.position.xy) * perlinNoiseSize);
-		uint2 texCoordYZ = (uint2)(frac(particle.position.yz) * perlinNoiseSize.yy);
-		uint2 texCoordZX = (uint2)(frac(particle.position.zx) * perlinNoiseSize.yx);
-		
-		float3 displacement = perlinNoise[texCoordXY].xyz;
-		displacement += perlinNoise[texCoordYZ].xyz;
-		displacement += perlinNoise[texCoordZX].xyz;
-		
-		displacement = (displacement * 2.0f / 3.0f - 1.0f.xxx) * particleTurbulence;
-		
 		float3 velocity = particle.velocity;
 		float3 acceleration = SumAccelerations(particle.position);
 		
 		particle.position += velocity * deltaTime;
-		particle.velocity += acceleration * deltaTime * deltaTime + displacement;
+		particle.velocity += acceleration * deltaTime * deltaTime;
 		particle.velocity *= particleDamping;
 		
 		particle.rotation += particle.rotationSpeed * deltaTime;

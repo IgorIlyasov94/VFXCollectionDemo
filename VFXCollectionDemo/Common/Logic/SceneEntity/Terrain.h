@@ -57,7 +57,7 @@ namespace Common::Logic::SceneEntity
 		void GenerateMesh(const std::filesystem::path& terrainFileName,
 			const std::filesystem::path& blendMapFileName, ID3D12GraphicsCommandList* commandList,
 			Graphics::DirectX12Renderer* renderer);
-
+		
 		void CreateConstantBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager, const TerrainDesc& desc);
 
@@ -120,7 +120,6 @@ namespace Common::Logic::SceneEntity
 			DirectX::PackedVector::HALF tangentW;
 			DirectX::PackedVector::HALF texCoordX;
 			DirectX::PackedVector::HALF texCoordY;
-			uint32_t blendWeight;
 		};
 
 		struct MutableConstants
@@ -128,19 +127,19 @@ namespace Common::Logic::SceneEntity
 		public:
 			float4x4 viewProjection;
 
-			float3 cameraDirection;
+			float3 cameraPosition;
 			float time;
 
 			float2 mapTiling0;
 			float2 mapTiling1;
 			float2 mapTiling2;
 			float2 mapTiling3;
+
+			float2 noiseTiling;
+			float2 padding;
 		};
 
 		std::vector<floatN> normalHeightData;
-
-		uint32_t mapWidth;
-		uint32_t mapHeight;
 
 		uint32_t verticesPerWidth;
 		uint32_t verticesPerHeight;
@@ -160,6 +159,7 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID normal1Id;
 		Graphics::Resources::ResourceID normal2Id;
 		Graphics::Resources::ResourceID normal3Id;
+		Graphics::Resources::ResourceID blendMapId;
 
 		Graphics::Resources::ResourceID terrainVSId;
 		Graphics::Resources::ResourceID terrainPSId;

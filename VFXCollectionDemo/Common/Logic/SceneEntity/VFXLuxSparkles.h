@@ -35,7 +35,7 @@ namespace Common::Logic::SceneEntity
 			Graphics::Resources::ResourceManager* resourceManager);
 
 		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
-			Graphics::Resources::ResourceID vfxAtlasId);
+			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID vfxAtlasId);
 
 		void CreateParticleSystems(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer,
 			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID particleSimulationCSId);
@@ -49,6 +49,12 @@ namespace Common::Logic::SceneEntity
 			float2 atlasElementSize;
 
 			float colorIntensity;
+			float3 perlinNoiseTiling;
+
+			float3 perlinNoiseScrolling;
+			float particleTurbulence;
+
+			float time;
 			float3 padding;
 		};
 

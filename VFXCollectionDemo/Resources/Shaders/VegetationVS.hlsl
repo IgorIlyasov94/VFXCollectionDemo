@@ -2,18 +2,22 @@ struct Vegetation
 {
 	float4x4 world;
 	float2 atlasElementOffset;
-	float2 padding;
+	float tiltAmplitude;
+	float height;
 };
 
 cbuffer MutableConstants : register(b0)
 {
 	float4x4 viewProjection;
 	
-	float3 cameraDirection;
+	float3 cameraPosition;
 	float time;
 	
 	float2 atlasElementSize;
-	float2 padding;
+	float2 perlinNoiseTiling;
+	
+	float3 windDirection;
+	float windStrength;
 };
 
 struct Input
@@ -21,7 +25,6 @@ struct Input
 	float3 position : POSITION;
 	float2 texCoord : TEXCOORD0;
 	uint instanceId : SV_InstanceID;
-	bool isFrontFace : SV_IsFrontFace;
 };
 
 struct Output
@@ -45,13 +48,36 @@ Output main(Input input)
 	
 	Vegetation vegetation = vegetationBuffer[input.instanceId];
 	
-	float4 worldPosition = float4(mul(vegetation.world, float3(input.position, 1.0f)), 1.0f);
+	float4 localPosition = float4(input.position, 1.0f);
+	float4 worldPosition = mul(vegetation.world, localPosition);
+	
+	float2 noiseXZTexCoord = worldPosition.xz * perlinNoiseTiling;
+	float2 noiseYZTexCoord = worldPosition.yz * perlinNoiseTiling;
+	
+	float noiseXZ = perlinNoise.SampleLevel(samplerLinear, noiseXZTexCoord, 0.0f).x;
+	float noiseYZ = perlinNoise.SampleLevel(samplerLinear, noiseYZTexCoord, 0.0f).x;
+	float noise = (noiseXZ + noiseYZ) * 0.25f + 0.5f;
+	
+	float t = saturate(sin(time * windStrength * noise) * 0.5f + 0.5f);
+	
+	float3 shift = min(windDirection, vegetation.tiltAmplitude.xxx) + float3(0.0f, 0.0f, 0.0001f);
+	shift.z -= 0.5f * vegetation.height * dot(windDirection, windDirection);
+	shift = lerp(normalize(shift), 0.0f.xxx, t);
+	float shiftCoeff = (1.0f - input.texCoord.y) * vegetation.height;
+	
+	worldPosition.xyz += shift * shiftCoeff;
+	
 	output.position = mul(viewProjection, worldPosition);
 	
-	float sideCoeff = input.isFrontFace ? -1.0f : 1.0f;
+	output.normal = normalize(mul((float3x3)vegetation.world, float3(0.0f, -1.0f, 0.0f)));
+	output.tangent = normalize(mul((float3x3)vegetation.world, float3(-1.0f, 0.0f, 0.0f)));
 	
-	output.normal = normalize(mul((float3x3)world, float3(0.0f, sideCoeff, 0.0f)));
-	output.tangent = normalize(mul((float3x3)world, float3(sideCoeff, 0.0f, 0.0f)));
+	float3 view = normalize(worldPosition.xyz - cameraPosition);
+	
+	float sideCoeff = (dot(output.normal, view) < 0.0f) ? 1.0f : -1.0f;
+	
+	output.normal *= sideCoeff;
+	output.tangent *= sideCoeff;
 	
 	output.binormal = cross(output.tangent, output.normal);
 	output.texCoord = input.texCoord * atlasElementSize + vegetation.atlasElementOffset;

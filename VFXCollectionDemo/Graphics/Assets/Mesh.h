@@ -24,6 +24,8 @@ namespace Graphics::Assets
 		void DrawOnly(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber = 1u);
 
 		const MeshDesc& GetDesc();
+		const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView();
+		const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView();
 
 	private:
 		Mesh() = delete;

@@ -10,14 +10,14 @@ using namespace Graphics::Resources;
 using namespace DirectX::PackedVector;
 
 Common::Logic::SceneEntity::VFXLux::VFXLux(ID3D12GraphicsCommandList* commandList, DirectX12Renderer* renderer,
-	ResourceID perlinNoiseId, Camera* camera)
+	ResourceID perlinNoiseId, Camera* camera, const float3& position)
 {
 	auto device = renderer->GetDevice();
 	auto resourceManager = renderer->GetResourceManager();
 
 	_camera = camera;
 
-	CreateConstantBuffers(device, commandList, resourceManager);
+	CreateConstantBuffers(device, commandList, resourceManager, position);
 	LoadShaders(device, resourceManager);
 
 	CreateMesh(device, commandList, resourceManager);
@@ -36,63 +36,66 @@ void Common::Logic::SceneEntity::VFXLux::OnCompute(ID3D12GraphicsCommandList* co
 
 void Common::Logic::SceneEntity::VFXLux::Draw(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
 {
-	pillarConstants->viewProjection = _camera->GetViewProjection();
-	pillarConstants->time = time;
+	circleConstants->viewProjection = _camera->GetViewProjection();
+	circleConstants->invView = _camera->GetInvView();
+	circleConstants->time = time;
 
-	pillarMaterial->Set(commandList);
-	pillarMesh->Draw(commandList);
+	circleMaterial->Set(commandList);
+	circleMesh->Draw(commandList);
 }
 
 void Common::Logic::SceneEntity::VFXLux::Release(Graphics::Resources::ResourceManager* resourceManager)
 {
-	delete pillarMaterial;
+	delete circleMaterial;
 
-	pillarMesh->Release(resourceManager);
-	delete pillarMesh;
+	circleMesh->Release(resourceManager);
+	delete circleMesh;
 
-	resourceManager->DeleteResource<ConstantBuffer>(pillarConstantsId);
+	resourceManager->DeleteResource<ConstantBuffer>(circleConstantsId);
 	
-	resourceManager->DeleteResource<Shader>(vfxLuxPillarVSId);
-	resourceManager->DeleteResource<Shader>(vfxLuxPillarPSId);
+	resourceManager->DeleteResource<Shader>(vfxLuxCircleVSId);
+	resourceManager->DeleteResource<Shader>(vfxLuxCirclePSId);
 }
 
-void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* device,
-	ID3D12GraphicsCommandList* commandList, Graphics::Resources::ResourceManager* resourceManager)
+void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+	Graphics::Resources::ResourceManager* resourceManager, const float3& position)
 {
 	floatN zero{};
 	floatN one = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
 	floatN identityQuaternion = XMQuaternionIdentity();
 
-	pillarWorld = XMMatrixTransformation(zero, identityQuaternion, one, zero, identityQuaternion, zero);
+	circleWorld = XMMatrixTransformation(zero, identityQuaternion, one, zero, identityQuaternion, zero);
 
 	BufferDesc bufferDesc{};
 	bufferDesc.data.resize(sizeof(VFXPillarConstants));
 	bufferDesc.flag = BufferFlag::IS_CONSTANT_DYNAMIC;
 
-	pillarConstantsId = resourceManager->CreateBufferResource(device, commandList, BufferResourceType::CONSTANT_BUFFER, bufferDesc);
+	circleConstantsId = resourceManager->CreateBufferResource(device, commandList, BufferResourceType::CONSTANT_BUFFER, bufferDesc);
 
-	auto pillarConstantsResource = resourceManager->GetResource<ConstantBuffer>(pillarConstantsId);
-	pillarConstants = reinterpret_cast<VFXPillarConstants*>(pillarConstantsResource->resourceCPUAddress);
-	pillarConstants->world = pillarWorld;
-	pillarConstants->viewProjection = _camera->GetViewProjection();
-	pillarConstants->tiling0 = float2(0.02f, 0.7f);
-	pillarConstants->tiling1 = float2(0.08f, 0.07f);
-	pillarConstants->scrollSpeed0 = float2(0.05f, 0.2f);
-	pillarConstants->scrollSpeed1 = float2(-0.12f, -0.09f);
-	pillarConstants->displacementStrength = float4(-0.15f, 0.09f, -0.25f, 1.06f);
-	pillarConstants->color0 = float4(1.0f, 0.1239f, 0.0f, 1.0f);
-	pillarConstants->color1 = float4(2.2f, 1.7405f, 0.7512f, 1.0f);
-	pillarConstants->alphaIntensity = 5.4f;
-	pillarConstants->colorIntensity = 0.5f;
-	pillarConstants->time = 0.0f;
+	auto circleConstantsResource = resourceManager->GetResource<ConstantBuffer>(circleConstantsId);
+	circleConstants = reinterpret_cast<VFXPillarConstants*>(circleConstantsResource->resourceCPUAddress);
+	circleConstants->invView = _camera->GetInvView();
+	circleConstants->viewProjection = _camera->GetViewProjection();
+	circleConstants->color0 = float4(1.0f, 0.1239f, 0.0f, 1.0f);
+	circleConstants->color1 = float4(1.0f, 0.7405f, 0.9812f, 1.0f);
+	circleConstants->worldPosition = position;
+	circleConstants->time = 0.0f;
+	circleConstants->tiling0 = float2(1.0f, 0.5f);
+	circleConstants->tiling1 = float2(1.0f, 0.35f);
+	circleConstants->scrollSpeed0 = float2(0.094f, 0.05f);
+	circleConstants->scrollSpeed1 = float2(-0.107f, -0.046f);
+	circleConstants->colorIntensity = 1.6f;
+	circleConstants->alphaSharpness = 3.0f;
+	circleConstants->distortionStrength = 0.15f;
+	circleConstants->padding = 0.0f;
 }
 
 void Common::Logic::SceneEntity::VFXLux::LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager)
 {
-	vfxLuxPillarVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxPillarVS.hlsl",
+	vfxLuxCircleVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxCircleVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
-	vfxLuxPillarPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxPillarPS.hlsl",
+	vfxLuxCirclePSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxCirclePS.hlsl",
 		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
 }
 
@@ -101,79 +104,42 @@ void Common::Logic::SceneEntity::VFXLux::CreateMesh(ID3D12Device* device, ID3D12
 {
 	VFXVertex vertices[VERTICES_NUMBER]{};
 
-	for (uint32_t vertexIndex = 0u; vertexIndex < VERTICES_PER_ROW; vertexIndex++)
-	{
-		auto& vertex = vertices[vertexIndex];
-		vertex.position = float3(GEOMETRY_X_OFFSETS[vertexIndex], 0.0f, GEOMETRY_HEIGHT);
+	for (uint32_t ringIndex = 0u; ringIndex < TOTAL_RING_NUMBER; ringIndex++)
+		for (uint32_t ringVertexIndex = 0u; ringVertexIndex < VERTICES_PER_RING; ringVertexIndex++)
+		{
+			auto vertexIndex = ringIndex * VERTICES_PER_RING + ringVertexIndex;
+			auto& vertex = vertices[vertexIndex];
+			auto angle = ringVertexIndex * 2.0f * static_cast<float>(std::numbers::pi) / (VERTICES_PER_RING - 1);
+			auto radius = RING_RADIUSES[ringIndex];
+			
+			vertex.position = float3(std::cos(angle) * radius, std::sin(angle) * radius, 0.0f);
 
-		float u = (vertex.position.x + GEOMETRY_WIDTH / 2.0f) / GEOMETRY_WIDTH;
+			auto u = ringVertexIndex / static_cast<float>(VERTICES_PER_RING - 1);
+			auto v = (radius - RING_START_OFFSET) / CIRCLE_WIDTH;
 
-		vertex.texCoord.x = XMConvertFloatToHalf(u);
-		vertex.texCoord.y = XMConvertFloatToHalf(0.0f);
+			vertex.texCoord.x = XMConvertFloatToHalf(u);
+			vertex.texCoord.y = XMConvertFloatToHalf(v);
 
-		float rFloat = u * 2.0f - 1.0f;
-		auto r = FloatToColorChannel((1.0f - rFloat * rFloat) * 255.0f);
+			auto r = FloatToColorChannel((TOTAL_RING_NUMBER - ringIndex - 1) * 255.0f / (TOTAL_RING_NUMBER - 1));
+			auto a = FloatToColorChannel((ringIndex == 1u || ringIndex == 2u) ? 255.0f : 0.0f);
 
-		vertex.color = SetColor(r, 0u, 0u, 0u);
-	}
-
-	for (uint32_t vertexIndex = VERTICES_PER_ROW; vertexIndex < (VERTICES_NUMBER - VERTICES_PER_ROW); vertexIndex++)
-	{
-		auto& vertex = vertices[vertexIndex];
-
-		auto xIndex = vertexIndex % VERTICES_PER_ROW;
-		auto yIndex = vertexIndex / VERTICES_PER_ROW;
-
-		float w = GEOMETRY_X_OFFSETS[xIndex];
-		float u = (w + GEOMETRY_WIDTH / 2.0f) / GEOMETRY_WIDTH;
-		float v = static_cast<float>(yIndex) / static_cast<float>(TOTAL_SEGMENT_NUMBER);
-		float h = GEOMETRY_HEIGHT * (1.0f - v);
-
-		vertex.position = float3(w, 0.0f, h);
-		vertex.texCoord.x = XMConvertFloatToHalf(u);
-		vertex.texCoord.y = XMConvertFloatToHalf(v);
-
-		float rFloat = u * 2.0f - 1.0f;
-		float gFloat = v * 2.0f - 1.0f;
-
-		auto r = FloatToColorChannel((1.0f - rFloat * rFloat) * 255.0f);
-		auto g = FloatToColorChannel((1.0f - gFloat * gFloat) * 255.0f);
-		uint8_t a = (xIndex == 0 || xIndex == 3) ? 0u : 255u;
-
-		vertex.color = SetColor(r, g, 0u, a);
-	}
-
-	for (uint32_t vertexIndex = VERTICES_NUMBER - VERTICES_PER_ROW; vertexIndex < VERTICES_NUMBER; vertexIndex++)
-	{
-		auto& vertex = vertices[vertexIndex];
-
-		auto xIndex = vertexIndex % VERTICES_PER_ROW;
-
-		if (xIndex < VERTICES_PER_ROW)
-			vertex.position = float3(GEOMETRY_X_OFFSETS[xIndex], 0.0f, 0.0f);
-
-		float u = (vertex.position.x + GEOMETRY_WIDTH / 2.0f) / GEOMETRY_WIDTH;
-
-		vertex.texCoord.x = XMConvertFloatToHalf(u);
-		vertex.texCoord.y = XMConvertFloatToHalf(1.0f);
-
-		float rFloat = u * 2.0f - 1.0f;
-		auto r = FloatToColorChannel((1.0f - rFloat * rFloat) * 255.0f);
-
-		vertex.color = SetColor(r, 0u, 0u, 0u);
-	}
+			vertex.color = SetColor(r, 0u, 0u, a);
+		}
 
 	uint16_t indices[INDICES_NUMBER]{};
+	uint32_t indexIterator = 0u;
 
-	for (uint32_t index = 0; index < INDICES_NUMBER; index++)
+	for (uint32_t ribbonIndex = 0; ribbonIndex < TOTAL_RIBBON_NUMBER; ribbonIndex++)
 	{
-		auto& vertexIndex = indices[index];
+		auto ringOffset = ribbonIndex * VERTICES_PER_RING;
 
-		auto localIndex = index % INDICES_PER_QUAD;
-		auto rowIndex = index / INDICES_PER_QUAD;
-		auto segmentIndex = index / INDICES_PER_SEGMENT;
+		for (uint32_t segmentIndex = 0; segmentIndex < TOTAL_SEGMENT_NUMBER; segmentIndex++)
+		{
+			auto offset = segmentIndex + ringOffset;
 
-		vertexIndex = INDEX_OFFSETS[localIndex] + rowIndex + segmentIndex;
+			for (uint32_t index = 0; index < INDICES_PER_SEGMENT; index++)
+				indices[indexIterator++] = INDEX_OFFSETS[index] + offset;
+		}
 	}
 
 	BufferDesc vertexBufferDesc(&vertices[0], sizeof(vertices));
@@ -193,35 +159,35 @@ void Common::Logic::SceneEntity::VFXLux::CreateMesh(ID3D12Device* device, ID3D12
 	meshDesc.indexFormat = IndexFormat::UINT16_INDEX;
 	meshDesc.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	
-	pillarMesh = new Mesh(meshDesc, vertexBufferId, indexBufferId, resourceManager);
+	circleMesh = new Mesh(meshDesc, vertexBufferId, indexBufferId, resourceManager);
 }
 
 void Common::Logic::SceneEntity::VFXLux::CreateMaterials(ID3D12Device* device, ResourceManager* resourceManager,
 	ResourceID perlinNoiseId)
 {
-	auto pillarConstantsResource = resourceManager->GetResource<ConstantBuffer>(pillarConstantsId);
+	auto pillarConstantsResource = resourceManager->GetResource<ConstantBuffer>(circleConstantsId);
 	auto perlinNoiseResource = resourceManager->GetResource<Texture>(perlinNoiseId);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
 		Graphics::DefaultFilterSetup::FILTER_TRILINEAR_WRAP);
 
-	auto vfxLuxPillarVS = resourceManager->GetResource<Shader>(vfxLuxPillarVSId);
-	auto vfxLuxPillarPS = resourceManager->GetResource<Shader>(vfxLuxPillarPSId);
+	auto vfxLuxCircleVS = resourceManager->GetResource<Shader>(vfxLuxCircleVSId);
+	auto vfxLuxCirclePS = resourceManager->GetResource<Shader>(vfxLuxCirclePSId);
 
 	auto blendSetup = Graphics::DefaultBlendSetup::BLEND_PREMULT_ALPHA_ADDITIVE;
 
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetConstantBuffer(0u, pillarConstantsResource->resourceGPUAddress);
-	materialBuilder.SetTexture(0u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_ALL);
-	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_ALL);
+	materialBuilder.SetTexture(0u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
 	materialBuilder.SetDepthStencilFormat(32u, false);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
-	materialBuilder.SetGeometryFormat(pillarMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	materialBuilder.SetVertexShader(vfxLuxPillarVS->bytecode);
-	materialBuilder.SetPixelShader(vfxLuxPillarPS->bytecode);
+	materialBuilder.SetGeometryFormat(circleMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	materialBuilder.SetVertexShader(vfxLuxCircleVS->bytecode);
+	materialBuilder.SetPixelShader(vfxLuxCirclePS->bytecode);
 
-	pillarMaterial = materialBuilder.ComposeStandard(device);
+	circleMaterial = materialBuilder.ComposeStandard(device);
 }
 
 uint8_t Common::Logic::SceneEntity::VFXLux::FloatToColorChannel(float value)

@@ -16,7 +16,7 @@ Common::Logic::SceneEntity::ParticleSystem::ParticleSystem(ID3D12GraphicsCommand
 	std::random_device randomDevice;
 	randomEngine = std::mt19937(randomDevice());
 
-	_desc.attractorsNumber = std::clamp(_desc.attractorsNumber, 0u, MAX_ATTRACTORS_NUMBER);
+	_desc.forcesNumber = std::clamp(_desc.forcesNumber, 0u, MAX_FORCES_NUMBER);
 
 	auto device = renderer->GetDevice();
 	auto resourceManager = renderer->GetResourceManager();
@@ -45,8 +45,8 @@ void Common::Logic::SceneEntity::ParticleSystem::OnCompute(ID3D12GraphicsCommand
 	mutableConstantsBuffer->random0 = Utilities::Random4(randomEngine);
 	mutableConstantsBuffer->random1 = Utilities::Random4(randomEngine);
 
-	for (uint32_t attractorIndex = 0u; attractorIndex < _desc.attractorsNumber; attractorIndex++)
-		mutableConstantsBuffer->attractors[attractorIndex] = _desc.attractors[attractorIndex];
+	for (uint32_t forceIndex = 0u; forceIndex < _desc.forcesNumber; forceIndex++)
+		mutableConstantsBuffer->forces[forceIndex] = _desc.forces[forceIndex];
 
 	auto numGroups = static_cast<uint32_t>(std::lroundf(std::ceilf(_desc.maxParticlesNumber / static_cast<float>(THREADS_PER_GROUP))));
 
@@ -111,11 +111,15 @@ void Common::Logic::SceneEntity::ParticleSystem::CreateConstantBuffers(ID3D12Dev
 	mutableConstantsBuffer->random0 = Utilities::Random4(randomEngine);
 	mutableConstantsBuffer->random1 = Utilities::Random4(randomEngine);
 
-	for (uint32_t attractorIndex = 0u; attractorIndex < MAX_ATTRACTORS_NUMBER; attractorIndex++)
-		if (attractorIndex < _desc.attractorsNumber)
-			mutableConstantsBuffer->attractors[attractorIndex] = _desc.attractors[attractorIndex];
+	for (uint32_t attractorIndex = 0u; attractorIndex < MAX_FORCES_NUMBER; attractorIndex++)
+		if (attractorIndex < _desc.forcesNumber)
+			mutableConstantsBuffer->forces[attractorIndex] = _desc.forces[attractorIndex];
 		else
-			mutableConstantsBuffer->attractors[attractorIndex] = {};
+		{
+			auto& force = mutableConstantsBuffer->forces[attractorIndex];
+			force = {};
+			force.nAccelerationCoeff = 1.0f;
+		}
 }
 
 void Common::Logic::SceneEntity::ParticleSystem::CreateBuffers(ID3D12Device* device,

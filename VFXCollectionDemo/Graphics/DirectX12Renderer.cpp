@@ -184,8 +184,8 @@ void Graphics::DirectX12Renderer::EndCreatingResources()
 
     WaitForGPU(resourceCommandQueueId);
 
-    bufferManager->ReleaseUploadBuffers();
-    textureManager->ReleaseUploadBuffers();
+    bufferManager->ReleaseTempBuffers();
+    textureManager->ReleaseTempBuffers();
 }
 
 void Graphics::DirectX12Renderer::FlushQueue()

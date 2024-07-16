@@ -96,6 +96,16 @@ const Graphics::Assets::MeshDesc& Graphics::Assets::Mesh::GetDesc()
 	return _meshDesc;
 }
 
+const D3D12_VERTEX_BUFFER_VIEW& Graphics::Assets::Mesh::GetVertexBufferView()
+{
+	return *vertexBufferView;
+}
+
+const D3D12_INDEX_BUFFER_VIEW& Graphics::Assets::Mesh::GetIndexBufferView()
+{
+	return *indexBufferView;
+}
+
 void Graphics::Assets::Mesh::LoadCache(std::filesystem::path filePath, MeshDesc& meshDesc,
 	std::vector<uint8_t>& verticesData, std::vector<uint8_t>& indicesData)
 {

@@ -18,7 +18,7 @@ Graphics::BufferManager::~BufferManager()
 		delete buffer.resource;
 	}
 
-	ReleaseUploadBuffers();
+	ReleaseTempBuffers();
 }
 
 Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* device, uint64_t size, BufferAllocationType type)
@@ -30,7 +30,9 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 
 	if (type != BufferAllocationType::UPLOAD &&
 		type != BufferAllocationType::COMMON &&
-		type != BufferAllocationType::UNORDERED_ACCESS)
+		type != BufferAllocationType::UNORDERED_ACCESS &&
+		type != BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL &&
+		type != BufferAllocationType::UNORDERED_ACCESS_TEMP)
 		for (auto& buffer : buffers)
 		{
 			if (buffer.type != type)
@@ -72,7 +74,8 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 
 	D3D12_HEAP_PROPERTIES heapProperties{};
 
-	heapProperties.Type = (type == BufferAllocationType::UPLOAD || type == BufferAllocationType::DYNAMIC_CONSTANT) ?
+	heapProperties.Type = (type == BufferAllocationType::UPLOAD || type == BufferAllocationType::DYNAMIC_CONSTANT ||
+		type == BufferAllocationType::SHADER_TABLES) ?
 		D3D12_HEAP_TYPE_UPLOAD :
 		D3D12_HEAP_TYPE_DEFAULT;
 
@@ -88,7 +91,9 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 	resourceDesc.DepthOrArraySize = 1;
 	resourceDesc.Alignment = DEFAULT_BUFFER_ALIGNMENT;
 
-	if (type == BufferAllocationType::UNORDERED_ACCESS)
+	if (type == BufferAllocationType::UNORDERED_ACCESS ||
+		type == BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL ||
+		type == BufferAllocationType::UNORDERED_ACCESS_TEMP)
 		resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	resourceDesc.Height = 1;
@@ -98,17 +103,29 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 	resourceDesc.Width = resourceSize;
 
 	auto flags = D3D12_HEAP_FLAG_NONE;
-	auto state = (type == BufferAllocationType::UPLOAD || type == BufferAllocationType::DYNAMIC_CONSTANT) ?
-		D3D12_RESOURCE_STATE_GENERIC_READ :
-		(type == BufferAllocationType::UNORDERED_ACCESS) ?
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS :
-		D3D12_RESOURCE_STATE_COPY_DEST;
+	auto state = D3D12_RESOURCE_STATE_COMMON;
 
+	if (type == BufferAllocationType::UPLOAD ||
+		type == BufferAllocationType::DYNAMIC_CONSTANT ||
+		type == BufferAllocationType::SHADER_TABLES)
+		state = D3D12_RESOURCE_STATE_GENERIC_READ;
+	else if (type == BufferAllocationType::UNORDERED_ACCESS ||
+		type == BufferAllocationType::UNORDERED_ACCESS_TEMP)
+		state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+	else if (type == BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL)
+		state = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+	else
+		state = D3D12_RESOURCE_STATE_COPY_DEST;
+	
 	ID3D12Resource* resource{};
-	auto hResult = device->CreateCommittedResource(&heapProperties, flags, &resourceDesc, state, nullptr, IID_PPV_ARGS(&resource));
+	auto hResult = device->CreateCommittedResource(&heapProperties, flags, &resourceDesc,
+		state, nullptr, IID_PPV_ARGS(&resource));
+
 	allocation.resource = new Resources::GPUResource(resource, state);
 
-	if (type == BufferAllocationType::UPLOAD || type == BufferAllocationType::DYNAMIC_CONSTANT)
+	if (type == BufferAllocationType::UPLOAD ||
+		type == BufferAllocationType::DYNAMIC_CONSTANT ||
+		type == BufferAllocationType::SHADER_TABLES)
 		allocation.cpuAddress = allocation.resource->Map();
 
 	allocation.gpuAddress = resource->GetGPUVirtualAddress();
@@ -121,7 +138,8 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 	newBufferSpace.chunk.size = resourceSize;
 	newBufferSpace.type = type;
 
-	if (type == BufferAllocationType::UPLOAD)
+	if (type == BufferAllocationType::UPLOAD ||
+		type == BufferAllocationType::UNORDERED_ACCESS_TEMP)
 		uploadBuffers.push_back(std::move(newBufferSpace));
 	else
 		buffers.push_back(std::move(newBufferSpace));
@@ -129,7 +147,8 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 	return allocation;
 }
 
-void Graphics::BufferManager::Deallocate(Resources::GPUResource* allocatedResource, D3D12_GPU_VIRTUAL_ADDRESS address, uint64_t size)
+void Graphics::BufferManager::Deallocate(Resources::GPUResource* allocatedResource,
+	D3D12_GPU_VIRTUAL_ADDRESS address, uint64_t size)
 {
 	for (auto& buffer : buffers)
 		if (buffer.resource == allocatedResource)
@@ -138,7 +157,10 @@ void Graphics::BufferManager::Deallocate(Resources::GPUResource* allocatedResour
 			
 			if (buffer.chunk.size == alignedSize ||
 				buffer.type == BufferAllocationType::COMMON ||
-				buffer.type == BufferAllocationType::UNORDERED_ACCESS)
+				buffer.type == BufferAllocationType::UNORDERED_ACCESS ||
+				buffer.type == BufferAllocationType::SHADER_TABLES ||
+				buffer.type == BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL ||
+				buffer.type == BufferAllocationType::UNORDERED_ACCESS_TEMP)
 			{
 				if (buffer.type == BufferAllocationType::DYNAMIC_CONSTANT)
 					buffer.resource->Unmap();
@@ -169,11 +191,13 @@ void Graphics::BufferManager::Deallocate(Resources::GPUResource* allocatedResour
 		}
 }
 
-void Graphics::BufferManager::ReleaseUploadBuffers()
+void Graphics::BufferManager::ReleaseTempBuffers()
 {
 	for (auto& buffer : uploadBuffers)
 	{
-		buffer.resource->Unmap();
+		if (buffer.type == BufferAllocationType::UPLOAD)
+			buffer.resource->Unmap();
+
 		delete buffer.resource;
 	}
 

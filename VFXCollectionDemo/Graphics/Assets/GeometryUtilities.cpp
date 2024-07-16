@@ -12,7 +12,7 @@ float Graphics::Assets::GeometryUtilities::CalculateTriangleArea(float3 point0, 
 	float result{};
 	XMStoreFloat(&result, XMVector3Dot(triangleVectorArea, triangleVectorArea));
 
-	return std::sqrt(result);
+	return std::sqrt(result) * 0.5f;
 }
 
 float3 Graphics::Assets::GeometryUtilities::CalculateNormal(const float3& point0, const float3& point1, const float3& point2) noexcept

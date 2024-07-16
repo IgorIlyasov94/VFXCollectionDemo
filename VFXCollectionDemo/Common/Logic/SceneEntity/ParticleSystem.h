@@ -9,11 +9,22 @@
 
 namespace Common::Logic::SceneEntity
 {
-	struct ParticleSystemAttractor
+	enum class ParticleSystemForceType : uint32_t
+	{
+		ATTRACTOR = 0u,
+		CIRCULAR = 1u
+	};
+
+	struct ParticleSystemForce
 	{
 	public:
 		float3 position;
 		float strength;
+		float3 axis;
+		uint32_t type;
+		float nAccelerationCoeff;
+		float tAccelerationCoeff;
+		float2 padding;
 	};
 
 	struct ParticleSystemDesc
@@ -44,8 +55,8 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID perlinNoiseId;
 		Graphics::Resources::ResourceID particleSimulationCSId;
 
-		ParticleSystemAttractor* attractors;
-		uint32_t attractorsNumber;
+		ParticleSystemForce* forces;
+		uint32_t forcesNumber;
 
 		float2 perlinNoiseSize;
 	};
@@ -75,7 +86,7 @@ namespace Common::Logic::SceneEntity
 
 		void Release(Graphics::Resources::ResourceManager* resourceManager) override;
 
-		static constexpr uint32_t MAX_ATTRACTORS_NUMBER = 8u;
+		static constexpr uint32_t MAX_FORCES_NUMBER = 4u;
 
 	private:
 		ParticleSystem() = delete;
@@ -130,7 +141,7 @@ namespace Common::Logic::SceneEntity
 			float4 random0;
 			float4 random1;
 
-			ParticleSystemAttractor attractors[MAX_ATTRACTORS_NUMBER];
+			ParticleSystemForce forces[MAX_FORCES_NUMBER];
 		};
 
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;

@@ -52,9 +52,12 @@ namespace Common::Logic::SceneEntity
 			float2 noiseScrollSpeed;
 
 			float time;
-			float strength;
+			float deltaTime;
 			float particleNumber;
-			float padding;
+			float noiseStrength;
+
+			float velocityStrength;
+			float3 padding;
 		};
 
 		VFXDistortersConstants* distortersConstants;

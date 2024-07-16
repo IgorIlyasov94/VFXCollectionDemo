@@ -36,13 +36,13 @@ Output main(Input input)
 	
 	float3 color = sceneBuffer[bufferIndex].xyz;
 	
-	float luminance = luminanceBuffer[0u] / area;
+	float luminance = luminanceBuffer[0u] / (float)area;
 	
 	float gray = dot(color, LUMINANCE_VECTOR);
-	float3 rodColor = float3(0.95f, 1.1f, 1.4f);
-	float colorShiftFactor = saturate(luminance / 4.0f);
+	float3 rodColor = float3(4.4f, 1.1f, 0.7f);
+	float colorShiftFactor = 0.75f;
 	
-	//color = lerp(gray * rodColor, color, colorShiftFactor);
+	color = lerp(gray * rodColor, color, colorShiftFactor);
 	
 	color *= middleGray / (luminance + 0.001f);
 	color *= 1.0f + color / whiteCutoff;

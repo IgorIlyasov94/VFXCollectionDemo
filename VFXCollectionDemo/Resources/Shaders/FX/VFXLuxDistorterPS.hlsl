@@ -10,16 +10,19 @@ cbuffer MutableConstants : register(b0)
 	float2 noiseScrollSpeed;
 	
 	float time;
-	float strength;
+	float deltaTime;
 	float particleNumber;
-	float padding;
+	float noiseStrength;
+	
+	float velocityStrength;
+	float3 padding;
 };
 
 struct Input
 {
 	float4 position : SV_Position;
 	float4 texCoord : TEXCOORD0;
-	float alpha : TEXCOORD1;
+	float3 velocityAlpha : TEXCOORD1;
 };
 
 struct Output
@@ -40,7 +43,11 @@ Output main(Input input)
 	float2 distortion = perlinNoise.Sample(samplerLinear, input.texCoord.zw).xy;
 	distortion = distortion * 2.0f - 1.0f.xx;
 	
-	output.distortion = distortion * (mask * strength * input.alpha);
+	float distortionCoeff = mask * input.velocityAlpha.z;
+	
+	output.distortion = input.velocityAlpha.xy * velocityStrength;
+	output.distortion += distortion * noiseStrength;
+	output.distortion *= distortionCoeff;
 	
 	return output;
 }

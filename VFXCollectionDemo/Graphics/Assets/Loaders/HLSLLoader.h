@@ -47,6 +47,8 @@ namespace Graphics::Assets::Loaders
 		static D3D12_SHADER_BYTECODE LoadCache(const std::filesystem::path& filePath);
 		static void SaveCache(const std::filesystem::path& filePath, D3D12_SHADER_BYTECODE bytecode);
 
+		static void SavePDB(const std::filesystem::path& shaderPath, IDxcResult* result);
+
 		class CustomIncludeHandler : public IDxcIncludeHandler
 		{
 		public:
@@ -64,6 +66,40 @@ namespace Graphics::Assets::Loaders
 			IDxcUtils* _utils;
 			const std::filesystem::path& _filePath;
 			std::unordered_set<std::filesystem::path> includedFiles;
+		};
+
+		template <char c0, char c1, char c2, char c3>
+		static constexpr uint32_t DXILFourCC()
+		{
+			return static_cast<uint32_t>(c0) |
+				static_cast<uint32_t>(c1) << 8 |
+				static_cast<uint32_t>(c2) << 16 |
+				static_cast<uint32_t>(c3) << 24;
+		}
+
+		enum DxilFourCC
+		{
+			DFCC_Container = DXILFourCC<'D', 'X', 'B', 'C'>(),
+			DFCC_ResourceDef = DXILFourCC<'R', 'D', 'E', 'F'>(),
+			DFCC_InputSignature = DXILFourCC<'I', 'S', 'G', '1'>(),
+			DFCC_OutputSignature = DXILFourCC<'O', 'S', 'G', '1'>(),
+			DFCC_PatchConstantSignature = DXILFourCC<'P', 'S', 'G', '1'>(),
+			DFCC_ShaderStatistics = DXILFourCC<'S', 'T', 'A', 'T'>(),
+			DFCC_ShaderDebugInfoDXIL = DXILFourCC<'I', 'L', 'D', 'B'>(),
+			DFCC_ShaderDebugName = DXILFourCC<'I', 'L', 'D', 'N'>(),
+			DFCC_FeatureInfo = DXILFourCC<'S', 'F', 'I', '0'>(),
+			DFCC_PrivateData = DXILFourCC<'P', 'R', 'I', 'V'>(),
+			DFCC_RootSignature = DXILFourCC<'R', 'T', 'S', '0'>(),
+			DFCC_DXIL = DXILFourCC<'D', 'X', 'I', 'L'>(),
+			DFCC_PipelineStateValidation = DXILFourCC<'P', 'S', 'V', '0'>(),
+			DFCC_RuntimeData = DXILFourCC<'R', 'D', 'A', 'T'>(),
+			DFCC_ShaderHash = DXILFourCC<'H', 'A', 'S', 'H'>()
+		};
+
+		struct DxilShaderDebugName
+		{
+			uint16_t Flags;
+			uint16_t NameLength;
 		};
 	};
 }

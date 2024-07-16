@@ -10,7 +10,7 @@ Graphics::TextureManager::~TextureManager()
 	for (auto& resource : resources)
 		delete resource;
 
-	ReleaseUploadBuffers();
+	ReleaseTempBuffers();
 }
 
 Graphics::TextureAllocation Graphics::TextureManager::Allocate(ID3D12Device* device, D3D12_RESOURCE_FLAGS resourceFlags,
@@ -118,7 +118,7 @@ void Graphics::TextureManager::Deallocate(Resources::GPUResource* allocatedResou
 		}
 }
 
-void Graphics::TextureManager::ReleaseUploadBuffers()
+void Graphics::TextureManager::ReleaseTempBuffers()
 {
 	for (auto& buffer : uploadBuffers)
 	{

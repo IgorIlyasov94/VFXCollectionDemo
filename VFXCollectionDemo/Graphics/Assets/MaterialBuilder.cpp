@@ -168,7 +168,7 @@ void Graphics::Assets::MaterialBuilder::SetGeometryFormat(VertexFormat format, D
 		inputElements.push_back({ "BLENDINDICES", 0, DXGI_FORMAT_R8G8B8A8_UINT, 0, appendParameter, classification, 0 });
 
 	if ((format & VertexFormat::BLENDWEIGHT) == VertexFormat::BLENDWEIGHT)
-		inputElements.push_back({ "BLENDWEIGHT", 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, appendParameter, classification, 0 });
+		inputElements.push_back({ "BLENDWEIGHT", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 }
 
 void Graphics::Assets::MaterialBuilder::SetCullMode(D3D12_CULL_MODE mode)

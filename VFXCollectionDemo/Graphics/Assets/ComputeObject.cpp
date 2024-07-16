@@ -66,8 +66,6 @@ void Graphics::Assets::ComputeObject::Set(ID3D12GraphicsCommandList* commandList
 	commandList->SetPipelineState(_pipelineState);
 	commandList->SetComputeRootSignature(_rootSignature);
 
-	uint32_t rootParameterIndex{};
-
 	for (auto& constantBufferSlot : _constantBufferSlots)
 		commandList->SetComputeRootConstantBufferView(constantBufferSlot.rootParameterIndex, constantBufferSlot.gpuAddress);
 

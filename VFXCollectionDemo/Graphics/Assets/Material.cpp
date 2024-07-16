@@ -66,8 +66,6 @@ void Graphics::Assets::Material::Set(ID3D12GraphicsCommandList* commandList)
 	commandList->SetPipelineState(_pipelineState);
 	commandList->SetGraphicsRootSignature(_rootSignature);
 
-	uint32_t rootParameterIndex{};
-
 	for (auto& constantBufferSlot : _constantBufferSlots)
 		commandList->SetGraphicsRootConstantBufferView(constantBufferSlot.rootParameterIndex, constantBufferSlot.gpuAddress);
 

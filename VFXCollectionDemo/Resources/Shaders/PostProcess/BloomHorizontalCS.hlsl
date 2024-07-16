@@ -56,11 +56,11 @@ void main(Input input)
 	texIndex = min(texIndex, area - 1);
 	
 	float3 color = sceneBuffer[texIndex.x].xyz;
-	//color += sceneBuffer[texIndex.y].xyz;
-	//color += sceneBuffer[texIndex.z].xyz;
-	//color += sceneBuffer[texIndex.w].xyz;
+	color += sceneBuffer[texIndex.y].xyz;
+	color += sceneBuffer[texIndex.z].xyz;
+	color += sceneBuffer[texIndex.w].xyz;
 	
-	color = max(color - brightThreshold, 0.0f.xxx);// * 0.25f;
+	color = max(color - brightThreshold, 0.0f.xxx) * 0.25f;
 	color *= middleGray / (luminance + 0.001f);
 	color *= 1.0f.xxx + color / whiteCutoff;
 	color /= 1.0f.xxx + color;

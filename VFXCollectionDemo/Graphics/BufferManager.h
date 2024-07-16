@@ -12,7 +12,10 @@ namespace Graphics
 		VERTEX_CONSTANT = 2u,
 		DYNAMIC_CONSTANT = 3u,
 		INDEX = 4u,
-		UPLOAD = 5u
+		UPLOAD = 5u,
+		SHADER_TABLES = 6u,
+		ACCELERATION_STRUCTURE_BOTTOM_LEVEL = 7u,
+		UNORDERED_ACCESS_TEMP = 8u
 	};
 
 	struct BufferAllocation
@@ -35,7 +38,7 @@ namespace Graphics
 		
 		void Deallocate(Resources::GPUResource* allocatedResource, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress, uint64_t size);
 
-		void ReleaseUploadBuffers();
+		void ReleaseTempBuffers();
 
 	private:
 		BufferManager(const BufferManager&) = delete;

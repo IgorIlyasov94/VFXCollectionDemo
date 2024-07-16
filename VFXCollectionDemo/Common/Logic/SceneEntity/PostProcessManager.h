@@ -50,7 +50,7 @@ namespace Common::Logic::SceneEntity
 			DirectX::PackedVector::XMHALF2 texCoord;
 		};
 
-		struct DistortionConstants
+		struct MotionBlurConstants
 		{
 		public:
 			uint32_t widthU;
@@ -85,7 +85,7 @@ namespace Common::Logic::SceneEntity
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
 
-		DistortionConstants distortionConstants;
+		MotionBlurConstants motionBlurConstants;
 		HDRConstants hdrConstants;
 		ToneMappingConstants toneMappingConstants;
 
@@ -98,10 +98,10 @@ namespace Common::Logic::SceneEntity
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneColorTargetDescriptor;
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneDepthTargetDescriptor;
 
-		D3D12_CPU_DESCRIPTOR_HANDLE sceneDistortionTargetDescriptor;
+		D3D12_CPU_DESCRIPTOR_HANDLE sceneMotionTargetDescriptor;
 
 		Graphics::Resources::GPUResource* sceneColorTargetGPUResource;
-		Graphics::Resources::GPUResource* sceneDistortionTargetGPUResource;
+		Graphics::Resources::GPUResource* sceneMotionTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneBufferGPUResource;
 		Graphics::Resources::GPUResource* luminanceBufferGPUResource;
 		Graphics::Resources::GPUResource* bloomBufferGPUResource;
@@ -109,13 +109,13 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID sceneColorTargetId;
 		Graphics::Resources::ResourceID sceneDepthTargetId;
 
-		Graphics::Resources::ResourceID sceneDistortionTargetId;
+		Graphics::Resources::ResourceID sceneMotionTargetId;
 		Graphics::Resources::ResourceID sceneBufferId;
 		Graphics::Resources::ResourceID luminanceBufferId;
 		Graphics::Resources::ResourceID bloomBufferId;
 
 		Graphics::Resources::ResourceID quadVSId;
-		Graphics::Resources::ResourceID distortionCSId;
+		Graphics::Resources::ResourceID motionBlurCSId;
 		Graphics::Resources::ResourceID luminanceCSId;
 		Graphics::Resources::ResourceID luminanceIterationCSId;
 		Graphics::Resources::ResourceID bloomHorizontalCSId;
@@ -123,7 +123,7 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID toneMappingPSId;
 
 		Graphics::Assets::Mesh* quadMesh;
-		Graphics::Assets::ComputeObject* distortionComputeObject;
+		Graphics::Assets::ComputeObject* motionBlurComputeObject;
 		Graphics::Assets::ComputeObject* luminanceComputeObject;
 		Graphics::Assets::ComputeObject* luminanceIterationComputeObject;
 		Graphics::Assets::ComputeObject* bloomHorizontalObject;

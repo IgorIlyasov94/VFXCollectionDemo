@@ -23,9 +23,12 @@ cbuffer MutableConstants : register(b0)
 	float2 noiseScrollSpeed;
 	
 	float time;
-	float strength;
+	float deltaTime;
 	float particleNumber;
-	float padding;
+	float noiseStrength;
+	
+	float velocityStrength;
+	float3 padding;
 };
 
 struct Input
@@ -39,7 +42,7 @@ struct Output
 {
 	float4 position : SV_Position;
 	float4 texCoord : TEXCOORD0;
-	float alpha : TEXCOORD1;
+	float3 velocityAlpha : TEXCOORD1;
 };
 
 StructuredBuffer<Particle> particleBuffer : register(t0);
@@ -70,7 +73,7 @@ Output main(Input input)
 	
 	float alpha = particle.life / (float)particle.startLife;
 	
-	float2 size = vfxAnimation.SampleLevel(samplerLinear, float2(alpha, 1.0f), 0.0f).xy;
+	float2 size = vfxAnimation.SampleLevel(samplerLinear, float2(alpha, 0.9f), 0.0f).xy;
 	size *= particle.size;
 	
 	float3 localPosition = float3(input.position.xy * size, 0.0f);
@@ -80,12 +83,22 @@ Output main(Input input)
 	worldPosition.xyz += particle.position;
 	
 	output.position = mul(viewProjection, worldPosition);
-	output.alpha = alpha;
 	output.texCoord.xy = input.texCoord * atlasElementSize + atlasElementOffset;
 	
 	float swizzledOffset = input.instanceId / particleNumber;
 	
 	output.texCoord.zw = input.texCoord * noiseTiling + frac((time + swizzledOffset) * noiseScrollSpeed);
+	
+	float4 lastPosition = worldPosition;
+	lastPosition.xyz -= particle.velocity * deltaTime;
+	lastPosition = mul(viewProjection, lastPosition);
+	
+	float2 projPosition = output.position.xy / output.position.w;
+	float2 lastProjPosition = lastPosition.xy / lastPosition.w;
+	
+	output.velocityAlpha.xy = (projPosition - lastProjPosition) * 0.5f;
+	output.velocityAlpha.y = -output.velocityAlpha.y;
+	output.velocityAlpha.z = vfxAnimation.SampleLevel(samplerLinear, float2(alpha, 0.1f), 0.0f).w;
 	
 	return output;
 }

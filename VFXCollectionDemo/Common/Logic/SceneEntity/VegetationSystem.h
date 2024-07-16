@@ -19,17 +19,16 @@ namespace Common::Logic::SceneEntity
 		uint32_t atlasRows;
 		uint32_t atlasColumns;
 
-		uint32_t smallGrassStartAtlasIndex;
-		uint32_t smallGrassEndAtlasIndex;
-		uint32_t mediumGrassStartAtlasIndex;
-		uint32_t mediumGrassEndAtlasIndex;
-		uint32_t largeGrassStartAtlasIndex;
-		uint32_t largeGrassEndAtlasIndex;
+		float3 smallGrassSize;
+		float3 mediumGrassSize;
+		float3 largeGrassSize;
 
 		const Terrain* terrain;
 
-		std::mt19937 randomEngine;
-		float2 perlinNoiseSize;
+		float3* windDirection;
+		float* windStrength;
+
+		float2 perlinNoiseTiling;
 
 		Graphics::Resources::ResourceID perlinNoiseId;
 		
@@ -71,12 +70,22 @@ namespace Common::Logic::SceneEntity
 		void CreateMaterial(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			Graphics::Resources::ResourceID perlinNoiseId);
 
-		void FillVegetationBuffer(uint8_t* buffer, const Graphics::Resources::TextureDesc& vegetationMapDesc,
-			const VegetationSystemDesc& desc, uint32_t elementNumber, uint32_t offset, uint32_t quadNumber,
-			DirectX::PackedVector::XMUBYTE4 mask);
+		struct VegetationBufferDesc
+		{
+			uint8_t* buffer;
+			const Graphics::Resources::TextureDesc& vegetationMapDesc;
+			const VegetationSystemDesc& vegetationSystemDesc;
+			uint32_t elementNumber;
+			uint32_t offset;
+			uint32_t quadNumber;
+			DirectX::PackedVector::XMUBYTE4 mask;
+			float3 grassSize;
+			float tiltAmplitude;
+		};
 
-		void GetRandomData(const Graphics::Resources::TextureDesc& vegetationMapDesc, const VegetationSystemDesc& desc,
-			DirectX::PackedVector::XMUBYTE4 mask, floatN& position, floatN& upVector, float2& atlasOffset);
+		void FillVegetationBuffer(const VegetationBufferDesc& desc);
+
+		void GetRandomData(const VegetationBufferDesc& desc, floatN& position, floatN& upVector, float2& atlasOffset);
 
 		floatN CalculateRotation(const floatN& upVector, const floatN& upVectorTarget);
 
@@ -96,7 +105,8 @@ namespace Common::Logic::SceneEntity
 			float4x4 world;
 
 			float2 atlasElementOffset;
-			float2 padding;
+			float tiltAmplitude;
+			float height;
 		};
 
 		struct MutableConstants
@@ -104,11 +114,14 @@ namespace Common::Logic::SceneEntity
 		public:
 			float4x4 viewProjection;
 
-			float3 cameraDirection;
+			float3 cameraPosition;
 			float time;
 
 			float2 atlasElementSize;
-			float2 padding;
+			float2 perlinNoiseTiling;
+
+			float3 windDirection;
+			float windStrength;
 		};
 
 		static constexpr uint32_t QUADS_PER_SMALL_GRASS = 1u;
@@ -121,11 +134,17 @@ namespace Common::Logic::SceneEntity
 		static constexpr float2 LARGE_GRASS_SIZE_MIN = float2(0.03f, 0.045f);
 		static constexpr float2 LARGE_GRASS_SIZE_MAX = float2(0.04f, 0.08f);
 
+		static constexpr float SMALL_GRASS_TILT_AMPLITUDE = 0.2f;
+		static constexpr float MEDIUM_GRASS_TILT_AMPLITUDE = 0.8f;
+		static constexpr float LARGE_GRASS_TILT_AMPLITUDE = 0.6f;
+
 		uint32_t instancesNumber;
 
 		const Camera* _camera;
 
 		MutableConstants* mutableConstantsBuffer;
+		float3* windDirection;
+		float* windStrength;
 
 		Graphics::Resources::ResourceID mutableConstantsId;
 		Graphics::Resources::ResourceID vegetationBufferId;

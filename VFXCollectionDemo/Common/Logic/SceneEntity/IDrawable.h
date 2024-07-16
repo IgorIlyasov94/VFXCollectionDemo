@@ -3,6 +3,7 @@
 #include "../../../Includes.h"
 #include "../../../Graphics/DirectX12Includes.h"
 #include "../../../Graphics/Resources/ResourceManager.h"
+#include "../../../Graphics/VertexFormat.h"
 
 namespace Common::Logic::SceneEntity
 {

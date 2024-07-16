@@ -16,16 +16,17 @@ Common::Logic::SceneEntity::Camera::~Camera()
 
 void Common::Logic::SceneEntity::Camera::Update(const float3& position, const float3& lookAt, const float3& upVector)
 {
-	auto _position = XMLoadFloat3(&position);
+	_position = position;
+	auto _positionV = XMLoadFloat3(&position);
 	auto _lookAt = XMLoadFloat3(&lookAt);
 	auto _upVector = XMLoadFloat3(&upVector);
 
-	view = XMMatrixLookAtRH(_position, _lookAt, _upVector);
+	view = XMMatrixLookAtRH(_positionV, _lookAt, _upVector);
 	viewProjection = view * projection;
 	invView = XMMatrixInverse(nullptr, view);
 	invViewProjection = XMMatrixInverse(nullptr, viewProjection);
 
-	auto _direction = _lookAt - _position;
+	auto _direction = _lookAt - _positionV;
 	_direction = XMVector3Normalize(_direction);
 
 	XMStoreFloat3(&direction, _direction);
@@ -68,6 +69,11 @@ const float4x4& Common::Logic::SceneEntity::Camera::GetInvProjection() const
 const float4x4& Common::Logic::SceneEntity::Camera::GetInvViewProjection() const
 {
 	return invViewProjection;
+}
+
+const float3& Common::Logic::SceneEntity::Camera::GetPosition() const
+{
+	return _position;
 }
 
 const float3& Common::Logic::SceneEntity::Camera::GetDirection() const

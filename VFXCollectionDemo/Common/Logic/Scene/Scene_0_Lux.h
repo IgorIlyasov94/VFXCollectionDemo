@@ -10,6 +10,8 @@
 #include "../../../Common/Logic/SceneEntity/PostProcessManager.h"
 
 #include "../SceneEntity/Camera.h"
+#include "../SceneEntity/Terrain.h"
+#include "../SceneEntity/VegetationSystem.h"
 
 #include "IScene.h"
 
@@ -76,6 +78,8 @@ namespace Common::Logic::Scene
 		std::chrono::steady_clock::time_point prevTimePoint;
 
 		float3 environmentPosition;
+		float3 windDirection;
+		float windStrength;
 
 		float4x4 environmentWorld;
 
@@ -96,13 +100,12 @@ namespace Common::Logic::Scene
 
 		SceneEntity::Camera* camera;
 
-		Graphics::Assets::Material* environmentMaterial;
 		Graphics::Assets::Material* wallsMaterial;
-		Graphics::Assets::Mesh* environmentMesh;
 		Graphics::Assets::Mesh* wallsMesh;
 
-		SceneEntity::IDrawable* environmentMeshObject;
 		SceneEntity::IDrawable* wallsMeshObject;
+		SceneEntity::Terrain* terrain;
+		SceneEntity::VegatationSystem* vegetationSystem;
 
 		SceneEntity::IDrawable* vfxLux;
 		SceneEntity::IDrawable* vfxLuxSparkles;

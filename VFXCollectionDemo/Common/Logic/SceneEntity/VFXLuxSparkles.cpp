@@ -20,7 +20,7 @@ Common::Logic::SceneEntity::VFXLuxSparkles::VFXLuxSparkles(ID3D12GraphicsCommand
 	LoadShaders(device, resourceManager);
 	LoadTextures(device, commandList, resourceManager);
 
-	CreateMaterials(device, resourceManager, vfxAtlasId);
+	CreateMaterials(device, resourceManager, perlinNoiseId, vfxAtlasId);
 	CreateParticleSystems(commandList, renderer, perlinNoiseId, particleSimulationCSId);
 }
 
@@ -31,14 +31,7 @@ Common::Logic::SceneEntity::VFXLuxSparkles::~VFXLuxSparkles()
 
 void Common::Logic::SceneEntity::VFXLuxSparkles::OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
 {
-	particleSystemDesc.attractors[0u].position.x = std::sin(time * 3.0f);
-	particleSystemDesc.attractors[1u].position.x = std::sin(time * 3.0f + 0.1f);
-	particleSystemDesc.attractors[2u].position.x = std::sin(time * 3.0f + 0.2f);
-	particleSystemDesc.attractors[3u].position.x = std::sin(time * 3.0f + 0.3f);
-	particleSystemDesc.attractors[4u].position.x = std::sin(time * 3.0f + 0.4f);
-	particleSystemDesc.attractors[5u].position.x = std::sin(time * 3.0f + 0.5f);
-	particleSystemDesc.attractors[6u].position.x = std::sin(time * 3.0f + 0.6f);
-	particleSystemDesc.attractors[7u].position.x = std::sin(time * 3.0f + 0.7f);
+	particleSystemDesc.forces[0u].axis = _camera->GetDirection();
 
 	particleSystem->OnCompute(commandList, time, deltaTime);
 }
@@ -47,6 +40,7 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::Draw(ID3D12GraphicsCommandList*
 {
 	sparklesConstants->invView = _camera->GetInvView();
 	sparklesConstants->viewProjection = _camera->GetViewProjection();
+	sparklesConstants->time = time;
 
 	particleSystem->Draw(commandList, time, deltaTime);
 }
@@ -64,7 +58,7 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::Release(Graphics::Resources::Re
 	delete particleSystem;
 
 	delete particleSystemDesc.emitterOrigin;
-	delete[] particleSystemDesc.attractors;
+	delete[] particleSystemDesc.forces;
 }
 
 void Common::Logic::SceneEntity::VFXLuxSparkles::CreateConstantBuffers(ID3D12Device* device,
@@ -80,9 +74,13 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateConstantBuffers(ID3D12Dev
 	sparklesConstants = reinterpret_cast<VFXSparklesConstants*>(sparklesConstantsResource->resourceCPUAddress);
 	sparklesConstants->invView = _camera->GetInvView();
 	sparklesConstants->viewProjection = _camera->GetViewProjection();
-	sparklesConstants->atlasElementOffset = float2(0.25f, 0.0f);
+	sparklesConstants->atlasElementOffset = float2(0.0f, 0.0f);
 	sparklesConstants->atlasElementSize = float2(1.0f / 8.0f, 1.0f / 8.0f);
-	sparklesConstants->colorIntensity = 0.5f;
+	sparklesConstants->colorIntensity = 5.0f;
+	sparklesConstants->perlinNoiseTiling =  float3(0.3f, 0.3f, 0.3f);
+	sparklesConstants->perlinNoiseScrolling = float3(0.011f, 0.019f, -0.017f);
+	sparklesConstants->particleTurbulence = 0.25f;
+	sparklesConstants->time = 0.0f;
 	sparklesConstants->padding = {};
 }
 
@@ -105,13 +103,15 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::LoadTextures(ID3D12Device* devi
 }
 
 void Common::Logic::SceneEntity::VFXLuxSparkles::CreateMaterials(ID3D12Device* device,
-	Graphics::Resources::ResourceManager* resourceManager, Graphics::Resources::ResourceID vfxAtlasId)
+	Graphics::Resources::ResourceManager* resourceManager, Graphics::Resources::ResourceID perlinNoiseId,
+	Graphics::Resources::ResourceID vfxAtlasId)
 {
 	auto sparklesConstantsResource = resourceManager->GetResource<ConstantBuffer>(sparklesConstantsId);
 	auto vfxAtlasResource = resourceManager->GetResource<Texture>(vfxAtlasId);
 	auto sparklesAnimationResource = resourceManager->GetResource<Texture>(sparklesAnimationId);
+	auto perlinNoiseResource = resourceManager->GetResource<Texture>(perlinNoiseId);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
-		Graphics::DefaultFilterSetup::FILTER_BILINEAR_CLAMP);
+		Graphics::DefaultFilterSetup::FILTER_BILINEAR_WRAP);
 
 	auto vfxLuxSparklesVS = resourceManager->GetResource<Shader>(vfxLuxSparklesVSId);
 	auto vfxLuxSparklesPS = resourceManager->GetResource<Shader>(vfxLuxSparklesPSId);
@@ -122,7 +122,8 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateMaterials(ID3D12Device* d
 	materialBuilder.SetConstantBuffer(0u, sparklesConstantsResource->resourceGPUAddress);
 	materialBuilder.SetBuffer(0u, {}, D3D12_SHADER_VISIBILITY_VERTEX);
 	materialBuilder.SetTexture(1u, sparklesAnimationResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
-	materialBuilder.SetTexture(2u, vfxAtlasResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetTexture(2u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
+	materialBuilder.SetTexture(3u, vfxAtlasResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_ALL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
@@ -141,35 +142,44 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateMaterials(ID3D12Device* d
 void Common::Logic::SceneEntity::VFXLuxSparkles::CreateParticleSystems(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer, ResourceID perlinNoiseId, ResourceID particleSimulationCSId)
 {
-	particleSystemDesc.emitterOrigin = new float3(0.0f, 0.0f, 0.25f);
-	particleSystemDesc.emitterRadius = 0.25f;
-	particleSystemDesc.minParticleVelocity = float3(0.0f, 0.0f, 1.1f);
+	particleSystemDesc.emitterOrigin = new float3(0.0f, 0.0f, 1.25f);
+	particleSystemDesc.emitterRadius = 0.8f;
+	particleSystemDesc.minParticleVelocity = float3(-0.05f, -0.05f, -0.05f);
 	particleSystemDesc.particleDamping = 0.99f;
-	particleSystemDesc.maxParticleVelocity = float3(0.0f, 0.0f, 2.25f);
-	particleSystemDesc.particleTurbulence = 0.01f;
+	particleSystemDesc.maxParticleVelocity = float3(0.05f, 0.05f, 0.05f);
+	particleSystemDesc.particleTurbulence = 0.0f;
 	particleSystemDesc.minRotation = 0.0f;
-	particleSystemDesc.maxRotation = static_cast<float>(std::numbers::pi * 2.0);
+	particleSystemDesc.maxRotation = 0.0f;
 	particleSystemDesc.minRotationSpeed = 0.0f;
-	particleSystemDesc.maxRotationSpeed = 0.5f;
-	particleSystemDesc.minSize = float2(0.005f, 0.005f);
-	particleSystemDesc.maxSize = float2(0.02f, 0.02f);
+	particleSystemDesc.maxRotationSpeed = 0.0f;
+	particleSystemDesc.minSize = float2(0.01f, 0.01f);
+	particleSystemDesc.maxSize = float2(0.05f, 0.05f);
 	particleSystemDesc.minLifeSec = 1.4f;
-	particleSystemDesc.maxLifeSec = 3.0f;
+	particleSystemDesc.maxLifeSec = 18.0f;
 	particleSystemDesc.averageParticleEmitPerSecond = 25u;
-	particleSystemDesc.maxParticlesNumber = 10000u;
+	particleSystemDesc.maxParticlesNumber = 500u;
 	particleSystemDesc.perlinNoiseId = perlinNoiseId;
 	particleSystemDesc.particleSimulationCSId = particleSimulationCSId;
 
-	particleSystemDesc.attractorsNumber = 8u;
-	particleSystemDesc.attractors = new ParticleSystemAttractor[particleSystemDesc.attractorsNumber]{};
-	particleSystemDesc.attractors[0u] = { float3(0.5f, 0.0f, 0.5f), 10.0f };
-	particleSystemDesc.attractors[1u] = { float3(0.5f, 0.0f, 1.0f), 25.0f };
-	particleSystemDesc.attractors[2u] = { float3(0.5f, 0.0f, 1.5f), 42.0f };
-	particleSystemDesc.attractors[3u] = { float3(0.5f, 0.0f, 2.0f), 55.0f };
-	particleSystemDesc.attractors[4u] = { float3(0.5f, 0.0f, 2.5f), 67.0f };
-	particleSystemDesc.attractors[5u] = { float3(0.5f, 0.0f, 3.0f), 80.0f };
-	particleSystemDesc.attractors[6u] = { float3(0.5f, 0.0f, 3.5f), 99.0f };
-	particleSystemDesc.attractors[7u] = { float3(0.5f, 0.0f, 4.0f), 110.0f };
+	particleSystemDesc.forcesNumber = 2u;
+	particleSystemDesc.forces = new ParticleSystemForce[particleSystemDesc.forcesNumber]{};
+	auto& force0 = particleSystemDesc.forces[0u];
+	force0.position = float3(0.0f, 0.0f, 1.25f);
+	force0.strength = -20.0f;
+	force0.axis = float3(0.0f, 0.0f, 1.0f);
+	force0.type = static_cast<uint32_t>(ParticleSystemForceType::CIRCULAR);
+	force0.nAccelerationCoeff = 1.0f;
+	force0.tAccelerationCoeff = 2.5f;
+	force0.padding = float2(0.0f, 0.0f);
+
+	auto& force1 = particleSystemDesc.forces[1u];
+	force1.position = float3(0.0f, 0.0f, 1.25f);
+	force1.strength = 20.0f;
+	force1.axis = float3(0.0f, 0.0f, 1.0f);
+	force1.type = static_cast<uint32_t>(ParticleSystemForceType::ATTRACTOR);
+	force1.nAccelerationCoeff = 1.0f;
+	force1.tAccelerationCoeff = 2.5f;
+	force1.padding = float2(0.0f, 0.0f);
 
 	particleSystemDesc.perlinNoiseSize = float2(1024.0f, 1024.0f);
 
