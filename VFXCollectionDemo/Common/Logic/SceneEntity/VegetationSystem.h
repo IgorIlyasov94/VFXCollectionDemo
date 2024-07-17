@@ -31,6 +31,7 @@ namespace Common::Logic::SceneEntity
 		float2 perlinNoiseTiling;
 
 		Graphics::Resources::ResourceID perlinNoiseId;
+		Graphics::Resources::ResourceID lightConstantBufferId;
 		
 		std::filesystem::path vegetationCacheFileName;
 		std::filesystem::path vegetationMapFileName;
@@ -96,6 +97,14 @@ namespace Common::Logic::SceneEntity
 		{
 		public:
 			float3 position;
+			DirectX::PackedVector::HALF normalX;
+			DirectX::PackedVector::HALF normalY;
+			DirectX::PackedVector::HALF normalZ;
+			DirectX::PackedVector::HALF normalW;
+			DirectX::PackedVector::HALF tangentX;
+			DirectX::PackedVector::HALF tangentY;
+			DirectX::PackedVector::HALF tangentZ;
+			DirectX::PackedVector::HALF tangentW;
 			DirectX::PackedVector::XMHALF2 texCoord;
 		};
 
@@ -146,6 +155,7 @@ namespace Common::Logic::SceneEntity
 		float3* windDirection;
 		float* windStrength;
 
+		Graphics::Resources::ResourceID lightConstantBufferId;
 		Graphics::Resources::ResourceID mutableConstantsId;
 		Graphics::Resources::ResourceID vegetationBufferId;
 

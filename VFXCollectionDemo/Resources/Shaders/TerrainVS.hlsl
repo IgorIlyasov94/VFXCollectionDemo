@@ -1,4 +1,4 @@
-cbuffer MutableConstants : register(b0)
+cbuffer MutableConstants : register(b1)
 {
 	float4x4 viewProj;
 	

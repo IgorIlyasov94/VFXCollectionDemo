@@ -20,6 +20,8 @@ namespace Common::Logic::SceneEntity
 		float2 map2Tiling;
 		float2 map3Tiling;
 
+		Graphics::Resources::ResourceID lightConstantBufferId;
+
 		std::filesystem::path terrainFileName;
 		std::filesystem::path heightMapFileName;
 		std::filesystem::path blendMapFileName;
@@ -149,6 +151,7 @@ namespace Common::Logic::SceneEntity
 		
 		MutableConstants* mutableConstantsBuffer;
 
+		Graphics::Resources::ResourceID lightConstantBufferId;
 		Graphics::Resources::ResourceID mutableConstantsId;
 		
 		Graphics::Resources::ResourceID albedo0Id;

@@ -1,6 +1,13 @@
-#include "PBRLighting.hlsli"
+#include "Lighting/PBRLighting.hlsli"
 
-cbuffer MutableConstants : register(b0)
+cbuffer LightConstantBuffer : register(b0)
+{
+	uint32_t lightSourcesNumber;
+	float3 padding;
+	LightElement lights[MAX_LIGHT_SOURCE_NUMBER];
+};
+
+cbuffer MutableConstants : register(b1)
 {
 	float4x4 viewProjection;
 	
@@ -45,7 +52,7 @@ Output main(Input input)
 	texData = normalMetalness.SampleBias(samplerLinear, input.texCoord, -1.0f);
 	float3 normal = texData.xyz * 2.0f - 1.0f.xxx;
 	
-	normal = BumpMapping(normal, input.normal, input.binormal, input.tangent);
+	normal = normalize(input.normal);//BumpMapping(normal, normalize(input.normal), normalize(input.binormal), normalize(input.tangent));
 	float alpha = texData.w;
 	
 	if (alpha < 0.5f)
@@ -57,7 +64,7 @@ Output main(Input input)
 	
 	Material material;
 	material.albedo = albedo;
-	material.f0 = float3(0.175f, 0.4f, 0.075f);
+	material.f0 = float3(0.175f, 0.4f, 0.075f)*2;
 	material.f90 = 1.00f.xxx;
 	material.metalness = 0.0f;
 	material.roughness = roughness;
@@ -66,24 +73,14 @@ Output main(Input input)
 	
 	float3 lightSum = 0.0f.xxx;
 	
-	PointLight pointLight;
-	pointLight.position = float3(sin(time * 3.0f) * 0.3f, 0.0f, 5.0f);
-	pointLight.color = lerp(float3(4.2f, 3.9f, 2.774f), float3(4.1f, 3.9f, 2.8f), 0.0f) * 2.0f;
-	pointLight.color *= saturate(cos(time * 3.0f) * 0.2f + 0.8f);
+	for (uint lightIndex = 0; lightIndex < lightSourcesNumber; lightIndex++)
+	{
+		float3 light;
+		CalculateLighting(lights[lightIndex], surface, material, view, light);
+		lightSum += light;
+	}
 	
-	LightingDesc lightingDesc;
-	lightingDesc.surface = surface;
-	lightingDesc.pointLight = pointLight;
-	lightingDesc.material = material;
-	
-	float3 light;
-	CalculateLighting(lightingDesc, view, light);
-	
-	lightSum += light;
-	
-	float3 ambient = lerp(float3(0.4f, 0.35f, 0.1f), float3(0.5f, 0.6f, 0.65f), saturate(normal.z * 0.5f + 0.5f));
-	
-	output.color = float4(lightSum + albedo * ambient * 0.01f, 1.0f);
+	output.color = float4(lightSum, 1.0f);
 	
 	return output;
 }

@@ -201,6 +201,9 @@
     <ClCompile Include="Graphics\Assets\RaytracingObjectBuilder.cpp">
       <Filter>Исходные файлы\Graphics\Assets</Filter>
     </ClCompile>
+    <ClCompile Include="Common\Logic\SceneEntity\LightingSystem.cpp">
+      <Filter>Исходные файлы\Common\Logic\SceneEntity</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Includes.h">
@@ -367,6 +370,12 @@
     </ClInclude>
     <ClInclude Include="Graphics\Assets\RaytracingObject.h">
       <Filter>Файлы заголовков\Graphics\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\SceneEntity\LightingSystem.h">
+      <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\SceneEntity\LightDesc.h">
+      <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

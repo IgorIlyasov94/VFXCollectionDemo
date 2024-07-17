@@ -6,7 +6,7 @@ struct Vegetation
 	float height;
 };
 
-cbuffer MutableConstants : register(b0)
+cbuffer MutableConstants : register(b1)
 {
 	float4x4 viewProjection;
 	
@@ -23,6 +23,8 @@ cbuffer MutableConstants : register(b0)
 struct Input
 {
 	float3 position : POSITION;
+	float4 normal : NORMAL;
+	float4 tangent : TANGENT;
 	float2 texCoord : TEXCOORD0;
 	uint instanceId : SV_InstanceID;
 };
@@ -69,8 +71,8 @@ Output main(Input input)
 	
 	output.position = mul(viewProjection, worldPosition);
 	
-	output.normal = normalize(mul((float3x3)vegetation.world, float3(0.0f, -1.0f, 0.0f)));
-	output.tangent = normalize(mul((float3x3)vegetation.world, float3(-1.0f, 0.0f, 0.0f)));
+	output.normal = normalize(mul((float3x3)vegetation.world, input.normal.xyz));
+	output.tangent = normalize(mul((float3x3)vegetation.world, input.tangent.xyz));
 	
 	float3 view = normalize(worldPosition.xyz - cameraPosition);
 	

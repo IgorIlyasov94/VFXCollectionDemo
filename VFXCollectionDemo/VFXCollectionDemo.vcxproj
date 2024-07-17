@@ -23,6 +23,8 @@
     <ClInclude Include="Common\Logic\MainLogic.h" />
     <ClInclude Include="Common\Logic\SceneEntity\Camera.h" />
     <ClInclude Include="Common\Logic\SceneEntity\IDrawable.h" />
+    <ClInclude Include="Common\Logic\SceneEntity\LightDesc.h" />
+    <ClInclude Include="Common\Logic\SceneEntity\LightingSystem.h" />
     <ClInclude Include="Common\Logic\SceneEntity\MeshObject.h" />
     <ClInclude Include="Common\Logic\SceneEntity\ParticleSystem.h" />
     <ClInclude Include="Common\Logic\SceneEntity\PostProcessManager.h" />
@@ -79,6 +81,7 @@
     <ClCompile Include="Common\Application.cpp" />
     <ClCompile Include="Common\Logic\MainLogic.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\Camera.cpp" />
+    <ClCompile Include="Common\Logic\SceneEntity\LightingSystem.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\MeshObject.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\ParticleSystem.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\PostProcessManager.cpp" />
@@ -176,7 +179,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
+    <EnableMicrosoftCodeAnalysis>true</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

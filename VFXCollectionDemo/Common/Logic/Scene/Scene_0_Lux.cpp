@@ -13,7 +13,7 @@ using namespace Graphics::Assets::Loaders;
 using namespace Common::Logic::SceneEntity;
 
 Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
-	: isLoaded(false), terrain(nullptr), vegetationSystem(nullptr),
+	: isLoaded(false), terrain(nullptr), vegetationSystem(nullptr), lightingSystem(nullptr),
 	camera(nullptr), postProcessManager(nullptr), mutableConstantsBuffer{}, mutableConstantsId{},
 	environmentFloorAlbedoId{}, environmentFloorNormalId{}, vfxAtlasId{}, perlinNoiseId{}, pbrStandardVSId{},
 	pbrStandardPSId{}, particleSimulationCSId{}, environmentWorld{}, timer{}, _deltaTime{}, fps(60.0f),
@@ -287,6 +287,39 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer)
 {
+	lightingSystem = new LightingSystem(renderer);
+
+	LightDesc pointLight{};
+	pointLight.position = float3(0.0f, 0.0f, 1.0f);
+	pointLight.radius = 0.5f;
+	pointLight.color = float3(1.0f, 0.95f, 0.93f);
+	pointLight.intensity = 0.2f;
+	pointLight.type = LightType::POINT_LIGHT;
+
+	areaLightId = lightingSystem->CreateLight(pointLight);
+
+	pointLight.position = float3(0.0f, 0.0f, 1.5f);
+	pointLight.intensity = 0.5f;
+
+	areaLightId = lightingSystem->CreateLight(pointLight);
+
+	pointLight.position = float3(0.0f, 0.0f, 2.0f);
+	pointLight.intensity = 0.5f;
+
+	areaLightId = lightingSystem->CreateLight(pointLight);
+
+	pointLight.position = float3(0.0f, 0.0f, 3.0f);
+	pointLight.intensity = 1.0f;
+
+	areaLightId = lightingSystem->CreateLight(pointLight);
+
+	LightDesc ambientLight{};
+	ambientLight.color = float3(0.3f, 0.4f, 0.5f);
+	ambientLight.intensity = 0.0f;
+	ambientLight.type = LightType::AMBIENT_LIGHT;
+
+	ambientLightId = lightingSystem->CreateLight(ambientLight);
+	
 	TerrainDesc terrainDesc{};
 	terrainDesc.origin = {};
 	terrainDesc.verticesPerWidth = 256u;
@@ -296,6 +329,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrainDesc.map1Tiling = float2(11.0f, 11.0f);
 	terrainDesc.map2Tiling = float2(8.0f, 8.0f);
 	terrainDesc.map3Tiling = float2(12.0f, 12.0f);
+	terrainDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
 	terrainDesc.terrainFileName = "Resources\\Meshes\\Lux_Terrain.bin";
 	terrainDesc.heightMapFileName = "Resources\\Textures\\Terrain\\Lux_HeightMap.dds";
 	terrainDesc.blendMapFileName = "Resources\\Textures\\Terrain\\Lux_BlendWeights.dds";
@@ -324,6 +358,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	vegetationSystemDesc.windStrength = &windStrength;
 	vegetationSystemDesc.perlinNoiseTiling = float2(0.1f, 0.1f);
 	vegetationSystemDesc.perlinNoiseId = perlinNoiseId;
+	vegetationSystemDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
 	vegetationSystemDesc.vegetationCacheFileName = "Resources\\Meshes\\Lux_Vegetation.bin";
 	vegetationSystemDesc.vegetationMapFileName = "Resources\\Textures\\Terrain\\Lux_VegetationMap.dds";
 	vegetationSystemDesc.albedoMapFileName = "Resources\\Textures\\Terrain\\VegetationAlbedoAtlas.dds";
@@ -334,7 +369,10 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	wallsMeshObject = new MeshObject(wallsMesh, wallsMaterial);
 
 	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer);
-	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, camera, float3(0.0f, 0.0f, 1.25f));
+
+	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, camera,
+		float3(0.0f, 0.0f, 1.25f));
+
 	vfxLuxSparkles = new SceneEntity::VFXLuxSparkles(commandList, renderer,
 		perlinNoiseId, vfxAtlasId, particleSimulationCSId, camera);
 

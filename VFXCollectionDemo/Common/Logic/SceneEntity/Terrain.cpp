@@ -23,6 +23,8 @@ Common::Logic::SceneEntity::Terrain::Terrain(ID3D12GraphicsCommandList* commandL
 
 	mapSize = desc.size;
 
+	lightConstantBufferId = desc.lightConstantBufferId;
+
 	auto device = renderer->GetDevice();
 	auto resourceManager = renderer->GetResourceManager();
 
@@ -342,6 +344,7 @@ void Common::Logic::SceneEntity::Terrain::LoadTextures(ID3D12Device* device,
 
 void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, ResourceManager* resourceManager)
 {
+	auto lightConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightConstantBufferId);
 	auto constantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
 	auto blendMapResource = resourceManager->GetResource<Texture>(blendMapId);
 	auto albedo0Resource = resourceManager->GetResource<Texture>(albedo0Id);
@@ -361,7 +364,8 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 	auto blendSetup = Graphics::DefaultBlendSetup::BLEND_OPAQUE;
 
 	MaterialBuilder materialBuilder{};
-	materialBuilder.SetConstantBuffer(0u, constantsResource->resourceGPUAddress);
+	materialBuilder.SetConstantBuffer(0u, lightConstantBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetConstantBuffer(1u, constantsResource->resourceGPUAddress);
 	materialBuilder.SetTexture(0u, albedo0Resource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(1u, albedo1Resource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(2u, albedo2Resource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);

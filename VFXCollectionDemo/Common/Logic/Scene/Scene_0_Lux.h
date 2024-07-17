@@ -12,6 +12,7 @@
 #include "../SceneEntity/Camera.h"
 #include "../SceneEntity/Terrain.h"
 #include "../SceneEntity/VegetationSystem.h"
+#include "../SceneEntity/LightingSystem.h"
 
 #include "IScene.h"
 
@@ -103,9 +104,13 @@ namespace Common::Logic::Scene
 		Graphics::Assets::Material* wallsMaterial;
 		Graphics::Assets::Mesh* wallsMesh;
 
+		SceneEntity::LightID areaLightId;
+		SceneEntity::LightID ambientLightId;
+
 		SceneEntity::IDrawable* wallsMeshObject;
 		SceneEntity::Terrain* terrain;
 		SceneEntity::VegatationSystem* vegetationSystem;
+		SceneEntity::LightingSystem* lightingSystem;
 
 		SceneEntity::IDrawable* vfxLux;
 		SceneEntity::IDrawable* vfxLuxSparkles;

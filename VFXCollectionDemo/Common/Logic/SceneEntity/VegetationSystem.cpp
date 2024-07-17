@@ -17,6 +17,7 @@ Common::Logic::SceneEntity::VegatationSystem::VegatationSystem(ID3D12GraphicsCom
 	Graphics::DirectX12Renderer* renderer, const VegetationSystemDesc& desc, const Camera* camera)
 {
 	_camera = camera;
+	lightConstantBufferId = desc.lightConstantBufferId;
 
 	std::random_device randomDevice;
 	randomEngine = std::mt19937(randomDevice());
@@ -80,14 +81,77 @@ void Common::Logic::SceneEntity::VegatationSystem::GenerateMesh(ID3D12Device* de
 	vbDesc.dataStride = sizeof(GrassVertex);
 	vbDesc.data.resize(static_cast<size_t>(vbDesc.dataStride) * vbDesc.numElements);
 
+	auto nTop = float3(-1.0f, -1.0f, 100.0f);
+	auto tTop = GeometryUtilities::CalculateTangent(nTop);
+	auto tTopInv = GeometryUtilities::CalculateTangent(float3(-nTop.x, nTop.y, nTop.z));
+	auto nBottom = float3(-1.0f, -1.0f, 0.0f);
+	auto tBottom = GeometryUtilities::CalculateTangent(nBottom);
+	auto tBottomInv = GeometryUtilities::CalculateTangent(float3(-nBottom.x, nBottom.y, nBottom.z));
+
+	auto nTopN = XMVector3Normalize(XMLoadFloat3(&nTop));
+	auto tTopN = XMVector3Normalize(XMLoadFloat3(&tTop));
+	auto tTopInvN = XMVector3Normalize(XMLoadFloat3(&tTopInv));
+	auto nBottomN = XMVector3Normalize(XMLoadFloat3(&nBottom));
+	auto tBottomN = XMVector3Normalize(XMLoadFloat3(&tBottom));
+	auto tBottomInvN = XMVector3Normalize(XMLoadFloat3(&tBottomInv));
+
 	auto halfZero = XMConvertFloatToHalf(0.0f);
 	auto halfOne = XMConvertFloatToHalf(1.0f);
 
+	auto halfNTopX = XMConvertFloatToHalf(nTopN.m128_f32[0]);
+	auto halfNTopY = XMConvertFloatToHalf(nTopN.m128_f32[1]);
+	auto halfNTopZ = XMConvertFloatToHalf(nTopN.m128_f32[2]);
+	auto halfTTopX = XMConvertFloatToHalf(tTopN.m128_f32[0]);
+	auto halfTTopY = XMConvertFloatToHalf(tTopN.m128_f32[1]);
+	auto halfTTopZ = XMConvertFloatToHalf(tTopN.m128_f32[2]);
+	auto halfNBottomX = XMConvertFloatToHalf(nBottomN.m128_f32[0]);
+	auto halfNBottomY = XMConvertFloatToHalf(nBottomN.m128_f32[1]);
+	auto halfNBottomZ = XMConvertFloatToHalf(nBottomN.m128_f32[2]);
+	auto halfTBottomX = XMConvertFloatToHalf(tBottomN.m128_f32[0]);
+	auto halfTBottomY = XMConvertFloatToHalf(tBottomN.m128_f32[1]);
+	auto halfTBottomZ = XMConvertFloatToHalf(tBottomN.m128_f32[2]);
+	auto halfNTopInvX = XMConvertFloatToHalf(-nTopN.m128_f32[0]);
+	auto halfTTopInvX = XMConvertFloatToHalf(tTopInvN.m128_f32[0]);
+	auto halfTTopInvY = XMConvertFloatToHalf(tTopInvN.m128_f32[1]);
+	auto halfTTopInvZ = XMConvertFloatToHalf(tTopInvN.m128_f32[2]);
+	auto halfNBottomInvX = XMConvertFloatToHalf(-nBottomN.m128_f32[0]);
+	auto halfTBottomInvX = XMConvertFloatToHalf(tBottomInvN.m128_f32[0]);
+	auto halfTBottomInvY = XMConvertFloatToHalf(tBottomInvN.m128_f32[1]);
+	auto halfTBottomInvZ = XMConvertFloatToHalf(tBottomInvN.m128_f32[2]);
+
 	auto vertices = reinterpret_cast<GrassVertex*>(vbDesc.data.data());
-	vertices[0u] = { float3(-0.5f, 0.0f, 1.0f), XMHALF2(halfZero, halfZero) };
-	vertices[1u] = { float3(0.5f, 0.0f, 1.0f), XMHALF2(halfOne, halfZero) };
-	vertices[2u] = { float3(0.5f, 0.0f, 0.0f), XMHALF2(halfOne, halfOne) };
-	vertices[3u] = { float3(-0.5f, 0.0f, 0.0f), XMHALF2(halfZero, halfOne) };
+
+	vertices[0u] =
+	{
+		float3(-0.5f, 0.0f, 1.0f),
+		halfNTopX, halfNTopY, halfNTopZ, halfZero,
+		halfTTopX, halfTTopY, halfTTopZ, halfZero,
+		XMHALF2(halfZero, halfZero)
+	};
+
+	vertices[1u] =
+	{
+		float3(0.5f, 0.0f, 1.0f),
+		halfNTopInvX, halfNTopY, halfNTopZ, halfZero,
+		halfTTopInvX, halfTTopInvY, halfTTopInvZ, halfZero,
+		XMHALF2(halfOne, halfZero)
+	};
+
+	vertices[2u] =
+	{
+		float3(0.5f, 0.0f, 0.0f),
+		halfNBottomInvX, halfNBottomY, halfNBottomZ, halfZero,
+		halfTBottomInvX, halfTBottomInvY, halfTBottomInvZ, halfZero,
+		XMHALF2(halfOne, halfOne)
+	};
+
+	vertices[3u] =
+	{
+		float3(-0.5f, 0.0f, 0.0f),
+		halfNBottomX, halfNBottomY, halfNBottomZ, halfZero,
+		halfTBottomX, halfTBottomY, halfTBottomZ, halfZero,
+		XMHALF2(halfZero, halfOne)
+	};
 
 	auto vertexBufferId = resourceManager->CreateBufferResource(device, commandList,
 		BufferResourceType::VERTEX_BUFFER, vbDesc);
@@ -110,7 +174,7 @@ void Common::Logic::SceneEntity::VegatationSystem::GenerateMesh(ID3D12Device* de
 
 	MeshDesc meshDesc{};
 	meshDesc.verticesNumber = vbDesc.numElements;
-	meshDesc.vertexFormat = VertexFormat::POSITION | VertexFormat::TEXCOORD0;
+	meshDesc.vertexFormat = VertexFormat::POSITION | VertexFormat::NORMAL | VertexFormat::TANGENT | VertexFormat::TEXCOORD0;
 	meshDesc.indicesNumber = ibDesc.numElements;
 	meshDesc.indexFormat = IndexFormat::UINT16_INDEX;
 	meshDesc.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -237,6 +301,7 @@ void Common::Logic::SceneEntity::VegatationSystem::LoadTextures(ID3D12Device* de
 void Common::Logic::SceneEntity::VegatationSystem::CreateMaterial(ID3D12Device* device,
 	Graphics::Resources::ResourceManager* resourceManager, Graphics::Resources::ResourceID perlinNoiseId)
 {
+	auto lightConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightConstantBufferId);
 	auto mutableConstantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
 	auto vegetationBufferResource = resourceManager->GetResource<Buffer>(vegetationBufferId);
 	auto perlinNoiseResource = resourceManager->GetResource<Texture>(perlinNoiseId);
@@ -249,7 +314,8 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterial(ID3D12Device* 
 	auto vegetationPS = resourceManager->GetResource<Shader>(vegetationPSId);
 
 	MaterialBuilder materialBuilder{};
-	materialBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress);
+	materialBuilder.SetConstantBuffer(0u, lightConstantBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress);
 	materialBuilder.SetBuffer(0u, vegetationBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
 	materialBuilder.SetTexture(1u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
 	materialBuilder.SetTexture(2u, albedoResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
