@@ -83,7 +83,7 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateConstantBuffers(ID3D12D
 	distortersConstants->deltaTime = 0.0f;
 	distortersConstants->particleNumber = 20.0f;
 	distortersConstants->noiseStrength = 0.001f;
-	distortersConstants->velocityStrength = 0.25f;
+	distortersConstants->velocityStrength = 1.0f;
 	distortersConstants->padding = {};
 }
 
@@ -144,7 +144,7 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateParticleSystems(ID3D12G
 	Graphics::DirectX12Renderer* renderer, ResourceID perlinNoiseId, ResourceID particleSimulationCSId)
 {
 	particleSystemDesc.emitterOrigin = new float3(0.0f, 0.0f, 0.25f);
-	particleSystemDesc.emitterRadius = 0.15f;
+	particleSystemDesc.emitterRadius = 0.4f;
 	particleSystemDesc.minParticleVelocity = float3(-0.025f, -0.025f, -0.025f);
 	particleSystemDesc.particleDamping = 0.99f;
 	particleSystemDesc.maxParticleVelocity = float3(0.025f, 0.025f, 0.025f);
@@ -155,7 +155,7 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateParticleSystems(ID3D12G
 	particleSystemDesc.maxRotationSpeed = 0.0f;
 	particleSystemDesc.minSize = float2(0.8f, 0.8f);
 	particleSystemDesc.maxSize = float2(1.2f, 1.2f);
-	particleSystemDesc.minLifeSec = 8.4f;
+	particleSystemDesc.minLifeSec = 14.4f;
 	particleSystemDesc.maxLifeSec = 18.0f;
 	particleSystemDesc.averageParticleEmitPerSecond = 25u;
 	particleSystemDesc.maxParticlesNumber = 100u;
@@ -166,7 +166,7 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateParticleSystems(ID3D12G
 	particleSystemDesc.forces = new ParticleSystemForce[particleSystemDesc.forcesNumber]{};
 	auto& force0 = particleSystemDesc.forces[0u];
 	force0.position = float3(0.0f, 0.0f, 1.25f);
-	force0.strength = -20.0f;
+	force0.strength = -30.0f;
 	force0.axis = float3(0.0f, 0.0f, 1.0f);
 	force0.type = static_cast<uint32_t>(ParticleSystemForceType::CIRCULAR);
 	force0.nAccelerationCoeff = 1.0f;
@@ -175,7 +175,7 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateParticleSystems(ID3D12G
 
 	auto& force1 = particleSystemDesc.forces[1u];
 	force1.position = float3(0.0f, 0.0f, 1.25f);
-	force1.strength = 20.0f;
+	force1.strength = 30.0f;
 	force1.axis = float3(0.0f, 0.0f, 1.0f);
 	force1.type = static_cast<uint32_t>(ParticleSystemForceType::ATTRACTOR);
 	force1.nAccelerationCoeff = 1.0f;

@@ -29,7 +29,7 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 
 	hdrConstants.width = width;
 	hdrConstants.area = width * height;
-	hdrConstants.middleGray = 0.4f;
+	hdrConstants.middleGray = 0.2f;
 	hdrConstants.whiteCutoff = 0.6f;
 	hdrConstants.brightThreshold = 0.75f;
 

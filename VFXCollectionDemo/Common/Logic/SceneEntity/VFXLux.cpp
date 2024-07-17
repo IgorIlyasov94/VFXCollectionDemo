@@ -16,6 +16,8 @@ Common::Logic::SceneEntity::VFXLux::VFXLux(ID3D12GraphicsCommandList* commandLis
 	auto resourceManager = renderer->GetResourceManager();
 
 	_camera = camera;
+	colorIntensity = 0.0f;
+	animationSpeed = 0.075f;
 
 	CreateConstantBuffers(device, commandList, resourceManager, position);
 	LoadShaders(device, resourceManager);
@@ -39,9 +41,13 @@ void Common::Logic::SceneEntity::VFXLux::Draw(ID3D12GraphicsCommandList* command
 	circleConstants->viewProjection = _camera->GetViewProjection();
 	circleConstants->invView = _camera->GetInvView();
 	circleConstants->time = time;
+	circleConstants->colorIntensity = colorIntensity;
 
 	circleMaterial->Set(commandList);
 	circleMesh->Draw(commandList);
+
+	if (colorIntensity < 1.2f)
+		colorIntensity += deltaTime * animationSpeed;
 }
 
 void Common::Logic::SceneEntity::VFXLux::Release(Graphics::Resources::ResourceManager* resourceManager)
@@ -84,7 +90,7 @@ void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* dev
 	circleConstants->tiling1 = float2(1.0f, 0.35f);
 	circleConstants->scrollSpeed0 = float2(0.094f, 0.05f);
 	circleConstants->scrollSpeed1 = float2(-0.107f, -0.046f);
-	circleConstants->colorIntensity = 1.6f;
+	circleConstants->colorIntensity = 0.0f;
 	circleConstants->alphaSharpness = 3.0f;
 	circleConstants->distortionStrength = 0.15f;
 	circleConstants->padding = 0.0f;

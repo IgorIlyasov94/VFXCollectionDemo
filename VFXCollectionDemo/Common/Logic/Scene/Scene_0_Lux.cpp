@@ -290,16 +290,11 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	lightingSystem = new LightingSystem(renderer);
 
 	LightDesc pointLight{};
-	pointLight.position = float3(0.0f, 0.0f, 1.0f);
+	pointLight.position = float3(0.0f, 0.0f, 1.5f);
 	pointLight.radius = 0.5f;
 	pointLight.color = float3(1.0f, 0.95f, 0.93f);
-	pointLight.intensity = 0.2f;
+	pointLight.intensity = 0.25f;
 	pointLight.type = LightType::POINT_LIGHT;
-
-	areaLightId = lightingSystem->CreateLight(pointLight);
-
-	pointLight.position = float3(0.0f, 0.0f, 1.5f);
-	pointLight.intensity = 0.5f;
 
 	areaLightId = lightingSystem->CreateLight(pointLight);
 

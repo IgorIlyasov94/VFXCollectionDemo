@@ -97,16 +97,18 @@ namespace Common::Logic::SceneEntity
 		};
 
 		float4x4 circleWorld;
-
+		float colorIntensity;
+		float animationSpeed;
+		
 		VFXPillarConstants* circleConstants;
-
+		
 		Camera* _camera;
-
+		
 		Graphics::Resources::ResourceID circleConstantsId;
 		
 		Graphics::Resources::ResourceID vfxLuxCircleVSId;
 		Graphics::Resources::ResourceID vfxLuxCirclePSId;
-
+		
 		Graphics::Assets::Mesh* circleMesh;
 		Graphics::Assets::Material* circleMaterial;
 	};
