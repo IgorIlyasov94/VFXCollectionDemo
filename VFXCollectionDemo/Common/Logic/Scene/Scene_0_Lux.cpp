@@ -320,10 +320,10 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrainDesc.verticesPerWidth = 256u;
 	terrainDesc.verticesPerHeight = 256u;
 	terrainDesc.size = float3(20.0f, 20.0f, 2.5f);
-	terrainDesc.map0Tiling = float2(10.0f, 10.0f);
-	terrainDesc.map1Tiling = float2(11.0f, 11.0f);
+	terrainDesc.map0Tiling = float2(39.0f, 39.0f);
+	terrainDesc.map1Tiling = float2(37.0f, 37.0f);
 	terrainDesc.map2Tiling = float2(8.0f, 8.0f);
-	terrainDesc.map3Tiling = float2(12.0f, 12.0f);
+	terrainDesc.map3Tiling = float2(14.0f, 14.0f);
 	terrainDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
 	terrainDesc.terrainFileName = "Resources\\Meshes\\Lux_Terrain.bin";
 	terrainDesc.heightMapFileName = "Resources\\Textures\\Terrain\\Lux_HeightMap.dds";
@@ -340,14 +340,17 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrain = new Terrain(commandList, renderer, terrainDesc);
 	
 	VegetationSystemDesc vegetationSystemDesc{};
-	vegetationSystemDesc.smallGrassNumber = 0;
-	vegetationSystemDesc.mediumGrassNumber = 10000;
+	vegetationSystemDesc.smallGrassNumber = 50000;
+	vegetationSystemDesc.mediumGrassNumber = 7000;
 	vegetationSystemDesc.largeGrassNumber = 300;
 	vegetationSystemDesc.atlasRows = 4u;
 	vegetationSystemDesc.atlasColumns = 4u;
-	vegetationSystemDesc.smallGrassSize = float3(0.2f, 0.2f, 0.1f);
-	vegetationSystemDesc.mediumGrassSize = float3(0.4f, 0.4f, 0.8f);
-	vegetationSystemDesc.largeGrassSize = float3(0.4f, 0.4f, 1.5f);
+	vegetationSystemDesc.smallGrassSizeMin = float3(0.2f, 0.2f, 0.1f);
+	vegetationSystemDesc.mediumGrassSizeMin = float3(0.4f, 0.4f, 0.8f);
+	vegetationSystemDesc.largeGrassSizeMin = float3(0.4f, 0.4f, 1.6f);
+	vegetationSystemDesc.smallGrassSizeMax = float3(0.5f, 0.5f, 0.35f);
+	vegetationSystemDesc.mediumGrassSizeMax = float3(0.4f, 0.4f, 1.2f);
+	vegetationSystemDesc.largeGrassSizeMax = float3(0.4f, 0.4f, 2.0f);
 	vegetationSystemDesc.terrain = terrain;
 	vegetationSystemDesc.windDirection = &windDirection;
 	vegetationSystemDesc.windStrength = &windStrength;

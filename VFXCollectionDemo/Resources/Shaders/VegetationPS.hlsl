@@ -52,7 +52,7 @@ Output main(Input input)
 	texData = normalMetalness.SampleBias(samplerLinear, input.texCoord, -1.0f);
 	float3 normal = texData.xyz * 2.0f - 1.0f.xxx;
 	
-	normal = normalize(input.normal);//BumpMapping(normal, normalize(input.normal), normalize(input.binormal), normalize(input.tangent));
+	normal = BumpMapping(normal, normalize(input.normal), normalize(input.binormal), normalize(input.tangent));
 	float alpha = texData.w;
 	
 	if (alpha < 0.5f)

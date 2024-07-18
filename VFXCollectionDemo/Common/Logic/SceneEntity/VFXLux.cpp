@@ -17,12 +17,14 @@ Common::Logic::SceneEntity::VFXLux::VFXLux(ID3D12GraphicsCommandList* commandLis
 
 	_camera = camera;
 	colorIntensity = 0.0f;
+	haloColorIntensity = 0.1f;
 	animationSpeed = 0.075f;
 
 	CreateConstantBuffers(device, commandList, resourceManager, position);
 	LoadShaders(device, resourceManager);
+	LoadTextures(device, commandList, resourceManager);
 
-	CreateMesh(device, commandList, resourceManager);
+	CreateMeshes(device, commandList, resourceManager);
 	CreateMaterials(device, resourceManager, perlinNoiseId);
 }
 
@@ -46,21 +48,38 @@ void Common::Logic::SceneEntity::VFXLux::Draw(ID3D12GraphicsCommandList* command
 	circleMaterial->Set(commandList);
 	circleMesh->Draw(commandList);
 
+	haloConstants->viewProjection = _camera->GetViewProjection();
+	haloConstants->invView = _camera->GetInvView();
+	haloConstants->time = time;
+	haloConstants->colorIntensity = haloColorIntensity * (std::sin(time) * 0.5f + 0.5f);
+
+	haloMaterial->Set(commandList);
+	haloMesh->Draw(commandList);
+
 	if (colorIntensity < 1.2f)
 		colorIntensity += deltaTime * animationSpeed;
+
+	if (haloColorIntensity < 0.5f)
+		haloColorIntensity += deltaTime * animationSpeed;
 }
 
 void Common::Logic::SceneEntity::VFXLux::Release(Graphics::Resources::ResourceManager* resourceManager)
 {
 	delete circleMaterial;
+	delete haloMaterial;
 
 	circleMesh->Release(resourceManager);
+	haloMesh->Release(resourceManager);
 	delete circleMesh;
+	delete haloMesh;
 
 	resourceManager->DeleteResource<ConstantBuffer>(circleConstantsId);
-	
+	resourceManager->DeleteResource<ConstantBuffer>(haloConstantsId);
+
 	resourceManager->DeleteResource<Shader>(vfxLuxCircleVSId);
+	resourceManager->DeleteResource<Shader>(vfxLuxHaloVSId);
 	resourceManager->DeleteResource<Shader>(vfxLuxCirclePSId);
+	resourceManager->DeleteResource<Shader>(vfxLuxHaloPSId);
 }
 
 void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -88,12 +107,31 @@ void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* dev
 	circleConstants->time = 0.0f;
 	circleConstants->tiling0 = float2(1.0f, 0.5f);
 	circleConstants->tiling1 = float2(1.0f, 0.35f);
-	circleConstants->scrollSpeed0 = float2(0.094f, 0.05f);
+	circleConstants->scrollSpeed0 = float2(0.02f, 0.05f);
 	circleConstants->scrollSpeed1 = float2(-0.107f, -0.046f);
 	circleConstants->colorIntensity = 0.0f;
 	circleConstants->alphaSharpness = 3.0f;
 	circleConstants->distortionStrength = 0.15f;
 	circleConstants->padding = 0.0f;
+
+	bufferDesc.data.resize(sizeof(VFXHaloConstants));
+
+	haloConstantsId = resourceManager->CreateBufferResource(device, commandList, BufferResourceType::CONSTANT_BUFFER, bufferDesc);
+
+	auto haloConstantsResource = resourceManager->GetResource<ConstantBuffer>(haloConstantsId);
+	haloConstants = reinterpret_cast<VFXHaloConstants*>(haloConstantsResource->resourceCPUAddress);
+	haloConstants->invView = _camera->GetInvView();
+	haloConstants->viewProjection = _camera->GetViewProjection();
+	haloConstants->worldPosition = position;
+	haloConstants->time = 0.0f;
+	haloConstants->tiling0 = float2(0.3f, 0.5f);
+	haloConstants->tiling1 = float2(0.2f, 0.4f);
+	haloConstants->scrollSpeed0 = float2(0.0f, -0.08f);
+	haloConstants->scrollSpeed1 = float2(-0.01f, -0.015f);
+	haloConstants->colorIntensity = 0.0f;
+	haloConstants->alphaSharpness = 6.0f;
+	haloConstants->distortionStrength = 0.01f;
+	haloConstants->padding = 0.0f;
 }
 
 void Common::Logic::SceneEntity::VFXLux::LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager)
@@ -101,15 +139,36 @@ void Common::Logic::SceneEntity::VFXLux::LoadShaders(ID3D12Device* device, Graph
 	vfxLuxCircleVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxCircleVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
+	vfxLuxHaloVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxHaloVS.hlsl",
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
+
 	vfxLuxCirclePSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxCirclePS.hlsl",
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
+
+	vfxLuxHaloPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\FX\\VFXLuxHaloPS.hlsl",
 		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
 }
 
-void Common::Logic::SceneEntity::VFXLux::CreateMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+void Common::Logic::SceneEntity::VFXLux::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+	Graphics::Resources::ResourceManager* resourceManager)
+{
+	TextureDesc textureDesc{};
+	DDSLoader::Load("Resources\\Textures\\LuxHaloSpectrum.dds", textureDesc);
+	vfxLuxHaloSpectrumId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
+}
+
+void Common::Logic::SceneEntity::VFXLux::CreateMeshes(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	ResourceManager* resourceManager)
 {
-	VFXVertex vertices[VERTICES_NUMBER]{};
+	CreateCircleMesh(device, commandList, resourceManager);
+	CreateHaloMesh(device, commandList, resourceManager);
+}
 
+void Common::Logic::SceneEntity::VFXLux::CreateCircleMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+	Graphics::Resources::ResourceManager* resourceManager)
+{
+	VFXVertex vertices[VERTICES_NUMBER]{};
+	
 	for (uint32_t ringIndex = 0u; ringIndex < TOTAL_RING_NUMBER; ringIndex++)
 		for (uint32_t ringVertexIndex = 0u; ringVertexIndex < VERTICES_PER_RING; ringVertexIndex++)
 		{
@@ -117,7 +176,7 @@ void Common::Logic::SceneEntity::VFXLux::CreateMesh(ID3D12Device* device, ID3D12
 			auto& vertex = vertices[vertexIndex];
 			auto angle = ringVertexIndex * 2.0f * static_cast<float>(std::numbers::pi) / (VERTICES_PER_RING - 1);
 			auto radius = RING_RADIUSES[ringIndex];
-			
+
 			vertex.position = float3(std::cos(angle) * radius, std::sin(angle) * radius, 0.0f);
 
 			auto u = ringVertexIndex / static_cast<float>(VERTICES_PER_RING - 1);
@@ -164,25 +223,106 @@ void Common::Logic::SceneEntity::VFXLux::CreateMesh(ID3D12Device* device, ID3D12
 	meshDesc.vertexFormat = VertexFormat::POSITION | VertexFormat::COLOR0 | VertexFormat::TEXCOORD0;
 	meshDesc.indexFormat = IndexFormat::UINT16_INDEX;
 	meshDesc.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	
+
 	circleMesh = new Mesh(meshDesc, vertexBufferId, indexBufferId, resourceManager);
+}
+
+void Common::Logic::SceneEntity::VFXLux::CreateHaloMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+	Graphics::Resources::ResourceManager* resourceManager)
+{
+	VFXVertex vertices[HALO_VERTICES_NUMBER]{};
+
+	constexpr auto segmentAngle = 2.0f * static_cast<float>(std::numbers::pi) / (VERTICES_PER_RING - 1);
+
+	for (uint32_t ringIndex = 0u; ringIndex < TOTAL_RING_NUMBER; ringIndex++)
+		for (uint32_t ringVertexIndex = 0u; ringVertexIndex < HALO_VERTICES_PER_RING; ringVertexIndex++)
+		{
+			auto vertexIndex = ringIndex * HALO_VERTICES_PER_RING + ringVertexIndex;
+			auto& vertex = vertices[vertexIndex];
+			auto angle = ringVertexIndex * segmentAngle;
+			angle += (ringVertexIndex >= HALO_VERTICES_PER_SECTOR) ? -segmentAngle : -segmentAngle * 2.0f;
+
+			auto radius = HALO_RING_RADIUSES[ringIndex];
+
+			vertex.position = float3(std::cos(angle) * radius, std::sin(angle) * radius, 0.0f);
+
+			auto u = ringVertexIndex / static_cast<float>(HALO_VERTICES_PER_RING);
+			auto v = (radius - HALO_RING_START_OFFSET) / HALO_WIDTH;
+
+			vertex.texCoord.x = XMConvertFloatToHalf(u);
+			vertex.texCoord.y = XMConvertFloatToHalf(v);
+
+			auto isOpaque = ringIndex == 1u || ringIndex == 2u;
+			isOpaque = isOpaque && (ringVertexIndex != 0) && (ringVertexIndex != 4) &&
+				(ringVertexIndex != 5) && (ringVertexIndex != 9);
+
+			auto isSemitransparent = ringIndex == 1u || ringIndex == 2u;
+			isSemitransparent = isSemitransparent && (ringVertexIndex == 1 || ringVertexIndex == 3 ||
+				ringVertexIndex == 6 || ringVertexIndex == 8);
+
+			auto r = FloatToColorChannel((TOTAL_RING_NUMBER - ringIndex - 1) * 255.0f / (TOTAL_RING_NUMBER - 1));
+			auto g = static_cast<uint8_t>(255u - r);
+			auto a = FloatToColorChannel(isOpaque ? (isSemitransparent ? 196u : 255u) : 0.0f);
+
+			vertex.color = SetColor(r, g, 0u, a);
+		}
+
+	uint16_t indices[HALO_INDICES_NUMBER]{};
+	uint32_t indexIterator = 0u;
+
+	for (uint32_t ribbonIndex = 0; ribbonIndex < TOTAL_RIBBON_NUMBER; ribbonIndex++)
+	{
+		auto ringOffset = ribbonIndex * HALO_VERTICES_PER_RING;
+
+		for (uint32_t segmentIndex = 0; segmentIndex < HALO_SEGMENT_NUMBER; segmentIndex++)
+		{
+			auto offset = segmentIndex + ringOffset;
+			offset += segmentIndex >= HALO_SEGMENTS_PER_SECTOR ? 1u : 0u;
+
+			for (uint32_t index = 0; index < INDICES_PER_SEGMENT; index++)
+				indices[indexIterator++] = HALO_INDEX_OFFSETS[index] + offset;
+		}
+	}
+
+	BufferDesc vertexBufferDesc(&vertices[0], sizeof(vertices));
+
+	auto vertexBufferId = resourceManager->CreateBufferResource(device, commandList,
+		BufferResourceType::VERTEX_BUFFER, vertexBufferDesc);
+
+	BufferDesc indexBufferDesc(&indices[0], sizeof(indices));
+
+	auto indexBufferId = resourceManager->CreateBufferResource(device, commandList,
+		BufferResourceType::INDEX_BUFFER, indexBufferDesc);
+
+	MeshDesc meshDesc{};
+	meshDesc.verticesNumber = HALO_VERTICES_NUMBER;
+	meshDesc.indicesNumber = HALO_INDICES_NUMBER;
+	meshDesc.vertexFormat = VertexFormat::POSITION | VertexFormat::COLOR0 | VertexFormat::TEXCOORD0;
+	meshDesc.indexFormat = IndexFormat::UINT16_INDEX;
+	meshDesc.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+
+	haloMesh = new Mesh(meshDesc, vertexBufferId, indexBufferId, resourceManager);
 }
 
 void Common::Logic::SceneEntity::VFXLux::CreateMaterials(ID3D12Device* device, ResourceManager* resourceManager,
 	ResourceID perlinNoiseId)
 {
-	auto pillarConstantsResource = resourceManager->GetResource<ConstantBuffer>(circleConstantsId);
+	auto circleConstantsResource = resourceManager->GetResource<ConstantBuffer>(circleConstantsId);
+	auto haloConstantsResource = resourceManager->GetResource<ConstantBuffer>(haloConstantsId);
 	auto perlinNoiseResource = resourceManager->GetResource<Texture>(perlinNoiseId);
+	auto haloSpectrumResource = resourceManager->GetResource<Texture>(vfxLuxHaloSpectrumId);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
 		Graphics::DefaultFilterSetup::FILTER_TRILINEAR_WRAP);
 
 	auto vfxLuxCircleVS = resourceManager->GetResource<Shader>(vfxLuxCircleVSId);
+	auto vfxLuxHaloVS = resourceManager->GetResource<Shader>(vfxLuxHaloVSId);
 	auto vfxLuxCirclePS = resourceManager->GetResource<Shader>(vfxLuxCirclePSId);
+	auto vfxLuxHaloPS = resourceManager->GetResource<Shader>(vfxLuxHaloPSId);
 
 	auto blendSetup = Graphics::DefaultBlendSetup::BLEND_PREMULT_ALPHA_ADDITIVE;
 
 	MaterialBuilder materialBuilder{};
-	materialBuilder.SetConstantBuffer(0u, pillarConstantsResource->resourceGPUAddress);
+	materialBuilder.SetConstantBuffer(0u, circleConstantsResource->resourceGPUAddress);
 	materialBuilder.SetTexture(0u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
@@ -194,6 +334,20 @@ void Common::Logic::SceneEntity::VFXLux::CreateMaterials(ID3D12Device* device, R
 	materialBuilder.SetPixelShader(vfxLuxCirclePS->bytecode);
 
 	circleMaterial = materialBuilder.ComposeStandard(device);
+
+	materialBuilder.SetConstantBuffer(0u, haloConstantsResource->resourceGPUAddress);
+	materialBuilder.SetTexture(0u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetTexture(1u, haloSpectrumResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
+	materialBuilder.SetDepthStencilFormat(32u, false);
+	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
+	materialBuilder.SetGeometryFormat(haloMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	materialBuilder.SetVertexShader(vfxLuxHaloVS->bytecode);
+	materialBuilder.SetPixelShader(vfxLuxHaloPS->bytecode);
+
+	haloMaterial = materialBuilder.ComposeStandard(device);
 }
 
 uint8_t Common::Logic::SceneEntity::VFXLux::FloatToColorChannel(float value)

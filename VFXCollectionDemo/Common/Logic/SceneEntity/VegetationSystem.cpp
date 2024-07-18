@@ -245,7 +245,8 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateBuffers(ID3D12Device* d
 			0u,
 			QUADS_PER_SMALL_GRASS,
 			mask,
-			desc.smallGrassSize,
+			desc.smallGrassSizeMin,
+			desc.smallGrassSizeMax,
 			SMALL_GRASS_TILT_AMPLITUDE
 		};
 
@@ -256,7 +257,8 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateBuffers(ID3D12Device* d
 		vbDesc.quadNumber = QUADS_PER_MEDIUM_GRASS;
 		vbDesc.mask.z = 0u;
 		vbDesc.mask.y = 255u;
-		vbDesc.grassSize = desc.mediumGrassSize;
+		vbDesc.grassSizeMin = desc.mediumGrassSizeMin;
+		vbDesc.grassSizeMax = desc.mediumGrassSizeMax;
 		vbDesc.tiltAmplitude = MEDIUM_GRASS_TILT_AMPLITUDE;
 
 		FillVegetationBuffer(vbDesc);
@@ -266,7 +268,8 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateBuffers(ID3D12Device* d
 		vbDesc.quadNumber = QUADS_PER_LARGE_GRASS;
 		vbDesc.mask.y = 0u;
 		vbDesc.mask.x = 255u;
-		vbDesc.grassSize = desc.largeGrassSize;
+		vbDesc.grassSizeMin = desc.largeGrassSizeMin;
+		vbDesc.grassSizeMax = desc.largeGrassSizeMax;
 		vbDesc.tiltAmplitude = LARGE_GRASS_TILT_AMPLITUDE;
 
 		FillVegetationBuffer(vbDesc);
@@ -335,10 +338,9 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterial(ID3D12Device* 
 void Common::Logic::SceneEntity::VegatationSystem::FillVegetationBuffer(const VegetationBufferDesc& desc)
 {
 	auto vegetations = reinterpret_cast<Vegetation*>(desc.buffer);
-
+	
 	auto origin = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
 	auto identityQuaternion = XMQuaternionIdentity();
-	auto scale = XMLoadFloat3(&desc.grassSize);
 	auto upVector = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
 	floatN position{};
@@ -349,6 +351,16 @@ void Common::Logic::SceneEntity::VegatationSystem::FillVegetationBuffer(const Ve
 
 	for (uint32_t grassIndex = 0u; grassIndex < desc.elementNumber; grassIndex++)
 	{
+		auto randomX = Utilities::Random(randomEngine);
+		auto randomY = Utilities::Random(randomEngine);
+		auto randomZ = Utilities::Random(randomEngine);
+
+		float3 grassSize{};
+		grassSize.x = std::lerp(desc.grassSizeMin.x, desc.grassSizeMax.x, randomX);
+		grassSize.y = std::lerp(desc.grassSizeMin.y, desc.grassSizeMax.y, randomY);
+		grassSize.z = std::lerp(desc.grassSizeMin.z, desc.grassSizeMax.z, randomZ);
+		auto scale = XMLoadFloat3(&grassSize);
+
 		auto& vegetation = vegetations[grassIndex + desc.offset];
 
 		if (grassIndex % desc.quadNumber == 0u)
@@ -363,7 +375,7 @@ void Common::Logic::SceneEntity::VegatationSystem::FillVegetationBuffer(const Ve
 		vegetation.world = XMMatrixTransformation(origin, identityQuaternion, scale, origin, rotation, position);
 		vegetation.atlasElementOffset = atlasElementOffset;
 		vegetation.tiltAmplitude = desc.tiltAmplitude;
-		vegetation.height = desc.grassSize.z;
+		vegetation.height = grassSize.z;
 	}
 }
 

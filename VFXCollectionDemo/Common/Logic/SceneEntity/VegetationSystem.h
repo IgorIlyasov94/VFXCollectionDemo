@@ -19,9 +19,13 @@ namespace Common::Logic::SceneEntity
 		uint32_t atlasRows;
 		uint32_t atlasColumns;
 
-		float3 smallGrassSize;
-		float3 mediumGrassSize;
-		float3 largeGrassSize;
+		float3 smallGrassSizeMin;
+		float3 mediumGrassSizeMin;
+		float3 largeGrassSizeMin;
+
+		float3 smallGrassSizeMax;
+		float3 mediumGrassSizeMax;
+		float3 largeGrassSizeMax;
 
 		const Terrain* terrain;
 
@@ -80,7 +84,8 @@ namespace Common::Logic::SceneEntity
 			uint32_t offset;
 			uint32_t quadNumber;
 			DirectX::PackedVector::XMUBYTE4 mask;
-			float3 grassSize;
+			float3 grassSizeMin;
+			float3 grassSizeMax;
 			float tiltAmplitude;
 		};
 
@@ -136,12 +141,6 @@ namespace Common::Logic::SceneEntity
 		static constexpr uint32_t QUADS_PER_SMALL_GRASS = 1u;
 		static constexpr uint32_t QUADS_PER_MEDIUM_GRASS = 3u;
 		static constexpr uint32_t QUADS_PER_LARGE_GRASS = 3u;
-		static constexpr float2 SMALL_GRASS_SIZE_MIN = float2(0.01f, 0.01f);
-		static constexpr float2 SMALL_GRASS_SIZE_MAX = float2(0.015f, 0.015f);
-		static constexpr float2 MEDIUM_GRASS_SIZE_MIN = float2(0.03f, 0.03f);
-		static constexpr float2 MEDIUM_GRASS_SIZE_MAX = float2(0.035f, 0.04f);
-		static constexpr float2 LARGE_GRASS_SIZE_MIN = float2(0.03f, 0.045f);
-		static constexpr float2 LARGE_GRASS_SIZE_MAX = float2(0.04f, 0.08f);
 
 		static constexpr float SMALL_GRASS_TILT_AMPLITUDE = 0.2f;
 		static constexpr float MEDIUM_GRASS_TILT_AMPLITUDE = 0.8f;
