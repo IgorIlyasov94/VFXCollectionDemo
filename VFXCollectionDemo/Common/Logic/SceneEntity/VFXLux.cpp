@@ -33,34 +33,54 @@ Common::Logic::SceneEntity::VFXLux::~VFXLux()
 
 }
 
-void Common::Logic::SceneEntity::VFXLux::OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
-{
-
-}
-
-void Common::Logic::SceneEntity::VFXLux::Draw(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
+void Common::Logic::SceneEntity::VFXLux::Update(float time, float deltaTime)
 {
 	circleConstants->viewProjection = _camera->GetViewProjection();
 	circleConstants->invView = _camera->GetInvView();
 	circleConstants->time = time;
 	circleConstants->colorIntensity = colorIntensity;
 
-	circleMaterial->Set(commandList);
-	circleMesh->Draw(commandList);
-
 	haloConstants->viewProjection = _camera->GetViewProjection();
 	haloConstants->invView = _camera->GetInvView();
 	haloConstants->time = time;
-	haloConstants->colorIntensity = haloColorIntensity * (std::sin(time) * 0.5f + 0.5f);
-
-	haloMaterial->Set(commandList);
-	haloMesh->Draw(commandList);
+	haloConstants->colorIntensity = haloColorIntensity * (std::sin(time * 0.5f) * 0.3f + 0.7f);
 
 	if (colorIntensity < 1.2f)
 		colorIntensity += deltaTime * animationSpeed;
 
 	if (haloColorIntensity < 0.5f)
 		haloColorIntensity += deltaTime * animationSpeed;
+}
+
+void Common::Logic::SceneEntity::VFXLux::OnCompute(ID3D12GraphicsCommandList* commandList)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLux::DrawDepthPrepass(ID3D12GraphicsCommandList* commandList)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLux::DrawShadows(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLux::DrawShadowsCube(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLux::Draw(ID3D12GraphicsCommandList* commandList)
+{
+	circleMaterial->Set(commandList);
+	circleMesh->Draw(commandList);
+
+	haloMaterial->Set(commandList);
+	haloMesh->Draw(commandList);
 }
 
 void Common::Logic::SceneEntity::VFXLux::Release(Graphics::Resources::ResourceManager* resourceManager)
@@ -129,8 +149,8 @@ void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* dev
 	haloConstants->scrollSpeed0 = float2(0.0f, -0.08f);
 	haloConstants->scrollSpeed1 = float2(-0.01f, -0.015f);
 	haloConstants->colorIntensity = 0.0f;
-	haloConstants->alphaSharpness = 6.0f;
-	haloConstants->distortionStrength = 0.01f;
+	haloConstants->alphaSharpness = 8.0f;
+	haloConstants->distortionStrength = 0.1f;
 	haloConstants->padding = 0.0f;
 }
 

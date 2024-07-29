@@ -19,6 +19,7 @@ namespace Common::Logic::SceneEntity
 
 		void OnResize(Graphics::DirectX12Renderer* renderer);
 
+		void SetDepthPrepass(ID3D12GraphicsCommandList* commandList);
 		void SetGBuffer(ID3D12GraphicsCommandList* commandList);
 
 		void SetDistortBuffer(ID3D12GraphicsCommandList* commandList);
@@ -84,6 +85,7 @@ namespace Common::Logic::SceneEntity
 		static constexpr float CLEAR_COLOR[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
+		static constexpr uint32_t MAX_SIMULTANEOUS_BARRIER_NUMBER = 5u;
 
 		MotionBlurConstants motionBlurConstants;
 		HDRConstants hdrConstants;
@@ -99,6 +101,8 @@ namespace Common::Logic::SceneEntity
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneDepthTargetDescriptor;
 
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneMotionTargetDescriptor;
+
+		std::vector<D3D12_RESOURCE_BARRIER> barriers;
 
 		Graphics::Resources::GPUResource* sceneColorTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneMotionTargetGPUResource;

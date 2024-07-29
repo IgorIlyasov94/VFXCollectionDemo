@@ -29,21 +29,43 @@ Common::Logic::SceneEntity::VFXLuxDistorters::~VFXLuxDistorters()
 
 }
 
-void Common::Logic::SceneEntity::VFXLuxDistorters::OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
-{
-	particleSystemDesc.forces[0u].axis = _camera->GetDirection();
-
-	particleSystem->OnCompute(commandList, time, deltaTime);
-}
-
-void Common::Logic::SceneEntity::VFXLuxDistorters::Draw(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
+void Common::Logic::SceneEntity::VFXLuxDistorters::Update(float time, float deltaTime)
 {
 	distortersConstants->invView = _camera->GetInvView();
 	distortersConstants->viewProjection = _camera->GetViewProjection();
 	distortersConstants->time = time;
 	distortersConstants->deltaTime = deltaTime;
 
-	particleSystem->Draw(commandList, time, deltaTime);
+	particleSystemDesc.forces[0u].axis = _camera->GetDirection();
+
+	particleSystem->Update(time, deltaTime);
+}
+
+void Common::Logic::SceneEntity::VFXLuxDistorters::OnCompute(ID3D12GraphicsCommandList* commandList)
+{
+	particleSystem->OnCompute(commandList);
+}
+
+void Common::Logic::SceneEntity::VFXLuxDistorters::DrawDepthPrepass(ID3D12GraphicsCommandList* commandList)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLuxDistorters::DrawShadows(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLuxDistorters::DrawShadowsCube(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLuxDistorters::Draw(ID3D12GraphicsCommandList* commandList)
+{
+	particleSystem->Draw(commandList);
 }
 
 void Common::Logic::SceneEntity::VFXLuxDistorters::Release(Graphics::Resources::ResourceManager* resourceManager)

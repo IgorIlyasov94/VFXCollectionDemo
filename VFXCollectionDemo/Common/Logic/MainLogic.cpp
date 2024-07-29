@@ -49,6 +49,7 @@ void Common::Logic::MainLogic::Render()
 	auto scene = sceneManager->GetCurrentScene();
 	
 	auto commandList = renderer->StartFrame();
+	scene->RenderShadows(commandList);
 	scene->Render(commandList);
 
 	renderer->SetRenderToBackBuffer(commandList);

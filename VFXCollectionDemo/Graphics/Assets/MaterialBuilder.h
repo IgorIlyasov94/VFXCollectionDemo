@@ -39,10 +39,11 @@ namespace Graphics::Assets
 		void SetPixelShader(D3D12_SHADER_BYTECODE shaderBytecode);
 
 		void SetGeometryFormat(VertexFormat format, D3D12_PRIMITIVE_TOPOLOGY_TYPE type);
+		void SetDepthBias(float depthBias);
 		void SetCullMode(D3D12_CULL_MODE mode);
 		void SetBlendMode(D3D12_BLEND_DESC desc);
 		void SetRenderTargetFormat(uint32_t renderTargetIndex, DXGI_FORMAT format);
-		void SetDepthStencilFormat(uint32_t depthBit, bool enableZTest);
+		void SetDepthStencilFormat(uint32_t depthBit, bool enableZTest, bool readOnly = false);
 		
 		Material* ComposeStandard(ID3D12Device* device);
 		Material* ComposeMeshletized(ID3D12Device2* device);
@@ -148,7 +149,9 @@ namespace Graphics::Assets
 		D3D12_BLEND_DESC blendDesc;
 		DXGI_FORMAT depthStencilFormat;
 
+		float _depthBias;
 		bool zTest;
+		bool depthBufferReadOnly;
 		uint32_t renderTargetNumber;
 
 		std::array<DXGI_FORMAT, 8> renderTargetsFormat;

@@ -29,20 +29,42 @@ Common::Logic::SceneEntity::VFXLuxSparkles::~VFXLuxSparkles()
 
 }
 
-void Common::Logic::SceneEntity::VFXLuxSparkles::OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
-{
-	particleSystemDesc.forces[0u].axis = _camera->GetDirection();
-
-	particleSystem->OnCompute(commandList, time, deltaTime);
-}
-
-void Common::Logic::SceneEntity::VFXLuxSparkles::Draw(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
+void Common::Logic::SceneEntity::VFXLuxSparkles::Update(float time, float deltaTime)
 {
 	sparklesConstants->invView = _camera->GetInvView();
 	sparklesConstants->viewProjection = _camera->GetViewProjection();
 	sparklesConstants->time = time;
 
-	particleSystem->Draw(commandList, time, deltaTime);
+	particleSystemDesc.forces[0u].axis = _camera->GetDirection();
+
+	particleSystem->Update(time, deltaTime);
+}
+
+void Common::Logic::SceneEntity::VFXLuxSparkles::OnCompute(ID3D12GraphicsCommandList* commandList)
+{
+	particleSystem->OnCompute(commandList);
+}
+
+void Common::Logic::SceneEntity::VFXLuxSparkles::DrawDepthPrepass(ID3D12GraphicsCommandList* commandList)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLuxSparkles::DrawShadows(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLuxSparkles::DrawShadowsCube(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+
+}
+
+void Common::Logic::SceneEntity::VFXLuxSparkles::Draw(ID3D12GraphicsCommandList* commandList)
+{
+	particleSystem->Draw(commandList);
 }
 
 void Common::Logic::SceneEntity::VFXLuxSparkles::Release(Graphics::Resources::ResourceManager* resourceManager)

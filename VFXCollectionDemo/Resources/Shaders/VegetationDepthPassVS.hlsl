@@ -6,7 +6,16 @@ struct Vegetation
 	float height;
 };
 
+#ifndef DEPTH_PREPASS
+cbuffer RootConstants : register(b0)
+{
+	uint lightMatrixStartIndex;
+};
+
 cbuffer MutableConstants : register(b1)
+#else
+cbuffer MutableConstants : register(b0)
+#endif
 {
 	float4x4 viewProjection;
 	
@@ -18,11 +27,14 @@ cbuffer MutableConstants : register(b1)
 	
 	float3 windDirection;
 	float windStrength;
-	
-	float zNear;
-	float zFar;
-	float2 padding;
 };
+
+#ifndef DEPTH_PREPASS
+cbuffer LightConstants : register(b2)
+{
+	float4x4 lightViewProjection[LIGHT_MATRICES_NUMBER];
+};
+#endif
 
 struct Input
 {
@@ -36,11 +48,8 @@ struct Input
 struct Output
 {
 	float4 position : SV_Position;
-	float3 normal : NORMAL;
-	float3 binormal : BINORMAL;
-	float3 tangent : TANGENT;
 	float2 texCoord : TEXCOORD0;
-	float3 worldPosition : TEXCOORD1;
+	float2 depth : TEXCOORD1;
 };
 
 StructuredBuffer<Vegetation> vegetationBuffer : register(t0);
@@ -73,21 +82,14 @@ Output main(Input input)
 	
 	worldPosition.xyz += shift * shiftCoeff;
 	
+#ifndef DEPTH_PREPASS
+	output.position = mul(lightViewProjection[lightMatrixStartIndex], worldPosition);
+#else
 	output.position = mul(viewProjection, worldPosition);
+#endif
 	
-	output.normal = normalize(mul((float3x3)vegetation.world, input.normal.xyz));
-	output.tangent = normalize(mul((float3x3)vegetation.world, input.tangent.xyz));
-	
-	float3 view = normalize(worldPosition.xyz - cameraPosition);
-	
-	float sideCoeff = (dot(output.normal, view) < 0.0f) ? 1.0f : -1.0f;
-	
-	output.normal *= sideCoeff;
-	output.tangent *= sideCoeff;
-	
-	output.binormal = cross(output.tangent, output.normal);
 	output.texCoord = input.texCoord * atlasElementSize + vegetation.atlasElementOffset;
-	output.worldPosition = worldPosition.xyz;
+	output.depth = output.position.zw;
 	
 	return output;
 }

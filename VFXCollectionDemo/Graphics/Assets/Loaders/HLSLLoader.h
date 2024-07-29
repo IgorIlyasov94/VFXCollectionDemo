@@ -32,7 +32,8 @@ namespace Graphics::Assets::Loaders
 	class HLSLLoader final
 	{
 	public:
-		static D3D12_SHADER_BYTECODE Load(const std::filesystem::path& filePath, ShaderType type, ShaderVersion version);
+		static D3D12_SHADER_BYTECODE Load(const std::filesystem::path& filePath, ShaderType type,
+			ShaderVersion version, const std::vector<DxcDefine>& defines = {});
 
 	private:
 		HLSLLoader() = delete;
@@ -43,6 +44,7 @@ namespace Graphics::Assets::Loaders
 		HLSLLoader& operator=(HLSLLoader&&) = delete;
 
 		static std::wstring GetShaderProfileString(ShaderType type, ShaderVersion version);
+		static uint64_t GetHashFromDefines(const std::vector<DxcDefine>& defines);
 
 		static D3D12_SHADER_BYTECODE LoadCache(const std::filesystem::path& filePath);
 		static void SaveCache(const std::filesystem::path& filePath, D3D12_SHADER_BYTECODE bytecode);

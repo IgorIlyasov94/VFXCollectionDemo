@@ -36,7 +36,7 @@ Common::Logic::SceneEntity::ParticleSystem::~ParticleSystem()
 
 }
 
-void Common::Logic::SceneEntity::ParticleSystem::OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
+void Common::Logic::SceneEntity::ParticleSystem::Update(float time, float deltaTime)
 {
 	mutableConstantsBuffer->emitterOrigin = *_desc.emitterOrigin;
 	mutableConstantsBuffer->time = time;
@@ -47,7 +47,10 @@ void Common::Logic::SceneEntity::ParticleSystem::OnCompute(ID3D12GraphicsCommand
 
 	for (uint32_t forceIndex = 0u; forceIndex < _desc.forcesNumber; forceIndex++)
 		mutableConstantsBuffer->forces[forceIndex] = _desc.forces[forceIndex];
+}
 
+void Common::Logic::SceneEntity::ParticleSystem::OnCompute(ID3D12GraphicsCommandList* commandList)
+{
 	auto numGroups = static_cast<uint32_t>(std::lroundf(std::ceilf(_desc.maxParticlesNumber / static_cast<float>(THREADS_PER_GROUP))));
 
 	particleBufferGPUResource->EndBarrier(commandList);
@@ -58,7 +61,24 @@ void Common::Logic::SceneEntity::ParticleSystem::OnCompute(ID3D12GraphicsCommand
 	particleBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 }
 
-void Common::Logic::SceneEntity::ParticleSystem::Draw(ID3D12GraphicsCommandList* commandList, float time, float deltaTime)
+void Common::Logic::SceneEntity::ParticleSystem::DrawDepthPrepass(ID3D12GraphicsCommandList* commandList)
+{
+
+}
+
+void Common::Logic::SceneEntity::ParticleSystem::DrawShadows(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+
+}
+
+void Common::Logic::SceneEntity::ParticleSystem::DrawShadowsCube(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+
+}
+
+void Common::Logic::SceneEntity::ParticleSystem::Draw(ID3D12GraphicsCommandList* commandList)
 {
 	particleBufferGPUResource->UAVBarrier(commandList);
 	particleBufferGPUResource->EndBarrier(commandList);

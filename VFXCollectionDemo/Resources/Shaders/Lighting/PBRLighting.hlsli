@@ -1,36 +1,61 @@
+static const uint AREA_LIGHT_SAMPLES_NUMBER = 8;
+
 static const float PI = 3.14159265f;
 static const float EPSILON = 0.59604645E-7f;
 
-static const uint MAX_LIGHT_SOURCE_NUMBER = 32;
-static const uint AREA_LIGHT_SAMPLES_NUMBER = 8;
+static const float AREA_LIGHT_SAMPLE_WEIGHT = 1.0f / AREA_LIGHT_SAMPLES_NUMBER;
 
 static const float3 AREA_LIGHT_SAMPLES[AREA_LIGHT_SAMPLES_NUMBER] =
 {
-	float3(0.0f, 0.0f, 0.0f),
-	float3(0.0f, 0.0f, 0.0f),
-	float3(0.0f, 0.0f, 0.0f),
-	float3(0.0f, 0.0f, 0.0f),
+	float3(0.154508f, 0.475528f, 0.000000f),
+	float3(-0.286031f, 0.207813f, 0.353553f),
+	float3(-0.286031f, -0.207814f, -0.353553f),
+	float3(0.059128f, -0.181977f, 0.461940f),
 	
-	float3(0.0f, 0.0f, 0.0f),
-	float3(0.0f, 0.0f, 0.0f),
-	float3(0.0f, 0.0f, 0.0f),
-	float3(0.0f, 0.0f, 0.0f)
+	float3(-0.309017f, -0.951056f, 0.000000f),
+	float3(0.572062f, -0.415627f, 0.707107f),
+	float3(0.572061f, 0.415627f, -0.707107f),
+	float3(-0.118256f, 0.363954f, 0.923880f)
 };
 
-static const uint LIGHT_TYPE_DIRECTIONAL = 0;
-static const uint LIGHT_TYPE_POINT = 1;
-static const uint LIGHT_TYPE_AREA = 2;
-static const uint LIGHT_TYPE_SPOT = 3;
-static const uint LIGHT_TYPE_AMBIENT = 4;
+struct DirectionalLight
+{
+	float3 direction;
+	float padding0;
+	float3 color;
+	float padding1;
+};
 
-struct LightElement
+struct PointLight
 {
 	float3 position;
-	uint type;
+	float padding0;
 	float3 color;
-	float various0;
+	float padding1;
+};
+
+struct AreaLight
+{
+	float3 position;
+	float radius;
+	float3 color;
+	float padding;
+};
+
+struct SpotLight
+{
+	float3 position;
+	float falloff;
+	float3 color;
+	float cosPhi2;
 	float3 direction;
-	float various1;
+	float cosTheta2;
+};
+
+struct AmbientLight
+{
+	float3 color;
+	float padding;
 };
 
 struct Material
@@ -40,6 +65,21 @@ struct Material
 	float3 f90;
 	float metalness;
 	float roughness;
+};
+
+struct ShadowData
+{
+	float4x4 lightViewProjection;
+	Texture2D shadowMap;
+	SamplerComparisonState shadowSampler;
+};
+
+struct ShadowCubeData
+{
+	float zNear;
+	float zFar;
+	TextureCube shadowMap;
+	SamplerComparisonState shadowSampler;
 };
 
 struct LightData
@@ -165,30 +205,148 @@ void CalculatePBRAmbient(LightingDesc lightingDesc, float3 viewDir, out float3 l
 	light = albedo * diffuse * lightingDesc.lightData.color;
 }
 
-void CalculateLighting(LightElement lightElement, Surface surface, Material material, float3 viewDir, out float3 light)
+float LightVectorToDepth(float3 lightVector, float zNear, float zFar)
 {
-	float3 lightToSurface = surface.position - lightElement.position;
+	float3 absLightVector = abs(lightVector);
+	float dist = max(absLightVector.x, max(absLightVector.y, absLightVector.z));
 	
-	float radius = lightElement.various0;
+	float coeff0 = zFar / (zNear - zFar);
+	float coeff1 = zNear * zFar / (zNear - zFar);
+	return -coeff0 + coeff1 / dist - 0.0001f;
+}
+
+float CalculateShadowCube(ShadowCubeData shadowData, float3 worldPosition, float3 lightPosition)
+{
+	uint status;
 	
-	float cosAlpha = dot(normalize(lightToSurface), lightElement.direction);
-	float cosPhi2 = lightElement.various0;
-	float cosTheta2 = lightElement.various1;
-	float spotAttenuation = (cosAlpha - cosPhi2) / (cosTheta2 - cosPhi2 + 0.00001f);
+	float3 lightVector = worldPosition - lightPosition;
+	float3 direction = normalize(lightVector);
+	direction = direction.xzy;
 	
+	float sceneDepth = LightVectorToDepth(lightVector, shadowData.zNear, shadowData.zFar);
+	float4 occlusions = shadowData.shadowMap.GatherCmpRed(shadowData.shadowSampler, direction, sceneDepth, status);
+	
+	return dot(occlusions, 0.25f.xxxx);
+}
+
+void CalculateDirectionalLight(DirectionalLight directionalLight, Surface surface, Material material, float3 viewDir, out float3 light)
+{
 	LightData lightData;
-	lightData.vector = lightElement.type == LIGHT_TYPE_DIRECTIONAL ? lightElement.direction : lightToSurface;
-	
-	lightData.color = lightElement.color;
-	lightData.attenuationCoeff = lightElement.type == LIGHT_TYPE_SPOT ? spotAttenuation : 1.0f;
+	lightData.vector = directionalLight.direction;
+	lightData.color = directionalLight.color;
+	lightData.attenuationCoeff = 1.0f;
 	
 	LightingDesc lightingDesc;
 	lightingDesc.surface = surface;
 	lightingDesc.lightData = lightData;
 	lightingDesc.material = material;
 	
-	if (lightElement.type == LIGHT_TYPE_AMBIENT)
-		CalculatePBRAmbient(lightingDesc, viewDir, light);
-	else
-		CalculatePBRLighting(lightingDesc, viewDir, light);
+	CalculatePBRLighting(lightingDesc, viewDir, light);
+}
+
+void CalculatePointLight(PointLight pointLight, Surface surface, Material material, float3 viewDir, out float3 light)
+{
+	LightData lightData;
+	lightData.vector = surface.position - pointLight.position;
+	lightData.color = pointLight.color;
+	lightData.attenuationCoeff = 1.0f;
+	
+	LightingDesc lightingDesc;
+	lightingDesc.surface = surface;
+	lightingDesc.lightData = lightData;
+	lightingDesc.material = material;
+	
+	CalculatePBRLighting(lightingDesc, viewDir, light);
+}
+
+void CalculateAreaLight(AreaLight areaLight, Surface surface, Material material, float3 viewDir, out float3 light)
+{
+	light = 0.0f.xxx;
+	
+	[unroll]
+	for (uint pointIndex = 0; pointIndex < AREA_LIGHT_SAMPLES_NUMBER; pointIndex++)
+	{
+		float3 lightPoint = areaLight.position + AREA_LIGHT_SAMPLES[pointIndex] * areaLight.radius;
+		
+		LightData lightData;
+		lightData.vector = surface.position - lightPoint;
+		lightData.color = areaLight.color * AREA_LIGHT_SAMPLE_WEIGHT;
+		lightData.attenuationCoeff = 1.0f;
+		
+		LightingDesc lightingDesc;
+		lightingDesc.surface = surface;
+		lightingDesc.lightData = lightData;
+		lightingDesc.material = material;
+		
+		float3 lightRate = 0.0f.xxx;
+		CalculatePBRLighting(lightingDesc, viewDir, lightRate);
+		
+		light += lightRate;
+	}
+}
+
+void CalculateSpotLight(SpotLight spotLight, Surface surface, Material material, float3 viewDir, out float3 light)
+{
+	float3 lightToSurface = surface.position - spotLight.position;
+	
+	float cosAlpha = dot(normalize(lightToSurface), spotLight.direction);
+	float cosPhi2 = spotLight.cosPhi2;
+	float cosTheta2 = spotLight.cosTheta2;
+	float spotAttenuation = saturate((cosAlpha - cosPhi2) / (cosTheta2 - cosPhi2 + 0.00001f));
+	spotAttenuation = pow(spotAttenuation, spotLight.falloff);
+	
+	LightData lightData;
+	lightData.vector = lightToSurface;
+	lightData.color = spotLight.color;
+	lightData.attenuationCoeff = spotAttenuation;
+	
+	LightingDesc lightingDesc;
+	lightingDesc.surface = surface;
+	lightingDesc.lightData = lightData;
+	lightingDesc.material = material;
+	
+	CalculatePBRLighting(lightingDesc, viewDir, light);
+}
+
+void CalculateAmbientLight(AmbientLight ambientLight, Surface surface, Material material, float3 viewDir, out float3 light)
+{
+	LightData lightData = (LightData)0;
+	lightData.color = ambientLight.color;
+	
+	LightingDesc lightingDesc;
+	lightingDesc.surface = surface;
+	lightingDesc.lightData = lightData;
+	lightingDesc.material = material;
+	
+	CalculatePBRAmbient(lightingDesc, viewDir, light);
+}
+
+void CalculateAreaLight(ShadowCubeData shadowData, AreaLight areaLight, Surface surface, Material material, float3 viewDir, out float3 light)
+{
+	light = 0.0f.xxx;
+	
+	[unroll]
+	for (uint pointIndex = 0; pointIndex < AREA_LIGHT_SAMPLES_NUMBER; pointIndex++)
+	{
+		float3 offset = AREA_LIGHT_SAMPLES[pointIndex] * areaLight.radius;
+		float3 lightPoint = areaLight.position + offset;
+		
+		LightData lightData;
+		lightData.vector = surface.position - lightPoint;
+		lightData.color = areaLight.color * AREA_LIGHT_SAMPLE_WEIGHT;
+		lightData.attenuationCoeff = 1.0f;
+		
+		LightingDesc lightingDesc;
+		lightingDesc.surface = surface;
+		lightingDesc.lightData = lightData;
+		lightingDesc.material = material;
+		
+		float3 lightRate = 0.0f.xxx;
+		CalculatePBRLighting(lightingDesc, viewDir, lightRate);
+		
+		float3 offsettedWorldPosition = surface.position + offset;
+		float occlusion = CalculateShadowCube(shadowData, offsettedWorldPosition, areaLight.position);
+		
+		light += lightRate * occlusion;
+	}
 }

@@ -81,8 +81,14 @@ namespace Common::Logic::SceneEntity
 			Graphics::Assets::Material* material, const ParticleSystemDesc& desc);
 		~ParticleSystem() override;
 
-		void OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime) override;
-		void Draw(ID3D12GraphicsCommandList* commandList, float time, float deltaTime) override;
+		void Update(float time, float deltaTime) override;
+
+		void OnCompute(ID3D12GraphicsCommandList* commandList) override;
+
+		void DrawDepthPrepass(ID3D12GraphicsCommandList* commandList) override;
+		void DrawShadows(ID3D12GraphicsCommandList* commandList, uint32_t lightMatrixStartIndex) override;
+		void DrawShadowsCube(ID3D12GraphicsCommandList* commandList, uint32_t lightMatrixStartIndex) override;
+		void Draw(ID3D12GraphicsCommandList* commandList) override;
 
 		void Release(Graphics::Resources::ResourceManager* resourceManager) override;
 

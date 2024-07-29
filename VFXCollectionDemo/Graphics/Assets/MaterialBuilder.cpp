@@ -3,7 +3,8 @@
 
 Graphics::Assets::MaterialBuilder::MaterialBuilder()
 	: vertexShader{}, hullShader{}, domainShader{}, geometryShader{}, amplificationShader{}, meshShader{}, pixelShader{},
-	topologyType{}, cullMode(D3D12_CULL_MODE_NONE), blendDesc{}, renderTargetNumber(0u), depthStencilFormat{}, zTest(false)
+	topologyType{}, cullMode(D3D12_CULL_MODE_NONE), blendDesc{}, renderTargetNumber(0u), depthStencilFormat{}, zTest(false),
+	depthBufferReadOnly(false)
 {
 	renderTargetsFormat.fill(DXGI_FORMAT_UNKNOWN);
 }
@@ -171,6 +172,11 @@ void Graphics::Assets::MaterialBuilder::SetGeometryFormat(VertexFormat format, D
 		inputElements.push_back({ "BLENDWEIGHT", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, appendParameter, classification, 0 });
 }
 
+void Graphics::Assets::MaterialBuilder::SetDepthBias(float depthBias)
+{
+	_depthBias = depthBias;
+}
+
 void Graphics::Assets::MaterialBuilder::SetCullMode(D3D12_CULL_MODE mode)
 {
 	cullMode = mode;
@@ -187,11 +193,12 @@ void Graphics::Assets::MaterialBuilder::SetRenderTargetFormat(uint32_t renderTar
 	renderTargetNumber++;
 }
 
-void Graphics::Assets::MaterialBuilder::SetDepthStencilFormat(uint32_t depthBit, bool enableZTest)
+void Graphics::Assets::MaterialBuilder::SetDepthStencilFormat(uint32_t depthBit, bool enableZTest, bool readOnly)
 {
 	depthStencilFormat = (depthBit == 32) ? DXGI_FORMAT_D32_FLOAT : (depthBit == 16) ? DXGI_FORMAT_D24_UNORM_S8_UINT :
 		DXGI_FORMAT_UNKNOWN;
 	zTest = enableZTest;
+	depthBufferReadOnly = readOnly;
 }
 
 Graphics::Assets::Material* Graphics::Assets::MaterialBuilder::ComposeStandard(ID3D12Device* device)
@@ -239,7 +246,9 @@ void Graphics::Assets::MaterialBuilder::Reset()
 	blendDesc = {};
 	depthStencilFormat = {};
 
+	_depthBias = D3D12_DEFAULT_DEPTH_BIAS;
 	zTest = false;
+	depthBufferReadOnly = false;
 	renderTargetNumber = 0u;
 
 	renderTargetsFormat.fill(DXGI_FORMAT_UNKNOWN);
@@ -393,22 +402,25 @@ ID3D12PipelineState* Graphics::Assets::MaterialBuilder::CreateGraphicsPipelineSt
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc{};
 	pipelineStateDesc.InputLayout = inputLayoutDesc;
 	pipelineStateDesc.pRootSignature = rootSignature;
-	pipelineStateDesc.RasterizerState = DirectX12Utilities::CreateRasterizeDesc(cullMode);
+	pipelineStateDesc.RasterizerState = DirectX12Utilities::CreateRasterizeDesc(cullMode, _depthBias);
 	pipelineStateDesc.BlendState = blendDesc;
 	pipelineStateDesc.VS = vertexShader;
 	pipelineStateDesc.HS = hullShader;
 	pipelineStateDesc.DS = domainShader;
 	pipelineStateDesc.GS = geometryShader;
 	pipelineStateDesc.PS = pixelShader;
-	pipelineStateDesc.DepthStencilState = DirectX12Utilities::CreateDepthStencilDesc(zTest);
+	pipelineStateDesc.DepthStencilState = DirectX12Utilities::CreateDepthStencilDesc(zTest, depthBufferReadOnly);
 	pipelineStateDesc.DSVFormat = depthStencilFormat;
 	pipelineStateDesc.SampleMask = UINT_MAX;
 	pipelineStateDesc.PrimitiveTopologyType = topologyType;
 	pipelineStateDesc.NumRenderTargets = renderTargetNumber;
 
-	auto srcAddress = renderTargetsFormat.data();
-	auto destAddress = &pipelineStateDesc.RTVFormats[0];
-	std::copy(srcAddress, srcAddress + renderTargetNumber, destAddress);
+	if (renderTargetNumber > 0u)
+	{
+		auto srcAddress = renderTargetsFormat.data();
+		auto destAddress = &pipelineStateDesc.RTVFormats[0];
+		std::copy(srcAddress, srcAddress + renderTargetNumber, destAddress);
+	}
 
 	pipelineStateDesc.SampleDesc.Count = 1;
 
@@ -428,7 +440,7 @@ ID3D12PipelineState* Graphics::Assets::MaterialBuilder::CreatePipelineState(ID3D
 	pipelineStateDesc.meshShader = meshShader;
 	pipelineStateDesc.amplificationShader = amplificationShader;
 	pipelineStateDesc.pixelShader = pixelShader;
-	pipelineStateDesc.depthStencilDesc = DirectX12Utilities::CreateDepthStencilDesc1(zTest);
+	pipelineStateDesc.depthStencilDesc = DirectX12Utilities::CreateDepthStencilDesc1(zTest, depthBufferReadOnly);
 	pipelineStateDesc.dsvFormat = depthStencilFormat;
 	pipelineStateDesc.sampleMask = UINT_MAX;
 	pipelineStateDesc.sampleDesc = { 1, 0 };
@@ -436,9 +448,12 @@ ID3D12PipelineState* Graphics::Assets::MaterialBuilder::CreatePipelineState(ID3D
 	D3D12_RT_FORMAT_ARRAY rtvFormatsArray{};
 	rtvFormatsArray.NumRenderTargets = renderTargetNumber;
 
-	auto srcAddress = renderTargetsFormat.data();
-	auto destAddress = &rtvFormatsArray.RTFormats[0];
-	std::copy(srcAddress, srcAddress + renderTargetNumber, destAddress);
+	if (renderTargetNumber > 0u)
+	{
+		auto srcAddress = renderTargetsFormat.data();
+		auto destAddress = &rtvFormatsArray.RTFormats[0];
+		std::copy(srcAddress, srcAddress + renderTargetNumber, destAddress);
+	}
 
 	pipelineStateDesc.rtvFormats = rtvFormatsArray;
 

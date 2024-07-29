@@ -148,7 +148,8 @@ D3D12_DEPTH_STENCIL_VIEW_DESC Graphics::DirectX12Utilities::CreateDSVDesc(const 
 	}
 	else if (desc.srvDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
 		depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	else if (desc.srvDimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY)
+	else if (desc.srvDimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY ||
+		desc.srvDimension == D3D12_SRV_DIMENSION_TEXTURECUBE)
 	{
 		depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
 		depthStencilViewDesc.Texture2DArray.ArraySize = desc.depth;
@@ -164,30 +165,30 @@ D3D12_DEPTH_STENCIL_VIEW_DESC Graphics::DirectX12Utilities::CreateDSVDesc(const 
 	return depthStencilViewDesc;
 }
 
-D3D12_RASTERIZER_DESC Graphics::DirectX12Utilities::CreateRasterizeDesc(D3D12_CULL_MODE mode)
+D3D12_RASTERIZER_DESC Graphics::DirectX12Utilities::CreateRasterizeDesc(D3D12_CULL_MODE mode, float depthBias)
 {
 	D3D12_RASTERIZER_DESC desc{};
 	desc.AntialiasedLineEnable = false;
 	desc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 	desc.CullMode = mode;
 	desc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-	desc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+	desc.DepthBiasClamp = 1.0f;// D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
 	desc.DepthClipEnable = true;
 	desc.FillMode = D3D12_FILL_MODE_SOLID;
 	desc.ForcedSampleCount = 0;
 	desc.FrontCounterClockwise = false;
 	desc.MultisampleEnable = false;
-	desc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-
+	desc.SlopeScaledDepthBias = depthBias;
+	
 	return desc;
 }
 
-D3D12_DEPTH_STENCIL_DESC Graphics::DirectX12Utilities::CreateDepthStencilDesc(bool enableZTest)
+D3D12_DEPTH_STENCIL_DESC Graphics::DirectX12Utilities::CreateDepthStencilDesc(bool enableZTest, bool readOnly)
 {
 	D3D12_DEPTH_STENCIL_DESC desc{};
 	desc.DepthEnable = enableZTest;
 	desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-	desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	desc.DepthWriteMask = readOnly ? D3D12_DEPTH_WRITE_MASK_ZERO : D3D12_DEPTH_WRITE_MASK_ALL;
 	desc.StencilEnable = false;
 	desc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
 	desc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
@@ -203,12 +204,12 @@ D3D12_DEPTH_STENCIL_DESC Graphics::DirectX12Utilities::CreateDepthStencilDesc(bo
 	return desc;
 }
 
-D3D12_DEPTH_STENCIL_DESC1 Graphics::DirectX12Utilities::CreateDepthStencilDesc1(bool enableZTest)
+D3D12_DEPTH_STENCIL_DESC1 Graphics::DirectX12Utilities::CreateDepthStencilDesc1(bool enableZTest, bool readOnly)
 {
 	D3D12_DEPTH_STENCIL_DESC1 desc{};
 	desc.DepthEnable = enableZTest;
 	desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-	desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	desc.DepthWriteMask = readOnly ? D3D12_DEPTH_WRITE_MASK_ZERO : D3D12_DEPTH_WRITE_MASK_ALL;
 	desc.StencilEnable = false;
 	desc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
 	desc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
@@ -263,21 +264,73 @@ D3D12_BLEND_DESC Graphics::DirectX12Utilities::CreateBlendDesc(DefaultBlendSetup
 	return desc;
 }
 
-D3D12_SAMPLER_DESC Graphics::DirectX12Utilities::CreateSamplerDesc(DefaultFilterSetup setup)
+D3D12_SAMPLER_DESC Graphics::DirectX12Utilities::CreateSamplerDesc(DefaultFilterSetup setup,
+	DefaultFilterComparisonFunc comparisonFunc)
 {
 	D3D12_SAMPLER_DESC desc{};
 
-	if (setup == DefaultFilterSetup::FILTER_POINT_CLAMP || setup == DefaultFilterSetup::FILTER_POINT_WRAP)
-		desc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-	else if (setup == DefaultFilterSetup::FILTER_BILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_BILINEAR_WRAP)
-		desc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-	else if (setup == DefaultFilterSetup::FILTER_TRILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_TRILINEAR_WRAP)
-		desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-	else
-		desc.Filter = D3D12_FILTER_ANISOTROPIC;
+	auto isClamp = setup == DefaultFilterSetup::FILTER_POINT_CLAMP || setup == DefaultFilterSetup::FILTER_BILINEAR_CLAMP ||
+		setup == DefaultFilterSetup::FILTER_TRILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_ANISOTROPIC_CLAMP ||
+		setup == DefaultFilterSetup::FILTER_COMPARISON_POINT_CLAMP || setup == DefaultFilterSetup::FILTER_COMPARISON_BILINEAR_CLAMP ||
+		setup == DefaultFilterSetup::FILTER_COMPARISON_TRILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_COMPARISON_ANISOTROPIC_CLAMP;
 
-	if (setup == DefaultFilterSetup::FILTER_POINT_CLAMP || setup == DefaultFilterSetup::FILTER_BILINEAR_CLAMP ||
-		setup == DefaultFilterSetup::FILTER_TRILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_ANISOTROPIC_CLAMP)
+	auto isPoint = setup == DefaultFilterSetup::FILTER_POINT_CLAMP || setup == DefaultFilterSetup::FILTER_POINT_WRAP ||
+		setup == DefaultFilterSetup::FILTER_COMPARISON_POINT_CLAMP || setup == DefaultFilterSetup::FILTER_COMPARISON_POINT_WRAP;
+
+	auto isBilinear = setup == DefaultFilterSetup::FILTER_BILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_BILINEAR_WRAP ||
+		setup == DefaultFilterSetup::FILTER_COMPARISON_BILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_COMPARISON_BILINEAR_WRAP;
+
+	auto isTrilinear = setup == DefaultFilterSetup::FILTER_TRILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_TRILINEAR_WRAP ||
+		setup == DefaultFilterSetup::FILTER_COMPARISON_TRILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_COMPARISON_TRILINEAR_WRAP;
+
+	auto isAnisotropic = !(isPoint || isBilinear || isTrilinear);
+
+	auto isComparison = setup == DefaultFilterSetup::FILTER_COMPARISON_POINT_CLAMP || setup == DefaultFilterSetup::FILTER_COMPARISON_POINT_WRAP ||
+		setup == DefaultFilterSetup::FILTER_COMPARISON_BILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_COMPARISON_BILINEAR_WRAP ||
+		setup == DefaultFilterSetup::FILTER_COMPARISON_TRILINEAR_CLAMP || setup == DefaultFilterSetup::FILTER_COMPARISON_TRILINEAR_WRAP ||
+		setup == DefaultFilterSetup::FILTER_COMPARISON_ANISOTROPIC_CLAMP || setup == DefaultFilterSetup::FILTER_COMPARISON_ANISOTROPIC_WRAP;
+
+	if (isComparison)
+	{
+		if (isPoint)
+			desc.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT;
+		else if (isBilinear)
+			desc.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+		else if (isTrilinear)
+			desc.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+		else
+			desc.Filter = D3D12_FILTER_COMPARISON_ANISOTROPIC;
+
+		if (comparisonFunc == DefaultFilterComparisonFunc::COMPARISON_NEVER)
+			desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+		else if (comparisonFunc == DefaultFilterComparisonFunc::COMPARISON_LESS)
+			desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS;
+		else if (comparisonFunc == DefaultFilterComparisonFunc::COMPARISON_EQUAL)
+			desc.ComparisonFunc = D3D12_COMPARISON_FUNC_EQUAL;
+		else if (comparisonFunc == DefaultFilterComparisonFunc::COMPARISON_LESS_EQUAL)
+			desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+		else if (comparisonFunc == DefaultFilterComparisonFunc::COMPARISON_GREATER)
+			desc.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER;
+		else if (comparisonFunc == DefaultFilterComparisonFunc::COMPARISON_NOT_EQUAL)
+			desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NOT_EQUAL;
+		else if (comparisonFunc == DefaultFilterComparisonFunc::COMPARISON_GREATER_EQUAL)
+			desc.ComparisonFunc = D3D12_COMPARISON_FUNC_EQUAL;
+		else if (comparisonFunc == DefaultFilterComparisonFunc::COMPARISON_ALWAYS)
+			desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+	}
+	else
+	{
+		if (isPoint)
+			desc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+		else if (isBilinear)
+			desc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+		else if (isTrilinear)
+			desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		else
+			desc.Filter = D3D12_FILTER_ANISOTROPIC;
+	}
+
+	if (isClamp)
 	{
 		desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 		desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -290,12 +343,12 @@ D3D12_SAMPLER_DESC Graphics::DirectX12Utilities::CreateSamplerDesc(DefaultFilter
 		desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 	}
 
-	if (setup == DefaultFilterSetup::FILTER_ANISOTROPIC_CLAMP || setup == DefaultFilterSetup::FILTER_ANISOTROPIC_WRAP)
+	if (isAnisotropic)
 		desc.MaxAnisotropy = 16u;
 	else
 		desc.MaxAnisotropy = 1u;
 
 	desc.MaxLOD = 14.0f;
-
+	
 	return desc;
 }

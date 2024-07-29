@@ -60,6 +60,8 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 
 	CreateMaterials(device, resourceManager, renderer);
 	CreateComputeObjects(device, resourceManager);
+
+	barriers.reserve(MAX_SIMULTANEOUS_BARRIER_NUMBER);
 }
 
 Common::Logic::SceneEntity::PostProcessManager::~PostProcessManager()
@@ -147,22 +149,35 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	toneMappingMaterial->UpdateBuffer(2u, bloomBufferResource->resourceGPUAddress);
 }
 
-void Common::Logic::SceneEntity::PostProcessManager::SetGBuffer(ID3D12GraphicsCommandList* commandList)
+void Common::Logic::SceneEntity::PostProcessManager::SetDepthPrepass(ID3D12GraphicsCommandList* commandList)
 {
 	commandList->RSSetViewports(1u, &viewport);
 	commandList->RSSetScissorRects(1u, &scissorRectangle);
 
+	commandList->ClearDepthStencilView(sceneDepthTargetDescriptor, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0u, 0u, nullptr);
+	commandList->OMSetRenderTargets(0u, nullptr, true, &sceneDepthTargetDescriptor);
+}
+
+void Common::Logic::SceneEntity::PostProcessManager::SetGBuffer(ID3D12GraphicsCommandList* commandList)
+{
 	sceneColorTargetGPUResource->EndBarrier(commandList);
 	
-	commandList->ClearDepthStencilView(sceneDepthTargetDescriptor, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0u, 0u, nullptr);
 	commandList->ClearRenderTargetView(sceneColorTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
 	commandList->OMSetRenderTargets(1u, &sceneColorTargetDescriptor, true, &sceneDepthTargetDescriptor);
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::SetDistortBuffer(ID3D12GraphicsCommandList* commandList)
 {
-	sceneColorTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	sceneMotionTargetGPUResource->EndBarrier(commandList);
+	D3D12_RESOURCE_BARRIER barrier{};
+	barriers.clear();
+
+	if (sceneColorTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	if (sceneMotionTargetGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+
+	if (!barriers.empty())
+		commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	commandList->ClearRenderTargetView(sceneMotionTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
 	commandList->OMSetRenderTargets(1u, &sceneMotionTargetDescriptor, true, nullptr);
@@ -170,9 +185,18 @@ void Common::Logic::SceneEntity::PostProcessManager::SetDistortBuffer(ID3D12Grap
 
 void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsCommandList* commandList)
 {
-	sceneColorTargetGPUResource->EndBarrier(commandList);
-	sceneMotionTargetGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	sceneBufferGPUResource->EndBarrier(commandList);
+	D3D12_RESOURCE_BARRIER barrier{};
+	barriers.clear();
+
+	if (sceneColorTargetGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+	if (sceneMotionTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	if (sceneBufferGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+
+	if (!barriers.empty())
+		commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	motionBlurConstants.widthU = _width;
 	motionBlurConstants.area = _width * _height;
@@ -185,9 +209,17 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 	motionBlurComputeObject->SetRootConstants(commandList, 0u, 4u, &motionBlurConstants);
 	motionBlurComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 
-	sceneBufferGPUResource->UAVBarrier(commandList);
-	sceneBufferGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	luminanceBufferGPUResource->EndBarrier(commandList);
+	barriers.clear();
+
+	sceneBufferGPUResource->GetUAVBarrier(barrier);
+	barriers.push_back(barrier);
+
+	if (sceneBufferGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	if (luminanceBufferGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+
+	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	hdrConstants.width = _width;
 	hdrConstants.area = motionBlurConstants.area;
@@ -212,10 +244,17 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 		luminanceIterationComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 	}
 
-	luminanceBufferGPUResource->UAVBarrier(commandList);
+	barriers.clear();
 
-	luminanceBufferGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	bloomBufferGPUResource->EndBarrier(commandList);
+	luminanceBufferGPUResource->GetUAVBarrier(barrier);
+	barriers.push_back(barrier);
+
+	if (luminanceBufferGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	if (bloomBufferGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+
+	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	toneMappingConstants.width = _width;
 	toneMappingConstants.area = _width * _height;
@@ -228,9 +267,17 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 	bloomHorizontalObject->SetRootConstants(commandList, 0u, 7u, &toneMappingConstants);
 	bloomHorizontalObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 
-	sceneBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	luminanceBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	bloomBufferGPUResource->UAVBarrier(commandList);
+	barriers.clear();
+
+	if (sceneBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	if (luminanceBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+
+	bloomBufferGPUResource->GetUAVBarrier(barrier);
+	barriers.push_back(barrier);
+
+	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	uint32_t verticalBlurConstants[3]
 	{
@@ -250,22 +297,41 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 
 void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12GraphicsCommandList* commandList)
 {
-	luminanceBufferGPUResource->UAVBarrier(commandList);
-	bloomBufferGPUResource->UAVBarrier(commandList);
+	D3D12_RESOURCE_BARRIER barrier{};
+	barriers.clear();
 
-	sceneBufferGPUResource->EndBarrier(commandList);
-	luminanceBufferGPUResource->EndBarrier(commandList);
-	bloomBufferGPUResource->EndBarrier(commandList);
+	luminanceBufferGPUResource->GetUAVBarrier(barrier);
+	barriers.push_back(barrier);
+	bloomBufferGPUResource->GetUAVBarrier(barrier);
+	barriers.push_back(barrier);
+
+	if (sceneBufferGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+	if (luminanceBufferGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+	if (bloomBufferGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+
+	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	toneMappingMaterial->Set(commandList);
 	toneMappingMaterial->SetRootConstants(commandList, 0u, 6u, &toneMappingConstants);
 	quadMesh->DrawOnly(commandList);
 
-	sceneColorTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	sceneMotionTargetGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	sceneBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	luminanceBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	bloomBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	barriers.clear();
+
+	if (sceneColorTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, barrier))
+		barriers.push_back(barrier);
+	if (sceneMotionTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, barrier))
+		barriers.push_back(barrier);
+	if (sceneBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
+		barriers.push_back(barrier);
+	if (luminanceBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
+		barriers.push_back(barrier);
+	if (bloomBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
+		barriers.push_back(barrier);
+
+	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateQuad(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,

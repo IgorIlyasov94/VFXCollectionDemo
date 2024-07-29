@@ -27,6 +27,11 @@ namespace Common::Logic::SceneEntity
 		float3 mediumGrassSizeMax;
 		float3 largeGrassSizeMax;
 
+		bool hasDepthPass;
+		bool hasDepthCubePass;
+
+		uint32_t lightMatricesNumber;
+
 		const Terrain* terrain;
 
 		float3* windDirection;
@@ -36,6 +41,10 @@ namespace Common::Logic::SceneEntity
 
 		Graphics::Resources::ResourceID perlinNoiseId;
 		Graphics::Resources::ResourceID lightConstantBufferId;
+		Graphics::Resources::ResourceID lightMatricesConstantBufferId;
+
+		std::vector<Graphics::Resources::ResourceID> shadowMapIds;
+		const std::vector<DxcDefine>* lightDefines;
 		
 		std::filesystem::path vegetationCacheFileName;
 		std::filesystem::path vegetationMapFileName;
@@ -50,8 +59,15 @@ namespace Common::Logic::SceneEntity
 			const VegetationSystemDesc& desc, const Camera* camera);
 		~VegatationSystem() override;
 
-		void OnCompute(ID3D12GraphicsCommandList* commandList, float time, float deltaTime) override;
-		void Draw(ID3D12GraphicsCommandList* commandList, float time, float deltaTime) override;
+		void Update(float time, float deltaTime) override;
+
+		void OnCompute(ID3D12GraphicsCommandList* commandList) override;
+
+		void DrawDepthPrepass(ID3D12GraphicsCommandList* commandList) override;
+		void DrawShadows(ID3D12GraphicsCommandList* commandList, uint32_t lightMatrixStartIndex) override;
+		void DrawShadowsCube(ID3D12GraphicsCommandList* commandList, uint32_t lightMatrixStartIndex) override;
+
+		void Draw(ID3D12GraphicsCommandList* commandList) override;
 
 		void Release(Graphics::Resources::ResourceManager* resourceManager) override;
 
@@ -67,13 +83,14 @@ namespace Common::Logic::SceneEntity
 		void CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager, const VegetationSystemDesc& desc);
 
-		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
+		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			const VegetationSystemDesc& desc);
 
 		void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager, const VegetationSystemDesc& desc);
 
-		void CreateMaterial(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
-			Graphics::Resources::ResourceID perlinNoiseId);
+		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			const VegetationSystemDesc& desc);
 
 		struct VegetationBufferDesc
 		{
@@ -136,6 +153,10 @@ namespace Common::Logic::SceneEntity
 
 			float3 windDirection;
 			float windStrength;
+
+			float zNear;
+			float zFar;
+			float2 padding;
 		};
 
 		static constexpr uint32_t QUADS_PER_SMALL_GRASS = 1u;
@@ -155,6 +176,7 @@ namespace Common::Logic::SceneEntity
 		float* windStrength;
 
 		Graphics::Resources::ResourceID lightConstantBufferId;
+		Graphics::Resources::ResourceID lightMatricesConstantBufferId;
 		Graphics::Resources::ResourceID mutableConstantsId;
 		Graphics::Resources::ResourceID vegetationBufferId;
 
@@ -164,8 +186,18 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID vegetationVSId;
 		Graphics::Resources::ResourceID vegetationPSId;
 
+		Graphics::Resources::ResourceID vegetationDepthPrepassVSId;
+		Graphics::Resources::ResourceID vegetationDepthPassVSId;
+		Graphics::Resources::ResourceID vegetationDepthPassPSId;
+		Graphics::Resources::ResourceID vegetationDepthCubePassVSId;
+		Graphics::Resources::ResourceID vegetationDepthCubePassGSId;
+		Graphics::Resources::ResourceID vegetationDepthCubePassPSId;
+		
 		Graphics::Assets::Mesh* _mesh;
 		Graphics::Assets::Material* _material;
+		Graphics::Assets::Material* materialDepthPrepass;
+		Graphics::Assets::Material* materialDepthPass;
+		Graphics::Assets::Material* materialDepthCubePass;
 
 		std::mt19937 randomEngine;
 	};

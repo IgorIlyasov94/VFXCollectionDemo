@@ -1,4 +1,5 @@
 #include "VegetationSystem.h"
+#include "LightingSystem.h"
 #include "../../../Graphics/Assets/MaterialBuilder.h"
 #include "../../../Graphics/Assets/Loaders/OBJLoader.h"
 #include "../../../Graphics/Assets/Loaders/DDSLoader.h"
@@ -15,9 +16,11 @@ using namespace Graphics::Assets::Loaders;
 
 Common::Logic::SceneEntity::VegatationSystem::VegatationSystem(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer, const VegetationSystemDesc& desc, const Camera* camera)
+	: materialDepthPass(nullptr), materialDepthCubePass(nullptr)
 {
 	_camera = camera;
 	lightConstantBufferId = desc.lightConstantBufferId;
+	lightMatricesConstantBufferId = desc.lightMatricesConstantBufferId;
 
 	std::random_device randomDevice;
 	randomEngine = std::mt19937(randomDevice());
@@ -28,9 +31,9 @@ Common::Logic::SceneEntity::VegatationSystem::VegatationSystem(ID3D12GraphicsCom
 	GenerateMesh(device, commandList, resourceManager);
 	CreateConstantBuffers(device, commandList, resourceManager, desc);
 	CreateBuffers(device, commandList, resourceManager, desc);
-	LoadShaders(device, resourceManager);
+	LoadShaders(device, resourceManager, desc);
 	LoadTextures(device, commandList, resourceManager, desc);
-	CreateMaterial(device, resourceManager, desc.perlinNoiseId);
+	CreateMaterials(device, resourceManager, desc);
 }
 
 Common::Logic::SceneEntity::VegatationSystem::~VegatationSystem()
@@ -38,21 +41,48 @@ Common::Logic::SceneEntity::VegatationSystem::~VegatationSystem()
 
 }
 
-void Common::Logic::SceneEntity::VegatationSystem::OnCompute(ID3D12GraphicsCommandList* commandList,
-	float time, float deltaTime)
-{
-
-}
-
-void Common::Logic::SceneEntity::VegatationSystem::Draw(ID3D12GraphicsCommandList* commandList,
-	float time, float deltaTime)
+void Common::Logic::SceneEntity::VegatationSystem::Update(float time, float deltaTime)
 {
 	mutableConstantsBuffer->viewProjection = _camera->GetViewProjection();
 	mutableConstantsBuffer->cameraPosition = _camera->GetPosition();
 	mutableConstantsBuffer->time = time;
 	mutableConstantsBuffer->windDirection = *windDirection;
 	mutableConstantsBuffer->windStrength = *windStrength;
+}
 
+void Common::Logic::SceneEntity::VegatationSystem::OnCompute(ID3D12GraphicsCommandList* commandList)
+{
+
+}
+
+void Common::Logic::SceneEntity::VegatationSystem::DrawDepthPrepass(ID3D12GraphicsCommandList* commandList)
+{
+	materialDepthPrepass->Set(commandList);
+	_mesh->Draw(commandList, instancesNumber);
+}
+
+void Common::Logic::SceneEntity::VegatationSystem::DrawShadows(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+	auto lightMatrixIndex = lightMatrixStartIndex;
+
+	materialDepthPass->Set(commandList);
+	materialDepthPass->SetRootConstant(commandList, 0u, &lightMatrixIndex);
+	_mesh->Draw(commandList, instancesNumber);
+}
+
+void Common::Logic::SceneEntity::VegatationSystem::DrawShadowsCube(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+	auto lightMatrixIndex = lightMatrixStartIndex;
+
+	materialDepthCubePass->Set(commandList);
+	materialDepthCubePass->SetRootConstant(commandList, 0u, &lightMatrixIndex);
+	_mesh->Draw(commandList, instancesNumber);
+}
+
+void Common::Logic::SceneEntity::VegatationSystem::Draw(ID3D12GraphicsCommandList* commandList)
+{
 	_material->Set(commandList);
 	_mesh->Draw(commandList, instancesNumber);
 }
@@ -66,11 +96,22 @@ void Common::Logic::SceneEntity::VegatationSystem::Release(Graphics::Resources::
 
 	resourceManager->DeleteResource<Shader>(vegetationVSId);
 	resourceManager->DeleteResource<Shader>(vegetationPSId);
+	resourceManager->DeleteResource<Shader>(vegetationDepthPassVSId);
+	resourceManager->DeleteResource<Shader>(vegetationDepthPassPSId);
+	resourceManager->DeleteResource<Shader>(vegetationDepthCubePassVSId);
+	resourceManager->DeleteResource<Shader>(vegetationDepthCubePassGSId);
+	resourceManager->DeleteResource<Shader>(vegetationDepthCubePassPSId);
 
 	_mesh->Release(resourceManager);
 	delete _mesh;
 
 	delete _material;
+
+	if (materialDepthPass != nullptr)
+		delete materialDepthPass;
+
+	if (materialDepthCubePass != nullptr)
+		delete materialDepthCubePass;
 }
 
 void Common::Logic::SceneEntity::VegatationSystem::GenerateMesh(ID3D12Device* device,
@@ -202,6 +243,9 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateConstantBuffers(ID3D12D
 	mutableConstantsBuffer->perlinNoiseTiling = desc.perlinNoiseTiling;
 	mutableConstantsBuffer->windDirection = *desc.windDirection;
 	mutableConstantsBuffer->windStrength = *desc.windStrength;
+	mutableConstantsBuffer->zNear = LightingSystem::SHADOW_MAP_Z_NEAR;
+	mutableConstantsBuffer->zFar = LightingSystem::SHADOW_MAP_Z_FAR;
+	mutableConstantsBuffer->padding = {};
 
 	windDirection = desc.windDirection;
 	windStrength = desc.windStrength;
@@ -281,12 +325,41 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateBuffers(ID3D12Device* d
 }
 
 void Common::Logic::SceneEntity::VegatationSystem::LoadShaders(ID3D12Device* device,
-	Graphics::Resources::ResourceManager* resourceManager)
+	Graphics::Resources::ResourceManager* resourceManager, const VegetationSystemDesc& desc)
 {
+	std::wstringstream lightMatricesNumberStream;
+	lightMatricesNumberStream << desc.lightMatricesNumber;
+	std::wstring lightMatricesNumberString;
+	lightMatricesNumberStream >> lightMatricesNumberString;
+
+	std::vector<DxcDefine> defines;
+	defines.push_back({ L"LIGHT_MATRICES_NUMBER", lightMatricesNumberString.c_str() });
+
+	std::vector<DxcDefine> definesDepthPrepass;
+	definesDepthPrepass.push_back({ L"DEPTH_PREPASS", nullptr });
+
 	vegetationVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
 	vegetationPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationPS.hlsl",
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, *desc.lightDefines);
+
+	vegetationDepthPrepassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthPassVS.hlsl",
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, definesDepthPrepass);
+
+	vegetationDepthPassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthPassVS.hlsl",
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, defines);
+
+	vegetationDepthPassPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthPassPS.hlsl",
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
+	
+	vegetationDepthCubePassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassVS.hlsl",
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
+
+	vegetationDepthCubePassGSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassGS.hlsl",
+		ShaderType::GEOMETRY_SHADER, ShaderVersion::SM_6_5, defines);
+
+	vegetationDepthCubePassPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassPS.hlsl",
 		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
 }
 
@@ -301,17 +374,20 @@ void Common::Logic::SceneEntity::VegatationSystem::LoadTextures(ID3D12Device* de
 	normalMapId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
 }
 
-void Common::Logic::SceneEntity::VegatationSystem::CreateMaterial(ID3D12Device* device,
-	Graphics::Resources::ResourceManager* resourceManager, Graphics::Resources::ResourceID perlinNoiseId)
+void Common::Logic::SceneEntity::VegatationSystem::CreateMaterials(ID3D12Device* device,
+	Graphics::Resources::ResourceManager* resourceManager, const VegetationSystemDesc& desc)
 {
 	auto lightConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightConstantBufferId);
 	auto mutableConstantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
 	auto vegetationBufferResource = resourceManager->GetResource<Buffer>(vegetationBufferId);
-	auto perlinNoiseResource = resourceManager->GetResource<Texture>(perlinNoiseId);
+	auto perlinNoiseResource = resourceManager->GetResource<Texture>(desc.perlinNoiseId);
 	auto albedoResource = resourceManager->GetResource<Texture>(albedoMapId);
 	auto normalResource = resourceManager->GetResource<Texture>(normalMapId);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
 		Graphics::DefaultFilterSetup::FILTER_TRILINEAR_WRAP);
+	auto samplerShadowResource = resourceManager->GetDefaultSampler(device,
+		Graphics::DefaultFilterSetup::FILTER_COMPARISON_POINT_CLAMP,
+		Graphics::DefaultFilterComparisonFunc::COMPARISON_LESS_EQUAL);
 
 	auto vegetationVS = resourceManager->GetResource<Shader>(vegetationVSId);
 	auto vegetationPS = resourceManager->GetResource<Shader>(vegetationPSId);
@@ -323,16 +399,93 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterial(ID3D12Device* 
 	materialBuilder.SetTexture(1u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
 	materialBuilder.SetTexture(2u, albedoResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(3u, normalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_ALL);
+
+	for (uint32_t shadowMapIndex = 0u; shadowMapIndex < desc.shadowMapIds.size(); shadowMapIndex++)
+	{
+		auto shadowMapResource = resourceManager->GetResource<Texture>(desc.shadowMapIds[shadowMapIndex]);
+		materialBuilder.SetTexture(4u + shadowMapIndex, shadowMapResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	}
+
+	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+	materialBuilder.SetSampler(1u, samplerShadowResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetDepthBias(-5.0f);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
-	materialBuilder.SetDepthStencilFormat(32u, true);
+	materialBuilder.SetDepthStencilFormat(32u, true, true);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
 	materialBuilder.SetGeometryFormat(_mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	materialBuilder.SetVertexShader(vegetationVS->bytecode);
 	materialBuilder.SetPixelShader(vegetationPS->bytecode);
 
 	_material = materialBuilder.ComposeStandard(device);
+
+	auto lightMatricesConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightMatricesConstantBufferId);
+
+	auto vegetationDepthPrepassVS = resourceManager->GetResource<Shader>(vegetationDepthPrepassVSId);
+	auto vegetationDepthPassPS = resourceManager->GetResource<Shader>(vegetationDepthPassPSId);
+
+	materialBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+	materialBuilder.SetBuffer(0u, vegetationBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+	materialBuilder.SetTexture(1u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
+	materialBuilder.SetTexture(2u, normalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
+	materialBuilder.SetDepthStencilFormat(32u, true);
+	materialBuilder.SetGeometryFormat(_mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	materialBuilder.SetVertexShader(vegetationDepthPrepassVS->bytecode);
+	materialBuilder.SetPixelShader(vegetationDepthPassPS->bytecode);
+
+	materialDepthPrepass = materialBuilder.ComposeStandard(device);
+	
+	if (desc.hasDepthPass)
+	{
+		auto lightMatricesConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightMatricesConstantBufferId);
+		
+		auto vegetationDepthPassVS = resourceManager->GetResource<Shader>(vegetationDepthPassVSId);
+		
+		materialBuilder.SetRootConstants(0u, 1u, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetConstantBuffer(2u, lightMatricesConstantBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetBuffer(0u, vegetationBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetTexture(1u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetTexture(2u, normalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+		materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+		materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
+		materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
+		materialBuilder.SetDepthStencilFormat(32u, true);
+		materialBuilder.SetGeometryFormat(_mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		materialBuilder.SetVertexShader(vegetationDepthPassVS->bytecode);
+		materialBuilder.SetPixelShader(vegetationDepthPassPS->bytecode);
+
+		materialDepthPass = materialBuilder.ComposeStandard(device);
+	}
+
+	if (desc.hasDepthCubePass)
+	{
+		auto lightMatricesConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightMatricesConstantBufferId);
+
+		auto vegetationDepthCubePassVS = resourceManager->GetResource<Shader>(vegetationDepthCubePassVSId);
+		auto vegetationDepthCubePassGS = resourceManager->GetResource<Shader>(vegetationDepthCubePassGSId);
+		auto vegetationDepthCubePassPS = resourceManager->GetResource<Shader>(vegetationDepthCubePassPSId);
+
+		materialBuilder.SetRootConstants(0u, 1u, D3D12_SHADER_VISIBILITY_GEOMETRY);
+		materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress);
+		materialBuilder.SetConstantBuffer(2u, lightMatricesConstantBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_GEOMETRY);
+		materialBuilder.SetBuffer(0u, vegetationBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetTexture(1u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetTexture(2u, normalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+		materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+		materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
+		materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
+		materialBuilder.SetDepthStencilFormat(32u, true);
+		materialBuilder.SetGeometryFormat(_mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		materialBuilder.SetVertexShader(vegetationDepthCubePassVS->bytecode);
+		materialBuilder.SetGeometryShader(vegetationDepthCubePassGS->bytecode);
+		materialBuilder.SetPixelShader(vegetationDepthCubePassPS->bytecode);
+
+		materialDepthCubePass = materialBuilder.ComposeStandard(device);
+	}
 }
 
 void Common::Logic::SceneEntity::VegatationSystem::FillVegetationBuffer(const VegetationBufferDesc& desc)

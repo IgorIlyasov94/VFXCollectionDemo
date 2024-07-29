@@ -3,6 +3,7 @@
 #include "../../../Graphics/Assets/Loaders/OBJLoader.h"
 #include "../../../Graphics/Assets/Loaders/DDSLoader.h"
 #include "../../../Graphics/Assets/GeometryUtilities.h"
+#include "LightingSystem.h"
 
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -17,11 +18,17 @@ Common::Logic::SceneEntity::Terrain::Terrain(ID3D12GraphicsCommandList* commandL
 	verticesPerWidth = desc.verticesPerWidth;
 	verticesPerHeight = desc.verticesPerHeight;
 
+	depthPassConstants.world = DirectX::XMMatrixTranslation(desc.origin.x, desc.origin.y, desc.origin.z);
+
 	minCorner = desc.origin;
 	minCorner.x -= desc.size.x * 0.5f;
 	minCorner.y -= desc.size.y * 0.5f;
 
 	mapSize = desc.size;
+
+	materialDepthPrepass = desc.materialDepthPrepass;
+	materialDepthPass = desc.materialDepthPass;
+	materialDepthCubePass = desc.materialDepthCubePass;
 
 	lightConstantBufferId = desc.lightConstantBufferId;
 
@@ -37,14 +44,19 @@ Common::Logic::SceneEntity::Terrain::Terrain(ID3D12GraphicsCommandList* commandL
 	}
 
 	CreateConstantBuffers(device, commandList, resourceManager, desc);
-	LoadShaders(device, resourceManager);
+	LoadShaders(device, resourceManager, desc);
 	LoadTextures(device, commandList, resourceManager, desc);
-	CreateMaterial(device, resourceManager);
+	CreateMaterial(device, resourceManager, desc);
 }
 
 Common::Logic::SceneEntity::Terrain::~Terrain()
 {
 
+}
+
+const float4x4& Common::Logic::SceneEntity::Terrain::GetWorld() const
+{
+	return depthPassConstants.world;
 }
 
 float Common::Logic::SceneEntity::Terrain::GetHeight(const float2& position) const
@@ -98,13 +110,42 @@ const float3& Common::Logic::SceneEntity::Terrain::GetMinCorner() const noexcept
 	return minCorner;
 }
 
-void Common::Logic::SceneEntity::Terrain::Draw(ID3D12GraphicsCommandList* commandList, const Camera* camera,
-	float time)
+void Common::Logic::SceneEntity::Terrain::DrawDepthPrepass(ID3D12GraphicsCommandList* commandList,
+	const Camera* camera, float time)
 {
+	auto worldViewProjection = depthPassConstants.world * camera->GetViewProjection();
+
 	mutableConstantsBuffer->viewProjection = camera->GetViewProjection();
 	mutableConstantsBuffer->cameraPosition = camera->GetPosition();
 	mutableConstantsBuffer->time = time;
 
+	materialDepthPrepass->Set(commandList);
+	materialDepthPrepass->SetRootConstants(commandList, 0u, 16u, &worldViewProjection);
+	mesh->Draw(commandList);
+}
+
+void Common::Logic::SceneEntity::Terrain::DrawShadows(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+	depthPassConstants.lightMatrixStartIndex = lightMatrixStartIndex;
+
+	materialDepthPass->Set(commandList);
+	materialDepthPass->SetRootConstants(commandList, 0u, 17u, &depthPassConstants);
+	mesh->Draw(commandList);
+}
+
+void Common::Logic::SceneEntity::Terrain::DrawShadowsCube(ID3D12GraphicsCommandList* commandList,
+	uint32_t lightMatrixStartIndex)
+{
+	depthPassConstants.lightMatrixStartIndex = lightMatrixStartIndex;
+
+	materialDepthCubePass->Set(commandList);
+	materialDepthCubePass->SetRootConstants(commandList, 0u, 17u, &depthPassConstants);
+	mesh->Draw(commandList);
+}
+
+void Common::Logic::SceneEntity::Terrain::Draw(ID3D12GraphicsCommandList* commandList)
+{
 	material->Set(commandList);
 	mesh->Draw(commandList);
 }
@@ -303,16 +344,19 @@ void Common::Logic::SceneEntity::Terrain::CreateConstantBuffers(ID3D12Device* de
 	mutableConstantsBuffer->mapTiling1 = desc.map1Tiling;
 	mutableConstantsBuffer->mapTiling2 = desc.map2Tiling;
 	mutableConstantsBuffer->mapTiling3 = desc.map3Tiling;
+	mutableConstantsBuffer->zNear = LightingSystem::SHADOW_MAP_Z_NEAR;
+	mutableConstantsBuffer->zFar = LightingSystem::SHADOW_MAP_Z_FAR;
+	mutableConstantsBuffer->padding = {};
 }
 
 void Common::Logic::SceneEntity::Terrain::LoadShaders(ID3D12Device* device,
-	Graphics::Resources::ResourceManager* resourceManager)
+	Graphics::Resources::ResourceManager* resourceManager, const TerrainDesc& desc)
 {
 	terrainVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\TerrainVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
 	terrainPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\TerrainPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, *desc.lightDefines);
 }
 
 void Common::Logic::SceneEntity::Terrain::LoadTextures(ID3D12Device* device,
@@ -342,7 +386,8 @@ void Common::Logic::SceneEntity::Terrain::LoadTextures(ID3D12Device* device,
 	blendMapId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
 }
 
-void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, ResourceManager* resourceManager)
+void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, ResourceManager* resourceManager,
+	const TerrainDesc& desc)
 {
 	auto lightConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightConstantBufferId);
 	auto constantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
@@ -357,10 +402,13 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 	auto normal3Resource = resourceManager->GetResource<Texture>(normal3Id);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
 		Graphics::DefaultFilterSetup::FILTER_TRILINEAR_WRAP);
+	auto samplerShadowResource = resourceManager->GetDefaultSampler(device,
+		Graphics::DefaultFilterSetup::FILTER_COMPARISON_POINT_CLAMP,
+		Graphics::DefaultFilterComparisonFunc::COMPARISON_LESS_EQUAL);
 
 	auto terrainVS = resourceManager->GetResource<Shader>(terrainVSId);
 	auto terrainPS = resourceManager->GetResource<Shader>(terrainPSId);
-
+	
 	auto blendSetup = Graphics::DefaultBlendSetup::BLEND_OPAQUE;
 
 	MaterialBuilder materialBuilder{};
@@ -375,10 +423,20 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 	materialBuilder.SetTexture(6u, normal2Resource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(7u, normal3Resource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetTexture(8u, blendMapResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	for (uint32_t shadowMapIndex = 0u; shadowMapIndex < desc.shadowMapIds.size(); shadowMapIndex++)
+	{
+		auto shadowMapResource = resourceManager->GetResource<Texture>(desc.shadowMapIds[shadowMapIndex]);
+		materialBuilder.SetTexture(9u + shadowMapIndex, shadowMapResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	}
+
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	materialBuilder.SetSampler(1u, samplerShadowResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	materialBuilder.SetDepthBias(-3.25f);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
-	materialBuilder.SetDepthStencilFormat(32u, true);
+	materialBuilder.SetDepthStencilFormat(32u, true, true);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
 	materialBuilder.SetGeometryFormat(mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	materialBuilder.SetVertexShader(terrainVS->bytecode);

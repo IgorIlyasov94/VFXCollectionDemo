@@ -9,6 +9,10 @@ cbuffer MutableConstants : register(b1)
 	float2 mapTiling1;
 	float2 mapTiling2;
 	float2 mapTiling3;
+	
+	float zNear;
+	float zFar;
+	float2 padding;
 };
 
 struct Input

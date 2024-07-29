@@ -2,9 +2,12 @@
 
 cbuffer LightConstantBuffer : register(b0)
 {
-	uint32_t lightSourcesNumber;
-	float3 padding;
-	LightElement lights[MAX_LIGHT_SOURCE_NUMBER];
+#ifdef AREA_LIGHT
+	AreaLight areaLight;
+	AmbientLight ambientLight;
+#else
+	DirectionalLight directionalLight;
+#endif
 };
 
 cbuffer MutableConstants : register(b1)
@@ -19,6 +22,10 @@ cbuffer MutableConstants : register(b1)
 	
 	float3 windDirection;
 	float windStrength;
+	
+	float zNear;
+	float zFar;
+	float2 padding;
 };
 
 struct Input
@@ -33,14 +40,22 @@ struct Input
 
 struct Output
 {
-	float4 color : SV_TARGET0;
+	float4 color : SV_Target0;
 };
 
 Texture2D albedoRoughness : register(t2);
-Texture2D normalMetalness : register(t3);
+Texture2D normalAlpha : register(t3);
+
+#ifdef AREA_LIGHT
+TextureCube shadowMap : register(t4);
+#else
+Texture2D shadowMap : register(t4);
+#endif
 
 SamplerState samplerLinear : register(s0);
+SamplerComparisonState shadowSampler : register(s1);
 
+[earlydepthstencil]
 Output main(Input input)
 {
 	Output output = (Output)0;
@@ -49,7 +64,7 @@ Output main(Input input)
 	float3 albedo = texData.xyz;
 	float roughness = texData.w * texData.w;
 	
-	texData = normalMetalness.SampleBias(samplerLinear, input.texCoord, -1.0f);
+	texData = normalAlpha.SampleBias(samplerLinear, input.texCoord, -1.0f);
 	float3 normal = texData.xyz * 2.0f - 1.0f.xxx;
 	
 	normal = BumpMapping(normal, normalize(input.normal), normalize(input.binormal), normalize(input.tangent));
@@ -64,7 +79,7 @@ Output main(Input input)
 	
 	Material material;
 	material.albedo = albedo;
-	material.f0 = float3(0.175f, 0.4f, 0.075f)*2;
+	material.f0 = float3(0.35f, 0.8f, 0.15f);
 	material.f90 = 1.00f.xxx;
 	material.metalness = 0.0f;
 	material.roughness = roughness;
@@ -73,12 +88,23 @@ Output main(Input input)
 	
 	float3 lightSum = 0.0f.xxx;
 	
-	for (uint lightIndex = 0; lightIndex < lightSourcesNumber; lightIndex++)
-	{
-		float3 light;
-		CalculateLighting(lights[lightIndex], surface, material, view, light);
-		lightSum += light;
-	}
+	float3 light = 0.0f.xxx;
+	
+#ifdef AREA_LIGHT
+	ShadowCubeData shadowData = (ShadowCubeData)0;
+	shadowData.zNear = zNear;
+	shadowData.zFar = zFar;
+	shadowData.shadowMap = shadowMap;
+	shadowData.shadowSampler = shadowSampler;
+	
+	CalculateAreaLight(shadowData, areaLight, surface, material, view, light);
+	lightSum += light;
+	//CalculateAmbientLight(ambientLight, surface, material, view, light);
+	//lightSum += light;
+#else
+	CalculateDirectionalLight(directionalLight, surface, material, view, light);
+	lightSum += light;
+#endif
 	
 	output.color = float4(lightSum, 1.0f);
 	

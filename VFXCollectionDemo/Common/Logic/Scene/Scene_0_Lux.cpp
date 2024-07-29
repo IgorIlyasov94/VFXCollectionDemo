@@ -18,7 +18,9 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	environmentFloorAlbedoId{}, environmentFloorNormalId{}, vfxAtlasId{}, perlinNoiseId{}, pbrStandardVSId{},
 	pbrStandardPSId{}, particleSimulationCSId{}, environmentWorld{}, timer{}, _deltaTime{}, fps(60.0f),
 	cpuTimeCounter{}, prevTimePoint{}, frameCounter{}, vfxLux{}, vfxLuxSparkles{}, environmentWallsAlbedoId{},
-	environmentWallsNormalId{}, wallsMaterial{}, wallsMesh{}, wallsMeshObject{}, vfxLuxDistorters{}
+	environmentWallsNormalId{}, wallsMaterial{}, wallsMesh{}, wallsMeshObject{}, vfxLuxDistorters{},
+	areaLightId{}, ambientLightId{}, depthPassVSId{}, depthCubePassVSId{}, depthCubePassGSId{},
+	depthPassMaterial{}, depthCubePassMaterial{}
 {
 	environmentPosition = float3(0.0f, 0.0f, 0.0f);
 	cameraPosition = float3(0.0f, 0.0f, 5.0f);
@@ -53,8 +55,10 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 	auto width = renderer->GetWidth();
 	auto height = renderer->GetHeight();
 
+	CreateLights(renderer);
+
 	LoadMeshes(device, commandList, resourceManager);
-	CreateConstantBuffers(device, commandList, resourceManager, width, height);
+	CreateConstantBuffers(device, resourceManager, width, height);
 	LoadShaders(device, resourceManager);
 	LoadTextures(device, commandList, resourceManager);
 
@@ -71,6 +75,14 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 	auto resourceManager = renderer->GetResourceManager();
 
 	delete wallsMaterial;
+
+	if (depthPassMaterial != nullptr)
+		delete depthPassMaterial;
+
+	if (depthCubePassMaterial != nullptr)
+		delete depthCubePassMaterial;
+
+	delete lightingSystem;
 
 	terrain->Release(resourceManager);
 	delete terrain;
@@ -93,6 +105,8 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 
 	resourceManager->DeleteResource<Shader>(pbrStandardVSId);
 	resourceManager->DeleteResource<Shader>(pbrStandardPSId);
+	resourceManager->DeleteResource<Shader>(depthCubePassVSId);
+	resourceManager->DeleteResource<Shader>(depthCubePassGSId);
 
 	resourceManager->DeleteResource<Shader>(particleSimulationCSId);
 
@@ -156,25 +170,50 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 	}
 
 	prevTimePoint = currentTimePoint;
+
+	vfxLux->Update(timer, _deltaTime);
+	vfxLuxSparkles->Update(timer, _deltaTime);
+	vfxLuxDistorters->Update(timer, _deltaTime);
+	vegetationSystem->Update(timer, _deltaTime);
+}
+
+void Common::Logic::Scene::Scene_0_Lux::RenderShadows(ID3D12GraphicsCommandList* commandList)
+{
+	lightingSystem->BeforeStartRenderShadowMaps(commandList);
+	lightingSystem->StartRenderShadowMap(areaLightId, commandList);
+
+	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
+
+	terrain->DrawShadowsCube(commandList, areaLightDesc.GetLightMatrixStartIndex());
+	vegetationSystem->DrawShadowsCube(commandList, areaLightDesc.GetLightMatrixStartIndex());
+
+	lightingSystem->EndRenderShadowMaps(commandList);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* commandList)
 {
-	vfxLuxSparkles->OnCompute(commandList, timer, _deltaTime);
-	vfxLuxDistorters->OnCompute(commandList, timer, _deltaTime);
+	vfxLuxSparkles->OnCompute(commandList);
+	vfxLuxDistorters->OnCompute(commandList);
+
+	postProcessManager->SetDepthPrepass(commandList);
+
+	terrain->DrawDepthPrepass(commandList, camera, timer);
+	vegetationSystem->DrawDepthPrepass(commandList);
 
 	postProcessManager->SetGBuffer(commandList);
 
 	//wallsMeshObject->Draw(commandList, timer, _deltaTime);
-	terrain->Draw(commandList, camera, timer);
-	vegetationSystem->Draw(commandList, timer, _deltaTime);
+	terrain->Draw(commandList);
+	vegetationSystem->Draw(commandList);
 
-	vfxLux->Draw(commandList, timer, _deltaTime);
-	vfxLuxSparkles->Draw(commandList, timer, _deltaTime);
+	lightingSystem->EndUsingShadowMaps(commandList);
+
+	vfxLux->Draw(commandList);
+	vfxLuxSparkles->Draw(commandList);
 
 	postProcessManager->SetDistortBuffer(commandList);
 
-	vfxLuxDistorters->Draw(commandList, timer, _deltaTime);
+	vfxLuxDistorters->Draw(commandList);
 
 	postProcessManager->Render(commandList);
 }
@@ -195,7 +234,7 @@ void Common::Logic::Scene::Scene_0_Lux::LoadMeshes(ID3D12Device* device, ID3D12G
 	wallsMesh = new Mesh("Resources\\Meshes\\LuxEnvironmentWalls.obj", device, commandList, resourceManager, false, true);
 }
 
-void Common::Logic::Scene::Scene_0_Lux::CreateConstantBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+void Common::Logic::Scene::Scene_0_Lux::CreateConstantBuffers(ID3D12Device* device,
 	Graphics::Resources::ResourceManager* resourceManager, uint32_t width, uint32_t height)
 {
 	auto aspectRatio = static_cast<float>(width) / static_cast<float>(height);
@@ -213,7 +252,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateConstantBuffers(ID3D12Device* devi
 	bufferDesc.data.resize(sizeof(MutableConstants), 0u);
 	bufferDesc.flag = BufferFlag::IS_CONSTANT_DYNAMIC;
 
-	mutableConstantsId = resourceManager->CreateBufferResource(device, commandList, BufferResourceType::CONSTANT_BUFFER, bufferDesc);
+	mutableConstantsId = resourceManager->CreateBufferResource(device, nullptr, BufferResourceType::CONSTANT_BUFFER, bufferDesc);
 
 	auto mutableConstantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
 	mutableConstantsBuffer = reinterpret_cast<MutableConstants*>(mutableConstantsResource->resourceCPUAddress);
@@ -225,6 +264,17 @@ void Common::Logic::Scene::Scene_0_Lux::CreateConstantBuffers(ID3D12Device* devi
 
 void Common::Logic::Scene::Scene_0_Lux::LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager)
 {
+	std::wstringstream lightMatricesNumberStream;
+	lightMatricesNumberStream << lightingSystem->GetLightMatricesNumber();
+	std::wstring lightMatricesNumberString;
+	lightMatricesNumberStream >> lightMatricesNumberString;
+
+	std::vector<DxcDefine> defines;
+	defines.push_back({ L"LIGHT_MATRICES_NUMBER", lightMatricesNumberString.c_str() });
+
+	std::vector<DxcDefine> definesDepthPrepass;
+	definesDepthPrepass.push_back({ L"DEPTH_PREPASS", nullptr });
+
 	pbrStandardVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\PBRStandardVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
@@ -233,6 +283,18 @@ void Common::Logic::Scene::Scene_0_Lux::LoadShaders(ID3D12Device* device, Graphi
 
 	particleSimulationCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\ParticleSimulationCS.hlsl",
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
+
+	depthPrepassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\DepthPassVS.hlsl",
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, definesDepthPrepass);
+
+	depthPassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\DepthPassVS.hlsl",
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, defines);
+
+	depthCubePassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\DepthCubePassVS.hlsl",
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
+
+	depthCubePassGSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\DepthCubePassGS.hlsl",
+		ShaderType::GEOMETRY_SHADER, ShaderVersion::SM_6_5, defines);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -256,10 +318,33 @@ void Common::Logic::Scene::Scene_0_Lux::LoadTextures(ID3D12Device* device, ID3D1
 	perlinNoiseId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
 }
 
+void Common::Logic::Scene::Scene_0_Lux::CreateLights(Graphics::DirectX12Renderer* renderer)
+{
+	lightingSystem = new LightingSystem(renderer);
+
+	LightDesc areaLight{};
+	areaLight.position = float3(0.0f, 0.0f, 2.25f);
+	areaLight.radius = 0.2f;
+	areaLight.color = float3(1.0f, 0.95f, 0.93f);
+	areaLight.intensity = 1.0f;
+	areaLight.type = LightType::AREA_LIGHT;
+	areaLight.castShadows = true;
+
+	areaLightId = lightingSystem->CreateLight(areaLight);
+
+	LightDesc ambientLight{};
+	ambientLight.color = float3(0.3f, 0.4f, 0.5f);
+	ambientLight.intensity = 0.0f;
+	ambientLight.type = LightType::AMBIENT_LIGHT;
+
+	ambientLightId = lightingSystem->CreateLight(ambientLight);
+}
+
 void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 	Graphics::DirectX12Renderer* renderer)
 {
 	auto mutableConstantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
+	auto lightMatricesConstantsResource = resourceManager->GetResource<ConstantBuffer>(lightingSystem->GetLightMatricesConstantBufferId());
 	auto environmentWallsAlbedoResource = resourceManager->GetResource<Texture>(environmentWallsAlbedoId);
 	auto environmentWallsNormalResource = resourceManager->GetResource<Texture>(environmentWallsNormalId);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
@@ -267,6 +352,9 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 
 	auto pbrStandardVS = resourceManager->GetResource<Shader>(pbrStandardVSId);
 	auto pbrStandardPS = resourceManager->GetResource<Shader>(pbrStandardPSId);
+	auto depthPrepassVS = resourceManager->GetResource<Shader>(depthPrepassVSId);
+	auto depthCubePassVS = resourceManager->GetResource<Shader>(depthCubePassVSId);
+	auto depthCubePassGS = resourceManager->GetResource<Shader>(depthCubePassGSId);
 
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress);
@@ -282,39 +370,36 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 	materialBuilder.SetPixelShader(pbrStandardPS->bytecode);
 
 	wallsMaterial = materialBuilder.ComposeStandard(device);
+
+	materialBuilder.SetRootConstants(0u, 16u);
+	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
+	materialBuilder.SetDepthStencilFormat(32u, true);
+	materialBuilder.SetGeometryFormat(wallsMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	materialBuilder.SetVertexShader(depthPrepassVS->bytecode);
+
+	depthPrepassMaterial = materialBuilder.ComposeStandard(device);
+
+	materialBuilder.SetRootConstants(0u, 17u);
+	materialBuilder.SetConstantBuffer(1u, lightMatricesConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_GEOMETRY);
+	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
+	materialBuilder.SetDepthStencilFormat(32u, true);
+	materialBuilder.SetGeometryFormat(wallsMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	materialBuilder.SetVertexShader(depthCubePassVS->bytecode);
+	materialBuilder.SetGeometryShader(depthCubePassGS->bytecode);
+
+	depthCubePassMaterial = materialBuilder.ComposeStandard(device);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer)
 {
-	lightingSystem = new LightingSystem(renderer);
+	std::vector<DxcDefine> lightDefines;
+	lightDefines.push_back({ L"AREA_LIGHT", nullptr });
 
-	LightDesc pointLight{};
-	pointLight.position = float3(0.0f, 0.0f, 1.5f);
-	pointLight.radius = 0.5f;
-	pointLight.color = float3(1.0f, 0.95f, 0.93f);
-	pointLight.intensity = 0.25f;
-	pointLight.type = LightType::POINT_LIGHT;
+	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
 
-	areaLightId = lightingSystem->CreateLight(pointLight);
-
-	pointLight.position = float3(0.0f, 0.0f, 2.0f);
-	pointLight.intensity = 0.5f;
-
-	areaLightId = lightingSystem->CreateLight(pointLight);
-
-	pointLight.position = float3(0.0f, 0.0f, 3.0f);
-	pointLight.intensity = 1.0f;
-
-	areaLightId = lightingSystem->CreateLight(pointLight);
-
-	LightDesc ambientLight{};
-	ambientLight.color = float3(0.3f, 0.4f, 0.5f);
-	ambientLight.intensity = 0.0f;
-	ambientLight.type = LightType::AMBIENT_LIGHT;
-
-	ambientLightId = lightingSystem->CreateLight(ambientLight);
-	
 	TerrainDesc terrainDesc{};
 	terrainDesc.origin = {};
 	terrainDesc.verticesPerWidth = 256u;
@@ -325,6 +410,11 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrainDesc.map2Tiling = float2(8.0f, 8.0f);
 	terrainDesc.map3Tiling = float2(14.0f, 14.0f);
 	terrainDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
+	terrainDesc.lightDefines = &lightDefines;
+	terrainDesc.shadowMapIds.push_back(areaLightDesc.GetShadowMapId());
+	terrainDesc.materialDepthPrepass = depthPrepassMaterial;
+	terrainDesc.materialDepthPass = depthPassMaterial;
+	terrainDesc.materialDepthCubePass = depthCubePassMaterial;
 	terrainDesc.terrainFileName = "Resources\\Meshes\\Lux_Terrain.bin";
 	terrainDesc.heightMapFileName = "Resources\\Textures\\Terrain\\Lux_HeightMap.dds";
 	terrainDesc.blendMapFileName = "Resources\\Textures\\Terrain\\Lux_BlendWeights.dds";
@@ -340,23 +430,29 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrain = new Terrain(commandList, renderer, terrainDesc);
 	
 	VegetationSystemDesc vegetationSystemDesc{};
-	vegetationSystemDesc.smallGrassNumber = 50000;
-	vegetationSystemDesc.mediumGrassNumber = 7000;
-	vegetationSystemDesc.largeGrassNumber = 300;
+	vegetationSystemDesc.smallGrassNumber = 15000;
+	vegetationSystemDesc.mediumGrassNumber = 4000;
+	vegetationSystemDesc.largeGrassNumber = 200;
 	vegetationSystemDesc.atlasRows = 4u;
 	vegetationSystemDesc.atlasColumns = 4u;
-	vegetationSystemDesc.smallGrassSizeMin = float3(0.2f, 0.2f, 0.1f);
+	vegetationSystemDesc.smallGrassSizeMin = float3(0.3f, 0.3f, 0.1f);
 	vegetationSystemDesc.mediumGrassSizeMin = float3(0.4f, 0.4f, 0.8f);
 	vegetationSystemDesc.largeGrassSizeMin = float3(0.4f, 0.4f, 1.6f);
-	vegetationSystemDesc.smallGrassSizeMax = float3(0.5f, 0.5f, 0.35f);
+	vegetationSystemDesc.smallGrassSizeMax = float3(0.6f, 0.6f, 0.4f);
 	vegetationSystemDesc.mediumGrassSizeMax = float3(0.4f, 0.4f, 1.2f);
 	vegetationSystemDesc.largeGrassSizeMax = float3(0.4f, 0.4f, 2.0f);
+	vegetationSystemDesc.hasDepthPass = false;
+	vegetationSystemDesc.hasDepthCubePass = true;
+	vegetationSystemDesc.lightMatricesNumber = lightingSystem->GetLightMatricesNumber();
 	vegetationSystemDesc.terrain = terrain;
 	vegetationSystemDesc.windDirection = &windDirection;
 	vegetationSystemDesc.windStrength = &windStrength;
 	vegetationSystemDesc.perlinNoiseTiling = float2(0.1f, 0.1f);
 	vegetationSystemDesc.perlinNoiseId = perlinNoiseId;
 	vegetationSystemDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
+	vegetationSystemDesc.lightMatricesConstantBufferId = lightingSystem->GetLightMatricesConstantBufferId();
+	vegetationSystemDesc.shadowMapIds.push_back(areaLightDesc.GetShadowMapId());
+	vegetationSystemDesc.lightDefines = &lightDefines;
 	vegetationSystemDesc.vegetationCacheFileName = "Resources\\Meshes\\Lux_Vegetation.bin";
 	vegetationSystemDesc.vegetationMapFileName = "Resources\\Textures\\Terrain\\Lux_VegetationMap.dds";
 	vegetationSystemDesc.albedoMapFileName = "Resources\\Textures\\Terrain\\VegetationAlbedoAtlas.dds";
@@ -364,7 +460,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 
 	vegetationSystem = new VegatationSystem(commandList, renderer, vegetationSystemDesc, camera);
 
-	wallsMeshObject = new MeshObject(wallsMesh, wallsMaterial);
+	wallsMeshObject = new MeshObject(wallsMesh, wallsMaterial, nullptr, nullptr, nullptr);
 
 	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer);
 

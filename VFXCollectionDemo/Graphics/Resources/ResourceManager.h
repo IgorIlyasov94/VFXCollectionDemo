@@ -50,9 +50,10 @@ namespace Graphics::Resources
 		ResourceID CreateSamplerResource(ID3D12Device* device, D3D12_SAMPLER_DESC desc);
 
 		ResourceID CreateShaderResource(ID3D12Device* device, std::filesystem::path filePath,
-			Assets::Loaders::ShaderType type, Assets::Loaders::ShaderVersion version);
+			Assets::Loaders::ShaderType type, Assets::Loaders::ShaderVersion version, const std::vector<DxcDefine>& defines = {});
 
-		Sampler* GetDefaultSampler(ID3D12Device* device, Graphics::DefaultFilterSetup filter);
+		Sampler* GetDefaultSampler(ID3D12Device* device, Graphics::DefaultFilterSetup filter,
+			Graphics::DefaultFilterComparisonFunc comparisonFunc = Graphics::DefaultFilterComparisonFunc::COMPARISON_NEVER);
 
 		template<ResourceType T>
 		T* GetResource(ResourceID id)

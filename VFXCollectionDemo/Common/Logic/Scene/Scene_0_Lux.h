@@ -30,6 +30,7 @@ namespace Common::Logic::Scene
 		void OnResize(Graphics::DirectX12Renderer* renderer) override;
 
 		void Update() override;
+		void RenderShadows(ID3D12GraphicsCommandList* commandList) override;
 		void Render(ID3D12GraphicsCommandList* commandList) override;
 		void RenderToBackBuffer(ID3D12GraphicsCommandList* commandList) override;
 
@@ -39,13 +40,15 @@ namespace Common::Logic::Scene
 		void LoadMeshes(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager);
 
-		void CreateConstantBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-			Graphics::Resources::ResourceManager* resourceManager, uint32_t width, uint32_t height);
+		void CreateConstantBuffers(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			uint32_t width, uint32_t height);
 
 		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
 
 		void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager);
+
+		void CreateLights(Graphics::DirectX12Renderer* renderer);
 
 		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			Graphics::DirectX12Renderer* renderer);
@@ -97,9 +100,19 @@ namespace Common::Logic::Scene
 		Graphics::Resources::ResourceID pbrStandardVSId;
 		Graphics::Resources::ResourceID pbrStandardPSId;
 
+		Graphics::Resources::ResourceID depthPrepassVSId;
+		Graphics::Resources::ResourceID depthPassVSId;
+
+		Graphics::Resources::ResourceID depthCubePassVSId;
+		Graphics::Resources::ResourceID depthCubePassGSId;
+
 		Graphics::Resources::ResourceID particleSimulationCSId;
 
 		SceneEntity::Camera* camera;
+
+		Graphics::Assets::Material* depthPrepassMaterial;
+		Graphics::Assets::Material* depthPassMaterial;
+		Graphics::Assets::Material* depthCubePassMaterial;
 
 		Graphics::Assets::Material* wallsMaterial;
 		Graphics::Assets::Mesh* wallsMesh;

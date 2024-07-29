@@ -1,9 +1,9 @@
 static const uint NUM_THREADS = 64;
 
-static const int SAMPLES_NUMBER = 12;
+static const int SAMPLES_NUMBER = 8;
 
 static const float PI = 3.14159265359f;
-static const float NORMAL_DISTRIBUTION_SIGMA = 4.0f;
+static const float NORMAL_DISTRIBUTION_SIGMA = 2.75f;
 
 static const float3 STRENGTH_COEFF = float3(0.4f, 0.6f, 1.0f);
 

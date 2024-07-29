@@ -100,10 +100,11 @@ Graphics::Resources::ResourceID Graphics::Resources::ResourceManager::CreateSamp
 }
 
 Graphics::Resources::ResourceID Graphics::Resources::ResourceManager::CreateShaderResource(ID3D12Device* device,
-	std::filesystem::path filePath, Assets::Loaders::ShaderType type, Assets::Loaders::ShaderVersion version)
+	std::filesystem::path filePath, Assets::Loaders::ShaderType type, Assets::Loaders::ShaderVersion version,
+	const std::vector<DxcDefine>& defines)
 {
 	auto newShader = new Shader;
-	newShader->bytecode = Assets::Loaders::HLSLLoader::Load(filePath, type, version);
+	newShader->bytecode = Assets::Loaders::HLSLLoader::Load(filePath, type, version, defines);
 
 	auto id = static_cast<ResourceID>(resources.size());
 
@@ -121,14 +122,14 @@ Graphics::Resources::ResourceID Graphics::Resources::ResourceManager::CreateShad
 }
 
 Graphics::Resources::Sampler* Graphics::Resources::ResourceManager::GetDefaultSampler(ID3D12Device* device,
-	Graphics::DefaultFilterSetup filter)
+	Graphics::DefaultFilterSetup filter, Graphics::DefaultFilterComparisonFunc comparisonFunc)
 {
 	auto samplerIdIt = defaultSamplers.find(filter);
 	ResourceID samplerId;
 
 	if (samplerIdIt == defaultSamplers.end())
 	{
-		samplerId = CreateSamplerResource(device, DirectX12Utilities::CreateSamplerDesc(filter));
+		samplerId = CreateSamplerResource(device, DirectX12Utilities::CreateSamplerDesc(filter, comparisonFunc));
 		defaultSamplers.insert({ filter, samplerId });
 	}
 	else

@@ -18,10 +18,6 @@ cbuffer MutableConstants : register(b1)
 	
 	float3 windDirection;
 	float windStrength;
-	
-	float zNear;
-	float zFar;
-	float2 padding;
 };
 
 struct Input
@@ -35,12 +31,8 @@ struct Input
 
 struct Output
 {
-	float4 position : SV_Position;
-	float3 normal : NORMAL;
-	float3 binormal : BINORMAL;
-	float3 tangent : TANGENT;
+	float4 position : POSITION;
 	float2 texCoord : TEXCOORD0;
-	float3 worldPosition : TEXCOORD1;
 };
 
 StructuredBuffer<Vegetation> vegetationBuffer : register(t0);
@@ -73,21 +65,8 @@ Output main(Input input)
 	
 	worldPosition.xyz += shift * shiftCoeff;
 	
-	output.position = mul(viewProjection, worldPosition);
-	
-	output.normal = normalize(mul((float3x3)vegetation.world, input.normal.xyz));
-	output.tangent = normalize(mul((float3x3)vegetation.world, input.tangent.xyz));
-	
-	float3 view = normalize(worldPosition.xyz - cameraPosition);
-	
-	float sideCoeff = (dot(output.normal, view) < 0.0f) ? 1.0f : -1.0f;
-	
-	output.normal *= sideCoeff;
-	output.tangent *= sideCoeff;
-	
-	output.binormal = cross(output.tangent, output.normal);
+	output.position = worldPosition;
 	output.texCoord = input.texCoord * atlasElementSize + vegetation.atlasElementOffset;
-	output.worldPosition = worldPosition.xyz;
 	
 	return output;
 }

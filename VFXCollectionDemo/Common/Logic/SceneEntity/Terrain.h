@@ -4,6 +4,7 @@
 #include "../../../Graphics/Assets/Material.h"
 #include "../../../Graphics/Assets/Mesh.h"
 #include "../../../Graphics/DirectX12Renderer.h"
+#include "LightingSystem.h"
 #include "Camera.h"
 
 namespace Common::Logic::SceneEntity
@@ -21,6 +22,12 @@ namespace Common::Logic::SceneEntity
 		float2 map3Tiling;
 
 		Graphics::Resources::ResourceID lightConstantBufferId;
+		std::vector<Graphics::Resources::ResourceID> shadowMapIds;
+		const std::vector<DxcDefine>* lightDefines;
+		
+		Graphics::Assets::Material* materialDepthPrepass;
+		Graphics::Assets::Material* materialDepthPass;
+		Graphics::Assets::Material* materialDepthCubePass;
 
 		std::filesystem::path terrainFileName;
 		std::filesystem::path heightMapFileName;
@@ -42,13 +49,17 @@ namespace Common::Logic::SceneEntity
 			const TerrainDesc& desc);
 		~Terrain();
 
+		const float4x4& GetWorld() const;
 		float GetHeight(const float2& position) const;
 		float3 GetNormal(const float2& position) const;
 
 		const float3& GetSize() const noexcept;
 		const float3& GetMinCorner() const noexcept;
 
-		void Draw(ID3D12GraphicsCommandList* commandList, const Camera* camera, float time);
+		void DrawDepthPrepass(ID3D12GraphicsCommandList* commandList, const Camera* camera, float time);
+		void DrawShadows(ID3D12GraphicsCommandList* commandList, uint32_t lightMatrixStartIndex);
+		void DrawShadowsCube(ID3D12GraphicsCommandList* commandList, uint32_t lightMatrixStartIndex);
+		void Draw(ID3D12GraphicsCommandList* commandList);
 
 		void Release(Graphics::Resources::ResourceManager* resourceManager);
 
@@ -63,12 +74,14 @@ namespace Common::Logic::SceneEntity
 		void CreateConstantBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager, const TerrainDesc& desc);
 
-		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
+		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			const TerrainDesc& desc);
 
 		void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager, const TerrainDesc& desc);
 
-		void CreateMaterial(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
+		void CreateMaterial(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			const TerrainDesc& desc);
 
 		void LoadCache(const std::filesystem::path& fileName, ID3D12Device* device,
 			ID3D12GraphicsCommandList* commandList, Graphics::Resources::ResourceManager* resourceManager);
@@ -137,9 +150,18 @@ namespace Common::Logic::SceneEntity
 			float2 mapTiling2;
 			float2 mapTiling3;
 
-			float2 noiseTiling;
+			float zNear;
+			float zFar;
 			float2 padding;
 		};
+
+		struct DepthPassConstants
+		{
+			float4x4 world;
+			uint32_t lightMatrixStartIndex;
+		};
+
+		DepthPassConstants depthPassConstants;
 
 		std::vector<floatN> normalHeightData;
 
@@ -148,12 +170,15 @@ namespace Common::Logic::SceneEntity
 		
 		float3 minCorner;
 		float3 mapSize;
-		
+
+		bool hasDepthPass;
+		bool hasDepthPassCube;
+
 		MutableConstants* mutableConstantsBuffer;
 
 		Graphics::Resources::ResourceID lightConstantBufferId;
 		Graphics::Resources::ResourceID mutableConstantsId;
-		
+
 		Graphics::Resources::ResourceID albedo0Id;
 		Graphics::Resources::ResourceID albedo1Id;
 		Graphics::Resources::ResourceID albedo2Id;
@@ -169,5 +194,8 @@ namespace Common::Logic::SceneEntity
 
 		Graphics::Assets::Mesh* mesh;
 		Graphics::Assets::Material* material;
+		Graphics::Assets::Material* materialDepthPrepass;
+		Graphics::Assets::Material* materialDepthPass;
+		Graphics::Assets::Material* materialDepthCubePass;
 	};
 }

@@ -1,9 +1,20 @@
 #include "HLSLLoader.h"
 
-D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::filesystem::path& filePath, ShaderType type, ShaderVersion version)
+D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::filesystem::path& filePath, ShaderType type,
+	ShaderVersion version, const std::vector<DxcDefine>& defines)
 {
 	std::filesystem::path filePathCache(filePath);
+
+	std::stringstream newNameStream;
+	newNameStream << filePathCache.stem().generic_string();
+	newNameStream << GetHashFromDefines(defines);
+
+	std::string newName;
+	newNameStream >> newName;
+
+	filePathCache.replace_filename(newName);
 	filePathCache.replace_extension(".hlslCACHE");
+	filePathCache = filePathCache.lexically_normal();
 	auto loadCache = std::filesystem::exists(filePathCache);
 
 	if (loadCache)
@@ -41,9 +52,11 @@ D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::Load(const std::fil
 	arguments.push_back(DXC_ARG_OPTIMIZATION_LEVEL3);
 #endif
 
+	const auto definesPtr = defines.size() > 0u ? defines.data() : nullptr;
+
 	CComPtr<IDxcCompilerArgs> args;
 	hrStatus = dxcUtils->BuildArguments(fileName, L"main", shaderProfile.c_str(), arguments.data(),
-		static_cast<uint32_t>(arguments.size()), nullptr, 0u, &args);
+		static_cast<uint32_t>(arguments.size()), definesPtr, static_cast<uint32_t>(defines.size()), &args);
 	
 	CComPtr<IDxcBlobEncoding> shaderText = nullptr;
 	hrStatus = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderText);
@@ -141,6 +154,21 @@ std::wstring Graphics::Assets::Loaders::HLSLLoader::GetShaderProfileString(Shade
 	}
 
 	return profile;
+}
+
+uint64_t Graphics::Assets::Loaders::HLSLLoader::GetHashFromDefines(const std::vector<DxcDefine>& defines)
+{
+	std::wstring stringToHash{};
+
+	for (const auto& define : defines)
+	{
+		stringToHash.append(define.Name);
+
+		if (define.Value != nullptr)
+			stringToHash.append(define.Value);
+	}
+
+	return std::hash<std::wstring>{}(stringToHash);
 }
 
 D3D12_SHADER_BYTECODE Graphics::Assets::Loaders::HLSLLoader::LoadCache(const std::filesystem::path& filePath)

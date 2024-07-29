@@ -16,36 +16,54 @@ namespace Common::Logic::SceneEntity
 		void SetSourceDesc(LightID id, const LightDesc& desc);
 		const LightDesc& GetSourceDesc(LightID id) const;
 		
-		Graphics::Resources::ResourceID GetLightConstantBufferId() const;
+		uint32_t GetLightMatricesNumber() const;
 
-		static constexpr uint32_t MAX_LIGHT_SOURCE_NUMBER = 32u;
+		Graphics::Resources::ResourceID GetLightConstantBufferId();
+		Graphics::Resources::ResourceID GetLightMatricesConstantBufferId();
+
+		void BeforeStartRenderShadowMaps(ID3D12GraphicsCommandList* commandList);
+		void StartRenderShadowMap(LightID id, ID3D12GraphicsCommandList* commandList);
+
+		void EndRenderShadowMaps(ID3D12GraphicsCommandList* commandList);
+		void EndUsingShadowMaps(ID3D12GraphicsCommandList* commandList);
+
+		void Clear();
+
+		static constexpr uint32_t SHADOW_MAP_SIZE = 2048u;
+		static constexpr uint32_t CUBE_SHADOW_MAP_SIZE = 1024u;
+
+		static constexpr float SHADOW_MAP_Z_NEAR = 0.01f;
+		static constexpr float SHADOW_MAP_Z_FAR = 1000.0f;
 
 	private:
 		LightingSystem() = delete;
 
-		void SetBufferElement(LightID id, const LightDesc& desc);
+		uint32_t GetSizeOfType(LightType type);
+		uint32_t CalculateLightBufferSize();
 
-		struct LightElement
-		{
-			float3 position;
-			uint32_t type;
-			float3 color;
-			float various0;
-			float3 direction;
-			float various1;
-		};
+		void SetLightBufferElement(LightDesc& desc);
 
-		struct LightConstantBuffer
-		{
-			uint32_t lightSourcesNumber;
-			float3 padding;
-			LightElement lights[MAX_LIGHT_SOURCE_NUMBER];
-		};
+		Graphics::Resources::ResourceID CreateShadowMap(bool isCube);
+		void CreateConstantBuffers();
+
+		void SetupViewProjectMatrices(LightDesc& desc);
+		float4x4 BuildViewProjectMatrix(const float3& position, const float3& direction,
+			const float3& up, uint32_t size, bool isDirectional);
+
+		D3D12_VIEWPORT viewport;
+		D3D12_VIEWPORT cubeViewport;
+		D3D12_RECT scissorRectangle;
+		D3D12_RECT cubeScissorRectangle;
+
+		bool isLightConstantBufferBuilded;
+		uint32_t lightMatricesNumber;
+
+		std::vector<LightDesc> lights;
+		std::vector<D3D12_RESOURCE_BARRIER> barriers;
 
 		Graphics::Resources::ResourceID lightConstantBufferId;
-		
-		std::vector<LightDesc> lights;
-		uint32_t* lightSourcesNumberAddress;
-		LightElement* lightBufferAddresses;
+		Graphics::Resources::ResourceID lightMatricesConstantBufferId;
+
+		Graphics::DirectX12Renderer* _renderer;
 	};
 }

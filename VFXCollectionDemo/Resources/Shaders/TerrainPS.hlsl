@@ -2,9 +2,12 @@
 
 cbuffer LightConstantBuffer : register(b0)
 {
-	uint32_t lightSourcesNumber;
-	float3 padding;
-	LightElement lights[MAX_LIGHT_SOURCE_NUMBER];
+#ifdef AREA_LIGHT
+	AreaLight areaLight;
+	AmbientLight ambientLight;
+#else
+	DirectionalLight directionalLight;
+#endif
 };
 
 cbuffer MutableConstants : register(b1)
@@ -18,6 +21,10 @@ cbuffer MutableConstants : register(b1)
 	float2 mapTiling1;
 	float2 mapTiling2;
 	float2 mapTiling3;
+	
+	float zNear;
+	float zFar;
+	float2 padding;
 };
 
 struct Input
@@ -47,7 +54,14 @@ Texture2D normalMetalness2 : register(t6);
 Texture2D normalMetalness3 : register(t7);
 Texture2D blendMap : register(t8);
 
+#ifdef AREA_LIGHT
+TextureCube shadowMap : register(t9);
+#else
+Texture2D shadowMap : register(t9);
+#endif
+
 SamplerState samplerLinear : register(s0);
+SamplerComparisonState shadowSampler : register(s1);
 
 [earlydepthstencil]
 Output main(Input input)
@@ -90,12 +104,24 @@ Output main(Input input)
 	
 	float3 lightSum = 0.0f.xxx;
 	
-	for (uint lightIndex = 0; lightIndex < lightSourcesNumber; lightIndex++)
-	{
-		float3 light;
-		CalculateLighting(lights[lightIndex], surface, material, view, light);
-		lightSum += light;
-	}
+	float3 light = 0.0f.xxx;
+	
+#ifdef AREA_LIGHT
+	ShadowCubeData shadowData = (ShadowCubeData)0;
+	shadowData.zNear = zNear;
+	shadowData.zFar = zFar;
+	shadowData.shadowMap = shadowMap;
+	shadowData.shadowSampler = shadowSampler;
+	
+	CalculateAreaLight(shadowData, areaLight, surface, material, view, light);
+	lightSum += light;
+	
+	//CalculateAmbientLight(ambientLight, surface, material, view, light);
+	//lightSum += light;
+#else
+	CalculateDirectionalLight(directionalLight, surface, material, view, light);
+	lightSum += light;
+#endif
 	
 	output.color = float4(lightSum, 1.0f);
 	

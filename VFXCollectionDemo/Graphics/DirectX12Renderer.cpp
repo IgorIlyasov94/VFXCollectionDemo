@@ -128,7 +128,7 @@ void Graphics::DirectX12Renderer::EndFrame(ID3D12GraphicsCommandList* commandLis
     commandManager->SubmitCommandList(commandListId);
     commandManager->ExecuteCommands(commandQueueId);
 
-    swapChain->Present(1u, 0u);
+    swapChain->Present(0u, 0u);
 
     PrepareToNextFrame();
 }
@@ -375,7 +375,7 @@ IDXGISwapChain3* Graphics::DirectX12Renderer::CreateSwapChain(uint32_t width, ui
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     desc.BufferCount = BACK_BUFFER_NUMBER;
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    
+
     factory->CreateSwapChainForHwnd(commandQueue, windowHandler, &desc, nullptr, nullptr, &newSwapChain1);
 
     IDXGISwapChain3* newSwapChain = nullptr;
