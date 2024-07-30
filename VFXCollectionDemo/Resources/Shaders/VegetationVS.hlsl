@@ -66,26 +66,26 @@ Output main(Input input)
 	
 	float t = saturate(sin(time * windStrength * noise) * 0.5f + 0.5f);
 	
+	float height = abs(vegetation.height);
+	bool isCap = vegetation.height < 0.0f;
+	
 	float3 shift = min(windDirection, vegetation.tiltAmplitude.xxx) + float3(0.0f, 0.0f, 0.0001f);
-	shift.z -= 0.5f * vegetation.height * dot(windDirection, windDirection);
+	shift.z -= 0.5f * height * dot(windDirection, windDirection);
 	shift = lerp(normalize(shift), 0.0f.xxx, t);
-	float shiftCoeff = (1.0f - input.texCoord.y) * vegetation.height;
+	float shiftCoeff = (1.0f - (isCap ? 0.0f : input.texCoord.y)) * height;
 	
 	worldPosition.xyz += shift * shiftCoeff;
 	
 	output.position = mul(viewProjection, worldPosition);
 	
-	output.normal = normalize(mul((float3x3)vegetation.world, input.normal.xyz));
-	output.tangent = normalize(mul((float3x3)vegetation.world, input.tangent.xyz));
+	float3 normal = normalize(mul((float3x3)vegetation.world, input.normal.xyz));
+	float3 tangent = normalize(mul((float3x3)vegetation.world, input.tangent.xyz));
 	
-	float3 view = normalize(worldPosition.xyz - cameraPosition);
-	
-	float sideCoeff = (dot(output.normal, view) < 0.0f) ? 1.0f : -1.0f;
-	
-	output.normal *= sideCoeff;
-	output.tangent *= sideCoeff;
+	output.normal = isCap ? float3(0.0f, 0.0f, 1.0f) : normal;
+	output.tangent = isCap ? float3(0.0f, -1.0f, 0.0f) : tangent;
 	
 	output.binormal = cross(output.tangent, output.normal);
+	
 	output.texCoord = input.texCoord * atlasElementSize + vegetation.atlasElementOffset;
 	output.worldPosition = worldPosition.xyz;
 	

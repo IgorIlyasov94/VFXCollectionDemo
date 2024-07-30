@@ -4,7 +4,7 @@
 Graphics::Assets::MaterialBuilder::MaterialBuilder()
 	: vertexShader{}, hullShader{}, domainShader{}, geometryShader{}, amplificationShader{}, meshShader{}, pixelShader{},
 	topologyType{}, cullMode(D3D12_CULL_MODE_NONE), blendDesc{}, renderTargetNumber(0u), depthStencilFormat{}, zTest(false),
-	depthBufferReadOnly(false)
+	depthBufferReadOnly(false), _depthBias(0.0f), _conservativeRender(false)
 {
 	renderTargetsFormat.fill(DXGI_FORMAT_UNKNOWN);
 }
@@ -177,6 +177,11 @@ void Graphics::Assets::MaterialBuilder::SetDepthBias(float depthBias)
 	_depthBias = depthBias;
 }
 
+void Graphics::Assets::MaterialBuilder::SetConservativeRender()
+{
+	_conservativeRender = true;
+}
+
 void Graphics::Assets::MaterialBuilder::SetCullMode(D3D12_CULL_MODE mode)
 {
 	cullMode = mode;
@@ -247,6 +252,7 @@ void Graphics::Assets::MaterialBuilder::Reset()
 	depthStencilFormat = {};
 
 	_depthBias = D3D12_DEFAULT_DEPTH_BIAS;
+	_conservativeRender = false;
 	zTest = false;
 	depthBufferReadOnly = false;
 	renderTargetNumber = 0u;
@@ -402,7 +408,7 @@ ID3D12PipelineState* Graphics::Assets::MaterialBuilder::CreateGraphicsPipelineSt
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc{};
 	pipelineStateDesc.InputLayout = inputLayoutDesc;
 	pipelineStateDesc.pRootSignature = rootSignature;
-	pipelineStateDesc.RasterizerState = DirectX12Utilities::CreateRasterizeDesc(cullMode, _depthBias);
+	pipelineStateDesc.RasterizerState = DirectX12Utilities::CreateRasterizeDesc(cullMode, _depthBias, _conservativeRender);
 	pipelineStateDesc.BlendState = blendDesc;
 	pipelineStateDesc.VS = vertexShader;
 	pipelineStateDesc.HS = hullShader;
@@ -435,7 +441,7 @@ ID3D12PipelineState* Graphics::Assets::MaterialBuilder::CreatePipelineState(ID3D
 
 	PIPELINE_STATE_STREAM_DESC pipelineStateDesc{};
 	pipelineStateDesc.rootSignature = rootSignature;
-	pipelineStateDesc.rasterizerState = DirectX12Utilities::CreateRasterizeDesc(cullMode);
+	pipelineStateDesc.rasterizerState = DirectX12Utilities::CreateRasterizeDesc(cullMode, _depthBias, _conservativeRender);
 	pipelineStateDesc.blendDesc = blendDesc;
 	pipelineStateDesc.meshShader = meshShader;
 	pipelineStateDesc.amplificationShader = amplificationShader;

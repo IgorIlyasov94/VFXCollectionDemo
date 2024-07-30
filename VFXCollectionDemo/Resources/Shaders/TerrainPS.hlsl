@@ -116,8 +116,8 @@ Output main(Input input)
 	CalculateAreaLight(shadowData, areaLight, surface, material, view, light);
 	lightSum += light;
 	
-	//CalculateAmbientLight(ambientLight, surface, material, view, light);
-	//lightSum += light;
+	CalculateAmbientLight(ambientLight, surface, material, view, light);
+	lightSum += light;
 #else
 	CalculateDirectionalLight(directionalLight, surface, material, view, light);
 	lightSum += light;

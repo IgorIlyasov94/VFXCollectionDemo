@@ -344,7 +344,7 @@ void CalculateAreaLight(ShadowCubeData shadowData, AreaLight areaLight, Surface 
 		float3 lightRate = 0.0f.xxx;
 		CalculatePBRLighting(lightingDesc, viewDir, lightRate);
 		
-		float3 offsettedWorldPosition = surface.position + offset;
+		float3 offsettedWorldPosition = surface.position - offset;
 		float occlusion = CalculateShadowCube(shadowData, offsettedWorldPosition, areaLight.position);
 		
 		light += lightRate * occlusion;

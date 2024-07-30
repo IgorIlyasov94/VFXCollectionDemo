@@ -114,6 +114,9 @@ namespace Common::Logic::SceneEntity
 		static constexpr uint32_t HALO_INDICES_PER_RIBBON = (TOTAL_SEGMENT_NUMBER - 4) * INDICES_PER_SEGMENT;
 		static constexpr uint32_t HALO_INDICES_NUMBER = TOTAL_RIBBON_NUMBER * HALO_INDICES_PER_RIBBON;
 
+		static constexpr float COLOR_INTENSITY_INCREMENT_SPEED = 0.075f;
+		static constexpr float HALO_INTENSITY_INCREMENT_SPEED = 0.125f;
+
 		static constexpr float RING_START_OFFSET = 0.4f;
 		static constexpr float RING_WIDTH = 0.5f;
 		static constexpr float RING_FADING_WIDTH = 0.3f;
@@ -163,7 +166,6 @@ namespace Common::Logic::SceneEntity
 		float4x4 circleWorld;
 		float colorIntensity;
 		float haloColorIntensity;
-		float animationSpeed;
 		
 		VFXPillarConstants* circleConstants;
 		VFXHaloConstants* haloConstants;

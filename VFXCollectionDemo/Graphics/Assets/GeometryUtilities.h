@@ -11,6 +11,10 @@ namespace Graphics::Assets
 
 		static float3 CalculateNormal(const float3& point0, const float3& point1, const float3& point2) noexcept;
 		static float3 CalculateTangent(const float3& normal) noexcept;
+		
+		static uint64_t CalculateNormalHalf(const float3& point0, const float3& point1, const float3& point2) noexcept;
+		static uint64_t CalculateTangentHalf(const float3& normal) noexcept;
+		
 		static float3 CalculateBarycentric(float3 point0, float3 point1, float3 point2, float3 point) noexcept;
 
 		static bool PointInTriangle(const float3& point0, const float3& point1, const float3& point2, const float3& point) noexcept;
@@ -18,6 +22,8 @@ namespace Graphics::Assets
 		static void TriangulatePolygon(const std::vector<uint8_t>& vertexBuffer, size_t stride, std::vector<uint32_t>& vertexIndices);
 		static void RecalculateNormals(const std::vector<uint32_t>& vertexIndices, size_t stride, std::vector<uint8_t>& vertexBuffer);
 		static void CalculateTangents(size_t stride, std::vector<uint8_t>& vertexBuffer);
+
+		static uint64_t Vector3ToHalf4(const float3& value);
 
 		static constexpr float EPSILON = 1E-5f;
 

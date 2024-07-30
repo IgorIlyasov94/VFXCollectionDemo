@@ -63,27 +63,17 @@ Common::Logic::SceneEntity::LightID Common::Logic::SceneEntity::LightingSystem::
 	return id;
 }
 
-void Common::Logic::SceneEntity::LightingSystem::SetSourceDesc(LightID id, const LightDesc& desc)
+void Common::Logic::SceneEntity::LightingSystem::UpdateSourceDesc(LightID id)
 {
 	auto& light = lights[id];
 
-	light.position = desc.position;
-	light.radius = desc.radius;
-	light.color = desc.color;
-	light.intensity = desc.intensity;
-	light.direction = desc.direction;
-	light.cosPhi2 = desc.cosPhi2;
-	light.cosTheta2 = desc.cosTheta2;
-	light.falloff = desc.falloff;
+	SetLightBufferElement(light);
 
 	if (light.castShadows)
-	{
 		SetupViewProjectMatrices(light);
-		SetLightBufferElement(light);
-	}
 }
 
-const Common::Logic::SceneEntity::LightDesc& Common::Logic::SceneEntity::LightingSystem::GetSourceDesc(LightID id) const
+Common::Logic::SceneEntity::LightDesc& Common::Logic::SceneEntity::LightingSystem::GetSourceDesc(LightID id)
 {
 	return lights[id];
 }
@@ -150,8 +140,6 @@ void Common::Logic::SceneEntity::LightingSystem::StartRenderShadowMap(LightID id
 		commandList->RSSetScissorRects(1u, &scissorRectangle);
 	}
 
-	lightDesc.shadowMapResource->EndBarrier(commandList);
-
 	commandList->ClearDepthStencilView(lightDesc.shadowMapCPUDescriptor, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0u, 0u, nullptr);
 	commandList->OMSetRenderTargets(0u, nullptr, true, &lightDesc.shadowMapCPUDescriptor);
 }
@@ -185,8 +173,8 @@ void Common::Logic::SceneEntity::LightingSystem::EndUsingShadowMaps(ID3D12Graphi
 			continue;
 
 		D3D12_RESOURCE_BARRIER barrier;
-		lightDesc.shadowMapResource->GetBeginBarrier(D3D12_RESOURCE_STATE_DEPTH_WRITE, barrier);
-		barriers.push_back(barrier);
+		if (lightDesc.shadowMapResource->GetBeginBarrier(D3D12_RESOURCE_STATE_DEPTH_WRITE, barrier))
+			barriers.push_back(barrier);
 	}
 
 	if (!barriers.empty())
@@ -239,7 +227,7 @@ void Common::Logic::SceneEntity::LightingSystem::SetLightBufferElement(LightDesc
 	{
 		auto light = reinterpret_cast<DirectionalLight*>(desc.lightBufferStartAddress);
 		light->direction = desc.direction;
-		light->color = desc.color;
+		light->color = float3(desc.color.x * desc.intensity, desc.color.y * desc.intensity, desc.color.z * desc.intensity);
 	}
 	else if (desc.type == LightType::POINT_LIGHT)
 	{

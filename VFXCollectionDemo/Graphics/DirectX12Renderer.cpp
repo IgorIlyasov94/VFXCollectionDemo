@@ -128,7 +128,7 @@ void Graphics::DirectX12Renderer::EndFrame(ID3D12GraphicsCommandList* commandLis
     commandManager->SubmitCommandList(commandListId);
     commandManager->ExecuteCommands(commandQueueId);
 
-    swapChain->Present(0u, 0u);
+    swapChain->Present(1u, 0u);
 
     PrepareToNextFrame();
 }

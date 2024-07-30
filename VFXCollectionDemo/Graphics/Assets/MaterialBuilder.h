@@ -40,6 +40,7 @@ namespace Graphics::Assets
 
 		void SetGeometryFormat(VertexFormat format, D3D12_PRIMITIVE_TOPOLOGY_TYPE type);
 		void SetDepthBias(float depthBias);
+		void SetConservativeRender();
 		void SetCullMode(D3D12_CULL_MODE mode);
 		void SetBlendMode(D3D12_BLEND_DESC desc);
 		void SetRenderTargetFormat(uint32_t renderTargetIndex, DXGI_FORMAT format);
@@ -150,6 +151,7 @@ namespace Graphics::Assets
 		DXGI_FORMAT depthStencilFormat;
 
 		float _depthBias;
+		float _conservativeRender;
 		bool zTest;
 		bool depthBufferReadOnly;
 		uint32_t renderTargetNumber;

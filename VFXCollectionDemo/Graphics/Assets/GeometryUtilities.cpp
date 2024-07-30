@@ -32,7 +32,7 @@ float3 Graphics::Assets::GeometryUtilities::CalculateNormal(const float3& point0
 float3 Graphics::Assets::GeometryUtilities::CalculateTangent(const float3& normal) noexcept
 {
 	float3 v0(0.0f, 0.0f, 1.0f);
-	float3 v1(0.0f, 1.0f, 0.0f);
+	float3 v1(0.0f, -1.0f, 0.0f);
 
 	floatN t0 = XMVector3Cross(XMLoadFloat3(&normal), XMLoadFloat3(&v0));
 	floatN t1 = XMVector3Cross(XMLoadFloat3(&normal), XMLoadFloat3(&v1));
@@ -45,6 +45,18 @@ float3 Graphics::Assets::GeometryUtilities::CalculateTangent(const float3& norma
 		XMStoreFloat3(&tangent, XMVector3Normalize(t1));
 
 	return tangent;
+}
+
+uint64_t Graphics::Assets::GeometryUtilities::CalculateNormalHalf(const float3& point0, const float3& point1, const float3& point2) noexcept
+{
+	auto normal = CalculateNormal(point0, point1, point2);
+	return Vector3ToHalf4(normal);
+}
+
+uint64_t Graphics::Assets::GeometryUtilities::CalculateTangentHalf(const float3& normal) noexcept
+{
+	auto tangent = CalculateTangent(normal);
+	return Vector3ToHalf4(tangent);
 }
 
 float3 Graphics::Assets::GeometryUtilities::CalculateBarycentric(float3 point0, float3 point1, float3 point2, float3 point) noexcept
@@ -230,4 +242,17 @@ void Graphics::Assets::GeometryUtilities::CalculateTangents(size_t stride, std::
 		auto& resultBufferSlot = reinterpret_cast<DirectX::PackedVector::XMHALF4&>(vertexBuffer[vertexBufferTangetIndex]);
 		resultBufferSlot = half4Tangent;
 	}
+}
+
+uint64_t Graphics::Assets::GeometryUtilities::Vector3ToHalf4(const float3& value)
+{
+	uint64_t result{};
+	auto resultPtr = reinterpret_cast<DirectX::PackedVector::HALF*>(&result);
+	*resultPtr = DirectX::PackedVector::XMConvertFloatToHalf(value.x);
+	resultPtr++;
+	*resultPtr = DirectX::PackedVector::XMConvertFloatToHalf(value.y);
+	resultPtr++;
+	*resultPtr = DirectX::PackedVector::XMConvertFloatToHalf(value.z);
+
+	return result;
 }

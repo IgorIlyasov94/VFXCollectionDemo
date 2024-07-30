@@ -29,9 +29,9 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 
 	hdrConstants.width = width;
 	hdrConstants.area = width * height;
-	hdrConstants.middleGray = 0.2f;
-	hdrConstants.whiteCutoff = 0.6f;
-	hdrConstants.brightThreshold = 0.75f;
+	hdrConstants.middleGray = MIDDLE_GRAY;
+	hdrConstants.whiteCutoff = WHITE_CUTOFF;
+	hdrConstants.brightThreshold = BRIGHT_THRESHOLD;
 
 	motionBlurConstants.widthU = width;
 	motionBlurConstants.area = hdrConstants.area;
@@ -42,9 +42,10 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 	toneMappingConstants.area = hdrConstants.area;
 	toneMappingConstants.halfWidth = width / 2u;
 	toneMappingConstants.quartArea = hdrConstants.area / 4u;
-	toneMappingConstants.middleGray = hdrConstants.middleGray;
-	toneMappingConstants.whiteCutoff = hdrConstants.whiteCutoff;
-	toneMappingConstants.brightThreshold = hdrConstants.brightThreshold;
+	toneMappingConstants.middleGray = MIDDLE_GRAY;
+	toneMappingConstants.whiteCutoff = WHITE_CUTOFF;
+	toneMappingConstants.brightThreshold = BRIGHT_THRESHOLD;
+	toneMappingConstants.bloomIntensity = BLOOM_INTENSITY;
 
 	_width = width;
 	_height = height;
@@ -315,7 +316,7 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	toneMappingMaterial->Set(commandList);
-	toneMappingMaterial->SetRootConstants(commandList, 0u, 6u, &toneMappingConstants);
+	toneMappingMaterial->SetRootConstants(commandList, 0u, 8u, &toneMappingConstants);
 	quadMesh->DrawOnly(commandList);
 
 	barriers.clear();
@@ -487,7 +488,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 	auto toneMappingPS = resourceManager->GetResource<Shader>(toneMappingPSId);
 
 	MaterialBuilder materialBuilder{};
-	materialBuilder.SetRootConstants(0u, 6u);
+	materialBuilder.SetRootConstants(0u, 8u);
 	materialBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetBuffer(1u, luminanceBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetBuffer(2u, bloomBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);

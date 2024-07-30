@@ -79,7 +79,7 @@ Output main(Input input)
 	
 	Material material;
 	material.albedo = albedo;
-	material.f0 = float3(0.35f, 0.8f, 0.15f);
+	material.f0 = albedo;
 	material.f90 = 1.00f.xxx;
 	material.metalness = 0.0f;
 	material.roughness = roughness;
@@ -99,8 +99,9 @@ Output main(Input input)
 	
 	CalculateAreaLight(shadowData, areaLight, surface, material, view, light);
 	lightSum += light;
-	//CalculateAmbientLight(ambientLight, surface, material, view, light);
-	//lightSum += light;
+	
+	CalculateAmbientLight(ambientLight, surface, material, view, light);
+	lightSum += light;
 #else
 	CalculateDirectionalLight(directionalLight, surface, material, view, light);
 	lightSum += light;

@@ -11,6 +11,10 @@ namespace Graphics
 		BLEND_TRANSPARENT = 1u,
 		BLEND_ADDITIVE = 2u,
 		BLEND_PREMULT_ALPHA_ADDITIVE = 3u,
+		BLEND_MIN = 4u,
+		BLEND_MAX = 5u,
+		BLEND_SUBTRACT = 6u,
+		BLEND_MULTIPLY = 7u,
 	};
 
 	enum class DefaultFilterSetup
@@ -57,7 +61,7 @@ namespace Graphics
 		static D3D12_RENDER_TARGET_VIEW_DESC CreateRTVDesc(const Resources::TextureDesc& desc);
 		static D3D12_DEPTH_STENCIL_VIEW_DESC CreateDSVDesc(const Resources::TextureDesc& desc);
 
-		static D3D12_RASTERIZER_DESC CreateRasterizeDesc(D3D12_CULL_MODE mode, float depthBias = 0.0f);
+		static D3D12_RASTERIZER_DESC CreateRasterizeDesc(D3D12_CULL_MODE mode, float depthBias = 0.0f, bool conservative = false);
 		static D3D12_DEPTH_STENCIL_DESC CreateDepthStencilDesc(bool enableZTest, bool readOnly = false);
 		static D3D12_DEPTH_STENCIL_DESC1 CreateDepthStencilDesc1(bool enableZTest, bool readOnly = false);
 

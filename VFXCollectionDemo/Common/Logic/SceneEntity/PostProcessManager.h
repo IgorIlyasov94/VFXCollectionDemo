@@ -80,9 +80,16 @@ namespace Common::Logic::SceneEntity
 			float middleGray;
 			float whiteCutoff;
 			float brightThreshold;
+			float bloomIntensity;
 		};
 
 		static constexpr float CLEAR_COLOR[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+		static constexpr float MIDDLE_GRAY = 0.15f;
+		static constexpr float WHITE_CUTOFF = 0.75f;
+		static constexpr float BRIGHT_THRESHOLD = 4.0f;
+		static constexpr float BLOOM_INTENSITY = 4.0f;
+
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
 		static constexpr uint32_t MAX_SIMULTANEOUS_BARRIER_NUMBER = 5u;

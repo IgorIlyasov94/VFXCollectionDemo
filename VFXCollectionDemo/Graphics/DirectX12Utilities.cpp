@@ -165,11 +165,11 @@ D3D12_DEPTH_STENCIL_VIEW_DESC Graphics::DirectX12Utilities::CreateDSVDesc(const 
 	return depthStencilViewDesc;
 }
 
-D3D12_RASTERIZER_DESC Graphics::DirectX12Utilities::CreateRasterizeDesc(D3D12_CULL_MODE mode, float depthBias)
+D3D12_RASTERIZER_DESC Graphics::DirectX12Utilities::CreateRasterizeDesc(D3D12_CULL_MODE mode, float depthBias, bool conservative)
 {
 	D3D12_RASTERIZER_DESC desc{};
 	desc.AntialiasedLineEnable = false;
-	desc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+	desc.ConservativeRaster = conservative ? D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON : D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 	desc.CullMode = mode;
 	desc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
 	desc.DepthBiasClamp = 1.0f;// D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
@@ -240,8 +240,6 @@ D3D12_BLEND_DESC Graphics::DirectX12Utilities::CreateBlendDesc(DefaultBlendSetup
 	{
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-		desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 	}
 	else if (setup == DefaultBlendSetup::BLEND_ADDITIVE ||
 		setup == DefaultBlendSetup::BLEND_PREMULT_ALPHA_ADDITIVE)
@@ -250,16 +248,31 @@ D3D12_BLEND_DESC Graphics::DirectX12Utilities::CreateBlendDesc(DefaultBlendSetup
 			D3D12_BLEND_SRC_ALPHA : D3D12_BLEND_ONE;
 
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
-		desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	}
+	else if (setup == DefaultBlendSetup::BLEND_MIN ||
+		setup == DefaultBlendSetup::BLEND_MAX ||
+		setup == DefaultBlendSetup::BLEND_SUBTRACT)
+	{
+		desc.RenderTarget[0].BlendOp = setup == DefaultBlendSetup::BLEND_MIN ?
+			D3D12_BLEND_OP_MIN :
+			(setup == DefaultBlendSetup::BLEND_MAX ? D3D12_BLEND_OP_MAX : D3D12_BLEND_OP_SUBTRACT);
+
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	}
+	else if (setup == DefaultBlendSetup::BLEND_MULTIPLY)
+	{
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_DEST_COLOR;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
 	}
 	else
 	{
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
-		desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 	}
+
+	desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 
 	return desc;
 }

@@ -99,6 +99,7 @@ namespace Common::Logic::SceneEntity
 			const VegetationSystemDesc& vegetationSystemDesc;
 			uint32_t elementNumber;
 			uint32_t offset;
+			uint32_t capOffset;
 			uint32_t quadNumber;
 			DirectX::PackedVector::XMUBYTE4 mask;
 			float3 grassSizeMin;
@@ -106,29 +107,29 @@ namespace Common::Logic::SceneEntity
 			float tiltAmplitude;
 		};
 
-		void FillVegetationBuffer(const VegetationBufferDesc& desc);
-
-		void GetRandomData(const VegetationBufferDesc& desc, floatN& position, floatN& upVector, float2& atlasOffset);
-
-		floatN CalculateRotation(const floatN& upVector, const floatN& upVectorTarget);
-
-		void LoadCache(const std::filesystem::path& fileName, uint8_t* buffer, size_t size);
-		void SaveCache(const std::filesystem::path& fileName, const uint8_t* buffer, size_t size);
-
 		struct GrassVertex
 		{
 		public:
 			float3 position;
-			DirectX::PackedVector::HALF normalX;
-			DirectX::PackedVector::HALF normalY;
-			DirectX::PackedVector::HALF normalZ;
-			DirectX::PackedVector::HALF normalW;
-			DirectX::PackedVector::HALF tangentX;
-			DirectX::PackedVector::HALF tangentY;
-			DirectX::PackedVector::HALF tangentZ;
-			DirectX::PackedVector::HALF tangentW;
+			uint32_t normalXY;
+			uint32_t normalZW;
+			uint32_t tangentXY;
+			uint32_t tangentZW;
 			DirectX::PackedVector::XMHALF2 texCoord;
 		};
+
+		void FillVegetationBuffer(const VegetationBufferDesc& desc, uint32_t& capNumber);
+
+		void GetRandomData(const VegetationBufferDesc& desc, floatN& position,
+			floatN& upVector, float2& atlasOffset, float2& capAtlasOffset, bool& hasCap);
+
+		floatN CalculateRotation(const floatN& upVector, const floatN& upVectorTarget);
+
+		GrassVertex SetVertex(const float3& position, uint64_t normal, uint64_t tangent,
+			const DirectX::PackedVector::XMHALF2& texCoord);
+
+		void LoadCache(const std::filesystem::path& fileName, std::vector<uint8_t>& buffer);
+		void SaveCache(const std::filesystem::path& fileName, const uint8_t* buffer, size_t size);
 
 		struct Vegetation
 		{

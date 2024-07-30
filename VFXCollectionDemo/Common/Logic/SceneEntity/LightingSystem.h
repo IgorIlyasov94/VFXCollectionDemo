@@ -13,8 +13,8 @@ namespace Common::Logic::SceneEntity
 		~LightingSystem();
 
 		LightID CreateLight(const LightDesc& desc);
-		void SetSourceDesc(LightID id, const LightDesc& desc);
-		const LightDesc& GetSourceDesc(LightID id) const;
+		void UpdateSourceDesc(LightID id);
+		LightDesc& GetSourceDesc(LightID id);
 		
 		uint32_t GetLightMatricesNumber() const;
 

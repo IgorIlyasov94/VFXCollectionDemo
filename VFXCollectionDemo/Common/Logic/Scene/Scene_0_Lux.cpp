@@ -19,13 +19,14 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	pbrStandardPSId{}, particleSimulationCSId{}, environmentWorld{}, timer{}, _deltaTime{}, fps(60.0f),
 	cpuTimeCounter{}, prevTimePoint{}, frameCounter{}, vfxLux{}, vfxLuxSparkles{}, environmentWallsAlbedoId{},
 	environmentWallsNormalId{}, wallsMaterial{}, wallsMesh{}, wallsMeshObject{}, vfxLuxDistorters{},
-	areaLightId{}, ambientLightId{}, depthPassVSId{}, depthCubePassVSId{}, depthCubePassGSId{},
-	depthPassMaterial{}, depthCubePassMaterial{}
+	areaLightId{}, ambientLightId{}, depthPrepassVSId{}, depthPassVSId{}, depthCubePassVSId{}, depthCubePassGSId{},
+	depthPassMaterial{}, depthCubePassMaterial{}, depthPrepassMaterial{}, areaLightIntensity(0.0f),
+	ambientLightIntensity(0.0f)
 {
 	environmentPosition = float3(0.0f, 0.0f, 0.0f);
 	cameraPosition = float3(0.0f, 0.0f, 5.0f);
 	windDirection = float3(0.45f, 0.0f, 0.0f);
-	windStrength = 4.5f;
+	windStrength = 2.5f;
 
 	XMStoreFloat3(&cameraLookAt, DirectX::XMLoadFloat3(&environmentPosition));
 	cameraLookAt.z = 1.0f;
@@ -76,6 +77,8 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 
 	delete wallsMaterial;
 
+	delete depthPrepassMaterial;
+
 	if (depthPassMaterial != nullptr)
 		delete depthPassMaterial;
 
@@ -105,6 +108,7 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 
 	resourceManager->DeleteResource<Shader>(pbrStandardVSId);
 	resourceManager->DeleteResource<Shader>(pbrStandardPSId);
+	resourceManager->DeleteResource<Shader>(depthPrepassVSId);
 	resourceManager->DeleteResource<Shader>(depthCubePassVSId);
 	resourceManager->DeleteResource<Shader>(depthCubePassGSId);
 
@@ -175,6 +179,19 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 	vfxLuxSparkles->Update(timer, _deltaTime);
 	vfxLuxDistorters->Update(timer, _deltaTime);
 	vegetationSystem->Update(timer, _deltaTime);
+
+	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
+	areaLightDesc.intensity = std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 60.0f) * 3.0f + areaLightIntensity;
+
+	lightingSystem->UpdateSourceDesc(areaLightId);
+
+	auto& ambientLightDesc = lightingSystem->GetSourceDesc(ambientLightId);
+	ambientLightDesc.intensity = std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 120.0f) * 0.2f + ambientLightIntensity;
+
+	lightingSystem->UpdateSourceDesc(ambientLightId);
+
+	if (areaLightIntensity < 2.0f)
+		areaLightIntensity += _deltaTime* AREA_LIGHT_INTENSITY_INCREMENT_SPEED;
 }
 
 void Common::Logic::Scene::Scene_0_Lux::RenderShadows(ID3D12GraphicsCommandList* commandList)
@@ -323,10 +340,10 @@ void Common::Logic::Scene::Scene_0_Lux::CreateLights(Graphics::DirectX12Renderer
 	lightingSystem = new LightingSystem(renderer);
 
 	LightDesc areaLight{};
-	areaLight.position = float3(0.0f, 0.0f, 2.25f);
-	areaLight.radius = 0.2f;
+	areaLight.position = float3(0.0f, 0.0f, 1.5f);
+	areaLight.radius = 0.1f;
 	areaLight.color = float3(1.0f, 0.95f, 0.93f);
-	areaLight.intensity = 1.0f;
+	areaLight.intensity = areaLightIntensity;
 	areaLight.type = LightType::AREA_LIGHT;
 	areaLight.castShadows = true;
 
@@ -334,7 +351,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateLights(Graphics::DirectX12Renderer
 
 	LightDesc ambientLight{};
 	ambientLight.color = float3(0.3f, 0.4f, 0.5f);
-	ambientLight.intensity = 0.0f;
+	ambientLight.intensity = ambientLightIntensity;
 	ambientLight.type = LightType::AMBIENT_LIGHT;
 
 	ambientLightId = lightingSystem->CreateLight(ambientLight);
@@ -432,22 +449,22 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	VegetationSystemDesc vegetationSystemDesc{};
 	vegetationSystemDesc.smallGrassNumber = 15000;
 	vegetationSystemDesc.mediumGrassNumber = 4000;
-	vegetationSystemDesc.largeGrassNumber = 200;
+	vegetationSystemDesc.largeGrassNumber = 300;
 	vegetationSystemDesc.atlasRows = 4u;
 	vegetationSystemDesc.atlasColumns = 4u;
-	vegetationSystemDesc.smallGrassSizeMin = float3(0.3f, 0.3f, 0.1f);
-	vegetationSystemDesc.mediumGrassSizeMin = float3(0.4f, 0.4f, 0.8f);
-	vegetationSystemDesc.largeGrassSizeMin = float3(0.4f, 0.4f, 1.6f);
-	vegetationSystemDesc.smallGrassSizeMax = float3(0.6f, 0.6f, 0.4f);
-	vegetationSystemDesc.mediumGrassSizeMax = float3(0.4f, 0.4f, 1.2f);
-	vegetationSystemDesc.largeGrassSizeMax = float3(0.4f, 0.4f, 2.0f);
+	vegetationSystemDesc.smallGrassSizeMin = float3(0.25f, 0.25f, 0.1f);
+	vegetationSystemDesc.mediumGrassSizeMin = float3(0.3f, 0.3f, 0.7f);
+	vegetationSystemDesc.largeGrassSizeMin = float3(0.05f, 0.05f, 0.5f);
+	vegetationSystemDesc.smallGrassSizeMax = float3(0.35f, 0.35f, 0.15f);
+	vegetationSystemDesc.mediumGrassSizeMax = float3(0.5f, 0.5f, 0.9f);
+	vegetationSystemDesc.largeGrassSizeMax = float3(0.1f, 0.1f, 0.8f);
 	vegetationSystemDesc.hasDepthPass = false;
 	vegetationSystemDesc.hasDepthCubePass = true;
 	vegetationSystemDesc.lightMatricesNumber = lightingSystem->GetLightMatricesNumber();
 	vegetationSystemDesc.terrain = terrain;
 	vegetationSystemDesc.windDirection = &windDirection;
 	vegetationSystemDesc.windStrength = &windStrength;
-	vegetationSystemDesc.perlinNoiseTiling = float2(0.1f, 0.1f);
+	vegetationSystemDesc.perlinNoiseTiling = float2(2.5f, 2.5f);
 	vegetationSystemDesc.perlinNoiseId = perlinNoiseId;
 	vegetationSystemDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
 	vegetationSystemDesc.lightMatricesConstantBufferId = lightingSystem->GetLightMatricesConstantBufferId();

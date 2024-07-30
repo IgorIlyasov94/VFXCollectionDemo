@@ -75,10 +75,13 @@ Output main(Input input)
 	
 	float t = saturate(sin(time * windStrength * noise) * 0.5f + 0.5f);
 	
+	float height = abs(vegetation.height);
+	bool isCap = vegetation.height < 0.0f;
+	
 	float3 shift = min(windDirection, vegetation.tiltAmplitude.xxx) + float3(0.0f, 0.0f, 0.0001f);
-	shift.z -= 0.5f * vegetation.height * dot(windDirection, windDirection);
+	shift.z -= 0.5f * height * dot(windDirection, windDirection);
 	shift = lerp(normalize(shift), 0.0f.xxx, t);
-	float shiftCoeff = (1.0f - input.texCoord.y) * vegetation.height;
+	float shiftCoeff = (1.0f - (isCap ? 0.0f : input.texCoord.y)) * height;
 	
 	worldPosition.xyz += shift * shiftCoeff;
 	

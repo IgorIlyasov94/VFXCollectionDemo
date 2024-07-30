@@ -18,7 +18,6 @@ Common::Logic::SceneEntity::VFXLux::VFXLux(ID3D12GraphicsCommandList* commandLis
 	_camera = camera;
 	colorIntensity = 0.0f;
 	haloColorIntensity = 0.1f;
-	animationSpeed = 0.075f;
 
 	CreateConstantBuffers(device, commandList, resourceManager, position);
 	LoadShaders(device, resourceManager);
@@ -38,18 +37,18 @@ void Common::Logic::SceneEntity::VFXLux::Update(float time, float deltaTime)
 	circleConstants->viewProjection = _camera->GetViewProjection();
 	circleConstants->invView = _camera->GetInvView();
 	circleConstants->time = time;
-	circleConstants->colorIntensity = colorIntensity;
+	circleConstants->colorIntensity = colorIntensity + std::pow(std::max(std::sin(time * 0.4f), 0.0f), 60.0f) * 2.0f;
 
 	haloConstants->viewProjection = _camera->GetViewProjection();
 	haloConstants->invView = _camera->GetInvView();
 	haloConstants->time = time;
 	haloConstants->colorIntensity = haloColorIntensity * (std::sin(time * 0.5f) * 0.3f + 0.7f);
 
-	if (colorIntensity < 1.2f)
-		colorIntensity += deltaTime * animationSpeed;
+	if (colorIntensity < 4.5f)
+		colorIntensity += deltaTime * COLOR_INTENSITY_INCREMENT_SPEED;
 
-	if (haloColorIntensity < 0.5f)
-		haloColorIntensity += deltaTime * animationSpeed;
+	if (haloColorIntensity < 4.5f)
+		haloColorIntensity += deltaTime * HALO_INTENSITY_INCREMENT_SPEED;
 }
 
 void Common::Logic::SceneEntity::VFXLux::OnCompute(ID3D12GraphicsCommandList* commandList)
@@ -340,13 +339,14 @@ void Common::Logic::SceneEntity::VFXLux::CreateMaterials(ID3D12Device* device, R
 	auto vfxLuxHaloPS = resourceManager->GetResource<Shader>(vfxLuxHaloPSId);
 
 	auto blendSetup = Graphics::DefaultBlendSetup::BLEND_PREMULT_ALPHA_ADDITIVE;
+	auto blendSetupTest = Graphics::DefaultBlendSetup::BLEND_TRANSPARENT;
 
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetConstantBuffer(0u, circleConstantsResource->resourceGPUAddress);
 	materialBuilder.SetTexture(0u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
-	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetupTest));
 	materialBuilder.SetDepthStencilFormat(32u, false);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
 	materialBuilder.SetGeometryFormat(circleMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);

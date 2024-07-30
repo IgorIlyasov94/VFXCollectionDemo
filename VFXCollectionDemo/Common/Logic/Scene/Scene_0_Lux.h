@@ -59,6 +59,8 @@ namespace Common::Logic::Scene
 		static constexpr float FOV_Y = DirectX::XM_PI / 4.0f;
 		static constexpr float Z_NEAR = 0.01f;
 		static constexpr float Z_FAR = 1000.0f;
+		static constexpr float AREA_LIGHT_INTENSITY_INCREMENT_SPEED = 0.075f;
+		static constexpr float AMBIENT_LIGHT_INTENSITY_INCREMENT_SPEED = 0.01f;
 
 		struct MutableConstants
 		{
@@ -82,8 +84,12 @@ namespace Common::Logic::Scene
 		std::chrono::steady_clock::time_point prevTimePoint;
 
 		float3 environmentPosition;
+		float areaLightIntensity;
+
 		float3 windDirection;
 		float windStrength;
+
+		float ambientLightIntensity;
 
 		float4x4 environmentWorld;
 

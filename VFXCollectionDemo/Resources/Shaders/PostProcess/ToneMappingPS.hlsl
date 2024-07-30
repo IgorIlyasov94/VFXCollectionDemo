@@ -8,6 +8,8 @@ cbuffer RootConstants : register(b0)
 	uint quartArea;
 	float middleGray;
 	float whiteCutoff;
+	float brightThreshold;
+	float bloomIntensity;
 };
 
 struct Input
@@ -39,7 +41,7 @@ Output main(Input input)
 	float luminance = luminanceBuffer[0u] / (float)area;
 	
 	float gray = dot(color, LUMINANCE_VECTOR);
-	float3 rodColor = float3(4.4f, 1.1f, 0.7f);
+	float3 rodColor = float3(3.4f, 1.4f, 0.7f);
 	float colorShiftFactor = 0.75f;
 	
 	color = lerp(gray * rodColor, color, colorShiftFactor);
@@ -55,7 +57,7 @@ Output main(Input input)
 	
 	float3 bloom = bloomBuffer[bufferIndex].xyz;
 	
-	output.color = float4(saturate(color + bloom), 1.0f);
+	output.color = float4(saturate(bloom * bloomIntensity + color), 1.0f);
 	
 	return output;
 }
