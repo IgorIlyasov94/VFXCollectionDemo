@@ -27,6 +27,8 @@ namespace Common::Logic::SceneEntity
 		void Render(ID3D12GraphicsCommandList* commandList);
 		void RenderToBackBuffer(ID3D12GraphicsCommandList* commandList);
 
+		const Graphics::Assets::Mesh* GetFullscreenQuadMesh() const;
+
 	private:
 		PostProcessManager() = delete;
 

@@ -26,7 +26,7 @@ void Graphics::Assets::RaytracingObjectBuilder::AddAccelerationStructure(const A
 	geometryDesc.Triangles.IndexCount = desc.indicesNumber;
 	geometryDesc.Triangles.IndexFormat = desc.indexStride == 2u ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 	geometryDesc.Triangles.Transform3x4 = desc.transformsAddress;
-
+	
 	geometryDescs.push_back(geometryDesc);
 }
 
@@ -839,6 +839,8 @@ void Graphics::Assets::RaytracingObjectBuilder::CreateBottomLevelAccelerationStr
 	
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo{};
 	device->GetRaytracingAccelerationStructurePrebuildInfo(&desc.Inputs, &prebuildInfo);
+
+
 
 	auto scratchBuffer = bufferManager->Allocate(device, prebuildInfo.ScratchDataSizeInBytes,
 		BufferAllocationType::UNORDERED_ACCESS_TEMP);

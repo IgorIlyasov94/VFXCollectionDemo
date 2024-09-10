@@ -5,7 +5,8 @@ Graphics::Assets::RaytracingObject::RaytracingObject(const RaytracingObjectDesc&
 	localRootSignatures(desc.localRootSignatures), _pipelineState(desc.pipelineState),
 	_rootConstantIndices(desc.rootConstantIndices), _constantBufferSlots(desc.constantBufferSlots),
 	_bufferSlots(desc.bufferSlots), _rwBufferSlots(desc.rwBufferSlots), _textureSlots(desc.textureSlots),
-	shaderLibraryGPUAllocation(desc.shaderLibraryGPUAllocation)
+	shaderLibraryGPUAllocation(desc.shaderLibraryGPUAllocation), bottomLevelStructure(desc.bottomLevelStructure),
+	bottomLevelStructureAABB(desc.bottomLevelStructureAABB), topLevelStructure(desc.topLevelStructure)
 {
 
 }
@@ -25,6 +26,17 @@ void Graphics::Assets::RaytracingObject::Release(BufferManager* bufferManager)
 
 	bufferManager->Deallocate(shaderLibraryGPUAllocation.resource,
 		shaderLibraryGPUAllocation.gpuAddress, shaderLibraryGPUAllocation.size);
+
+	if (bottomLevelStructure.size > 0ull)
+		bufferManager->Deallocate(bottomLevelStructure.resource,
+			bottomLevelStructure.gpuAddress, bottomLevelStructure.size);
+
+	if (bottomLevelStructureAABB.size > 0ull)
+		bufferManager->Deallocate(bottomLevelStructureAABB.resource,
+			bottomLevelStructureAABB.gpuAddress, bottomLevelStructureAABB.size);
+
+	bufferManager->Deallocate(topLevelStructure.resource,
+		topLevelStructure.gpuAddress, topLevelStructure.size);
 }
 
 void Graphics::Assets::RaytracingObject::UpdateConstantBuffer(uint32_t cRegisterIndex,

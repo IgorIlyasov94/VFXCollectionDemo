@@ -30,8 +30,11 @@ namespace Graphics
 
 		ID3D12Device* GetDevice();
 
+
+
 		CommandManager* GetCommandManager();
 		Resources::ResourceManager* GetResourceManager();
+		BufferManager* GetBufferManager();
 
 		ID3D12GraphicsCommandList* StartCreatingResources();
 		void EndCreatingResources();

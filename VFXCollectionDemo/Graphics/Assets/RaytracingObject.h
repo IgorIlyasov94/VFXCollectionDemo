@@ -61,5 +61,8 @@ namespace Graphics::Assets
 		std::vector<DescriptorTableSlot> _textureSlots;
 
 		BufferAllocation shaderLibraryGPUAllocation;
+		BufferAllocation bottomLevelStructure;
+		BufferAllocation bottomLevelStructureAABB;
+		BufferAllocation topLevelStructure;
 	};
 }

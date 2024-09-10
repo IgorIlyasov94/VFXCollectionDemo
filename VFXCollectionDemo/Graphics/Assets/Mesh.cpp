@@ -64,13 +64,13 @@ Graphics::Assets::Mesh::~Mesh()
 
 }
 
-void Graphics::Assets::Mesh::Release(Resources::ResourceManager* resourceManager)
+void Graphics::Assets::Mesh::Release(Resources::ResourceManager* resourceManager) const
 {
 	resourceManager->DeleteResource<VertexBuffer>(_vertexBufferId);
 	resourceManager->DeleteResource<IndexBuffer>(_indexBufferId);
 }
 
-void Graphics::Assets::Mesh::Draw(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber)
+void Graphics::Assets::Mesh::Draw(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber) const
 {
 	commandList->IASetPrimitiveTopology(_meshDesc.topology);
 	commandList->IASetVertexBuffers(0u, 1u, vertexBufferView);
@@ -79,29 +79,29 @@ void Graphics::Assets::Mesh::Draw(ID3D12GraphicsCommandList* commandList, uint32
 	commandList->DrawIndexedInstanced(_meshDesc.indicesNumber, instancesNumber, 0, 0, 0);
 }
 
-void Graphics::Assets::Mesh::SetInputAssemblerOnly(ID3D12GraphicsCommandList* commandList)
+void Graphics::Assets::Mesh::SetInputAssemblerOnly(ID3D12GraphicsCommandList* commandList) const
 {
 	commandList->IASetPrimitiveTopology(_meshDesc.topology);
 	commandList->IASetVertexBuffers(0u, 1u, vertexBufferView);
 	commandList->IASetIndexBuffer(indexBufferView);
 }
 
-void Graphics::Assets::Mesh::DrawOnly(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber)
+void Graphics::Assets::Mesh::DrawOnly(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber) const
 {
 	commandList->DrawIndexedInstanced(_meshDesc.indicesNumber, instancesNumber, 0, 0, 0);
 }
 
-const Graphics::Assets::MeshDesc& Graphics::Assets::Mesh::GetDesc()
+const Graphics::Assets::MeshDesc& Graphics::Assets::Mesh::GetDesc() const
 {
 	return _meshDesc;
 }
 
-const D3D12_VERTEX_BUFFER_VIEW& Graphics::Assets::Mesh::GetVertexBufferView()
+const D3D12_VERTEX_BUFFER_VIEW& Graphics::Assets::Mesh::GetVertexBufferView() const
 {
 	return *vertexBufferView;
 }
 
-const D3D12_INDEX_BUFFER_VIEW& Graphics::Assets::Mesh::GetIndexBufferView()
+const D3D12_INDEX_BUFFER_VIEW& Graphics::Assets::Mesh::GetIndexBufferView() const
 {
 	return *indexBufferView;
 }

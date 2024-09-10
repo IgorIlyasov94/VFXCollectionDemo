@@ -46,8 +46,6 @@ Common::Logic::Scene::Scene_0_Lux::~Scene_0_Lux()
 
 void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* renderer)
 {
-	prevTimePoint = std::chrono::high_resolution_clock::now();
-
 	auto device = renderer->GetDevice();
 	auto resourceManager = renderer->GetResourceManager();
 
@@ -67,6 +65,8 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 	CreateObjects(commandList, renderer);
 
 	renderer->EndCreatingResources();
+
+	prevTimePoint = std::chrono::high_resolution_clock::now();
 
 	isLoaded = true;
 }

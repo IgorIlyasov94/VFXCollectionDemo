@@ -162,7 +162,8 @@ void Graphics::BufferManager::Deallocate(Resources::GPUResource* allocatedResour
 				buffer.type == BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL ||
 				buffer.type == BufferAllocationType::UNORDERED_ACCESS_TEMP)
 			{
-				if (buffer.type == BufferAllocationType::DYNAMIC_CONSTANT)
+				if (buffer.type == BufferAllocationType::DYNAMIC_CONSTANT ||
+					buffer.type == BufferAllocationType::SHADER_TABLES)
 					buffer.resource->Unmap();
 
 				delete buffer.resource;

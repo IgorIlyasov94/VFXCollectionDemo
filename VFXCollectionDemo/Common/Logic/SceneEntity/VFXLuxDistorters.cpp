@@ -37,6 +37,7 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::Update(float time, float delt
 	distortersConstants->deltaTime = deltaTime;
 
 	particleSystemDesc.forces[0u].axis = _camera->GetDirection();
+	particleSystemDesc.forces[1u].strength = -std::pow(std::max(std::sin(time * 0.4f), 0.0f), 60.0f) * 150.0f + 30.0f;
 
 	particleSystem->Update(time, deltaTime);
 }
@@ -177,7 +178,7 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateParticleSystems(ID3D12G
 	particleSystemDesc.maxRotationSpeed = 0.0f;
 	particleSystemDesc.minSize = float2(0.8f, 0.8f);
 	particleSystemDesc.maxSize = float2(1.2f, 1.2f);
-	particleSystemDesc.minLifeSec = 14.4f;
+	particleSystemDesc.minLifeSec = 10.4f;
 	particleSystemDesc.maxLifeSec = 18.0f;
 	particleSystemDesc.averageParticleEmitPerSecond = 25u;
 	particleSystemDesc.maxParticlesNumber = 100u;

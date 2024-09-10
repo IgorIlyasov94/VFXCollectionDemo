@@ -171,6 +171,11 @@ Graphics::Resources::ResourceManager* Graphics::DirectX12Renderer::GetResourceMa
     return resourceManager;
 }
 
+Graphics::BufferManager* Graphics::DirectX12Renderer::GetBufferManager()
+{
+    return bufferManager;
+}
+
 ID3D12GraphicsCommandList* Graphics::DirectX12Renderer::StartCreatingResources()
 {
     return commandManager->BeginRecord(resourceCommandListId, resourceCommandAllocators[bufferIndex]);

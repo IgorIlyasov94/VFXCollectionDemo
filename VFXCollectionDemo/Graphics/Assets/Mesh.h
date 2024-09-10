@@ -16,16 +16,16 @@ namespace Graphics::Assets
 			Resources::ResourceManager* resourceManager, bool recalculateNormals, bool addTangents);
 		~Mesh();
 
-		void Release(Resources::ResourceManager* resourceManager);
+		void Release(Resources::ResourceManager* resourceManager) const;
 
-		void Draw(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber = 1u);
+		void Draw(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber = 1u) const;
 
-		void SetInputAssemblerOnly(ID3D12GraphicsCommandList* commandList);
-		void DrawOnly(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber = 1u);
+		void SetInputAssemblerOnly(ID3D12GraphicsCommandList* commandList) const;
+		void DrawOnly(ID3D12GraphicsCommandList* commandList, uint32_t instancesNumber = 1u) const;
 
-		const MeshDesc& GetDesc();
-		const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView();
-		const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView();
+		const MeshDesc& GetDesc() const;
+		const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const;
+		const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const;
 
 	private:
 		Mesh() = delete;

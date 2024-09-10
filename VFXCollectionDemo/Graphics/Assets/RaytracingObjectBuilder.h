@@ -3,6 +3,8 @@
 #include "../DirectX12Includes.h"
 #include "../Resources/IResource.h"
 #include "../BufferManager.h"
+#include "../Resources/ResourceManager.h"
+#include "Mesh.h"
 #include "RaytracingObject.h"
 
 namespace Graphics::Assets
@@ -51,7 +53,6 @@ namespace Graphics::Assets
 		uint32_t indicesNumber;
 
 		bool isOpaque;
-		D3D12_CULL_MODE cullMode;
 	};
 
 	struct AccelerationStructureAABBDesc
@@ -62,7 +63,6 @@ namespace Graphics::Assets
 		uint32_t instancesNumber;
 
 		bool isOpaque;
-		D3D12_CULL_MODE cullMode;
 	};
 
 	class RaytracingObjectBuilder

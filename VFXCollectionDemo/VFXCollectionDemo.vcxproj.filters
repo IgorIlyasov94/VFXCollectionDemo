@@ -204,6 +204,9 @@
     <ClCompile Include="Common\Logic\SceneEntity\LightingSystem.cpp">
       <Filter>Исходные файлы\Common\Logic\SceneEntity</Filter>
     </ClCompile>
+    <ClCompile Include="Common\Logic\Scene\Scene_1_Whiteroom.cpp">
+      <Filter>Исходные файлы\Common\Logic\Scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Includes.h">
@@ -376,6 +379,9 @@
     </ClInclude>
     <ClInclude Include="Common\Logic\SceneEntity\LightDesc.h">
       <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\Scene\Scene_1_Whiteroom.h">
+      <Filter>Файлы заголовков\Common\Logic\Scene</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

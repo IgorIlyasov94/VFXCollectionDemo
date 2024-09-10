@@ -41,7 +41,7 @@ Output main(Input input)
 	float luminance = luminanceBuffer[0u] / (float)area;
 	
 	float gray = dot(color, LUMINANCE_VECTOR);
-	float3 rodColor = float3(3.4f, 1.4f, 0.7f);
+	float3 rodColor = float3(3.4f, 2.4f, 3.7f);
 	float colorShiftFactor = 0.75f;
 	
 	color = lerp(gray * rodColor, color, colorShiftFactor);

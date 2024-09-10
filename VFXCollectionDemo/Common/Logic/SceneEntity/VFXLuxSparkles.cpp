@@ -100,7 +100,7 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateConstantBuffers(ID3D12Dev
 	sparklesConstants->viewProjection = _camera->GetViewProjection();
 	sparklesConstants->atlasElementOffset = float2(0.125f, 0.125f);
 	sparklesConstants->atlasElementSize = float2(1.0f / 8.0f, 1.0f / 8.0f);
-	sparklesConstants->colorIntensity = 3.0f;
+	sparklesConstants->colorIntensity = 4.0f;
 	sparklesConstants->perlinNoiseTiling =  float3(0.3f, 0.3f, 0.3f);
 	sparklesConstants->perlinNoiseScrolling = float3(0.011f, 0.019f, -0.017f);
 	sparklesConstants->particleTurbulence = 0.25f;

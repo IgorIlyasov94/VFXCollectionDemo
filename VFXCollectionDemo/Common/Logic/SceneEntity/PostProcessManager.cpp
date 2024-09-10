@@ -335,6 +335,11 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 }
 
+const Graphics::Assets::Mesh* Common::Logic::SceneEntity::PostProcessManager::GetFullscreenQuadMesh() const
+{
+	return quadMesh;
+}
+
 void Common::Logic::SceneEntity::PostProcessManager::CreateQuad(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	ResourceManager* resourceManager)
 {

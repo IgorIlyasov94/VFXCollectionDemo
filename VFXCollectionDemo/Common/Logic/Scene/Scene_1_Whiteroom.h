@@ -1,0 +1,137 @@
+#pragma once
+
+#include "../../../Includes.h"
+
+#include "../SceneEntity/IDrawable.h"
+
+#include "../../../Graphics/Assets/Mesh.h"
+#include "../../../Graphics/Assets/RaytracingObjectBuilder.h"
+
+#include "../../../Common/Logic/SceneEntity/PostProcessManager.h"
+
+#include "../SceneEntity/Camera.h"
+#include "../SceneEntity/LightingSystem.h"
+
+#include "IScene.h"
+
+namespace Common::Logic::Scene
+{
+	class Scene_1_WhiteRoom : public IScene
+	{
+	public:
+		Scene_1_WhiteRoom();
+		~Scene_1_WhiteRoom() override;
+
+		void Load(Graphics::DirectX12Renderer* renderer) override;
+		void Unload(Graphics::DirectX12Renderer* renderer) override;
+
+		void OnResize(Graphics::DirectX12Renderer* renderer) override;
+
+		void Update() override;
+		void RenderShadows(ID3D12GraphicsCommandList* commandList) override;
+		void Render(ID3D12GraphicsCommandList* commandList) override;
+		void RenderToBackBuffer(ID3D12GraphicsCommandList* commandList) override;
+
+		bool IsLoaded() override;
+
+	private:
+		void LoadMeshes(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			Graphics::Resources::ResourceManager* resourceManager);
+
+		void CreateConstantBuffers(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			uint32_t width, uint32_t height);
+
+		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
+
+		void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			Graphics::Resources::ResourceManager* resourceManager);
+
+		void CreateLights(Graphics::DirectX12Renderer* renderer);
+
+		void CreateTargets(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			Graphics::Resources::ResourceManager* resourceManager, uint32_t width, uint32_t height);
+
+		void CreateMaterials(ID3D12Device* device, Graphics::DirectX12Renderer* renderer,
+			Graphics::Resources::ResourceManager* resourceManager);
+
+		void CreateObjects(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer,
+			Graphics::Resources::ResourceManager* resourceManager);
+		
+		void LoadCache(std::filesystem::path filePath, Graphics::Assets::MeshDesc& meshDesc,
+			std::vector<uint8_t>& verticesData, std::vector<uint8_t>& indicesData);
+
+		void SaveCache(std::filesystem::path filePath, const Graphics::Assets::MeshDesc& meshDesc,
+			const std::vector<uint8_t>& verticesData, const std::vector<uint8_t>& indicesData);
+
+		bool isLoaded;
+		
+		static constexpr float FOV_Y = DirectX::XM_PI / 4.0f;
+		static constexpr float Z_NEAR = 0.01f;
+		static constexpr float Z_FAR = 1000.0f;
+
+		static constexpr uint32_t THREADS_PER_GROUP_X = 8u;
+		static constexpr uint32_t THREADS_PER_GROUP_Y = 8u;
+		static constexpr uint32_t MAX_SIMULTANEOUS_BARRIER_NUMBER = 2u;
+
+		struct MutableConstants
+		{
+		public:
+			float4x4 invViewProjection;
+			float3 cameraDirection;
+			float padding;
+		};
+
+		float3 cameraPosition;
+		float3 cameraLookAt;
+		float3 cameraUpVector;
+		
+		float timer;
+		float _deltaTime;
+		float fps;
+		uint32_t frameCounter;
+		uint64_t cpuTimeCounter;
+		Graphics::Assets::AccelerationStructureDesc accelerationStructureDesc;
+
+		uint32_t groupsNumberX;
+		uint32_t groupsNumberY;
+
+		std::chrono::steady_clock::time_point prevTimePoint;
+
+		float lightIntensity0;
+		float lightIntensity1;
+
+		MutableConstants* mutableConstantsBuffer;
+
+		Graphics::Assets::RaytracingObject* lightingObject;
+
+		Graphics::Assets::Material* texturedQuadMaterial;
+
+		const Graphics::Assets::Mesh* quadMesh;
+
+		SceneEntity::Camera* camera;
+		SceneEntity::LightingSystem* lightingSystem;
+
+		std::vector<D3D12_RESOURCE_BARRIER> barriers;
+
+		Graphics::Resources::GPUResource* resultTargetResource;
+		Graphics::Resources::GPUResource* whiteroomVertexBufferResource;
+		Graphics::Resources::GPUResource* whiteroomIndexBufferResource;
+
+		Graphics::Resources::ResourceID resultTargetId;
+
+		Graphics::Resources::ResourceID mutableConstantsId;
+		Graphics::Resources::ResourceID whiteroomAlbedoId;
+		Graphics::Resources::ResourceID whiteroomNormalId;
+		Graphics::Resources::ResourceID whiteroomVertexBufferId;
+		Graphics::Resources::ResourceID whiteroomIndexBufferId;
+
+		Graphics::Resources::ResourceID lightingRSId;
+		Graphics::Resources::ResourceID quadVSId;
+		Graphics::Resources::ResourceID quadPSId;
+
+		SceneEntity::LightID pointLight0Id;
+		SceneEntity::LightID pointLight1Id;
+
+		SceneEntity::PostProcessManager* postProcessManager;
+	};
+}

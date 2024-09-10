@@ -44,11 +44,11 @@ void Common::Logic::SceneEntity::VFXLux::Update(float time, float deltaTime)
 	haloConstants->time = time;
 	haloConstants->colorIntensity = haloColorIntensity * (std::sin(time * 0.5f) * 0.3f + 0.7f);
 
-	if (colorIntensity < 4.5f)
-		colorIntensity += deltaTime * COLOR_INTENSITY_INCREMENT_SPEED;
+	if (colorIntensity < 1.0f)
+		colorIntensity += deltaTime* COLOR_INTENSITY_INCREMENT_SPEED;
 
 	if (haloColorIntensity < 4.5f)
-		haloColorIntensity += deltaTime * HALO_INTENSITY_INCREMENT_SPEED;
+		haloColorIntensity += deltaTime* HALO_INTENSITY_INCREMENT_SPEED;
 }
 
 void Common::Logic::SceneEntity::VFXLux::OnCompute(ID3D12GraphicsCommandList* commandList)
@@ -120,7 +120,7 @@ void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* dev
 	circleConstants = reinterpret_cast<VFXPillarConstants*>(circleConstantsResource->resourceCPUAddress);
 	circleConstants->invView = _camera->GetInvView();
 	circleConstants->viewProjection = _camera->GetViewProjection();
-	circleConstants->color0 = float4(1.0f, 0.1239f, 0.0f, 1.0f);
+	circleConstants->color0 = float4(1.5f, 0.6239f, 0.75f, 1.0f);
 	circleConstants->color1 = float4(1.0f, 0.7405f, 0.9812f, 1.0f);
 	circleConstants->worldPosition = position;
 	circleConstants->time = 0.0f;

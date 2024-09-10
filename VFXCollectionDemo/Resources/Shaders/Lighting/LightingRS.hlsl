@@ -1,66 +1,314 @@
-#include "RaytracingHlslCompat.h"
+#include "PBRLighting.hlsli"
 
-RaytracingAccelerationStructure Scene : register(t0, space0);
-RWTexture2D<float4> RenderTarget : register(u0);
-ConstantBuffer<RayGenConstantBuffer> g_rayGenCB : register(b0);
+static const uint MAX_RECURSION_DEPTH = 2u;
 
-typedef BuiltInTriangleIntersectionAttributes MyAttributes;
-struct RayPayload
+static const uint INSTANCE_INCLUSION_MASK = ~0u;
+
+static const uint HIT_GROUP_GEOMETRY_INDEX = 0u;
+static const uint HIT_GROUP_SHADOW_INDEX = 1u;
+static const uint HIT_GROUP_NUMBER = 2u;
+
+static const uint MISS_GEOMETRY_INDEX = 0u;
+static const uint MISS_SHADOW_INDEX = 1u;
+
+static const uint HIT_KIND_CLOSEST = 0u;
+
+static const uint LIGHT_SOURCE_NUMBER = 2u;
+
+static const uint GEOMETRY_INDEX_STRIDE = 2u;
+static const uint GEOMETRY_INDICES_PER_TRIANGLE = 3u;
+static const uint GEOMETRY_TRIANGLE_STRIDE = GEOMETRY_INDEX_STRIDE * GEOMETRY_INDICES_PER_TRIANGLE;
+
+struct Vertex
 {
-    float4 color;
+	float3 position;
+	uint normalXY;
+	uint normalZW;
+	uint tangentXY;
+	uint tangentZW;
+	uint texCoordXY;
 };
 
-bool IsInsideViewport(float2 p, Viewport viewport)
+struct UnpackedData
 {
-    return (p.x >= viewport.left && p.x <= viewport.right)
-        && (p.y >= viewport.top && p.y <= viewport.bottom);
+	float3 normal;
+	float3 tangent;
+	float2 texCoord;
+};
+
+struct Payload
+{
+    float3 color;
+	float hitT;
+	uint recursionDepth;
+};
+
+struct PayloadShadow
+{
+	bool isShadow;
+};
+
+cbuffer LightConstantBuffer : register(b0)
+{
+	PointLight lightSources[LIGHT_SOURCE_NUMBER];
+};
+
+cbuffer MutableConstants : register(b1)
+{
+	float4x4 invViewProjection;
+	float3 cameraPosition;
+	float padding;
+};
+
+RaytracingAccelerationStructure sceneStructure : register(t0);
+StructuredBuffer<Vertex> sceneGeometry : register(t1);
+ByteAddressBuffer sceneIndices : register(t2);
+
+Texture2D sceneAlbedoRoughness : register(t3);
+Texture2D sceneNormalMetalness : register(t4);
+
+SamplerState samplerLinear : register(s0);
+
+RWTexture2D resultTarget : register(u0);
+
+RayDesc BuildRay(uint2 rayIndex, uint2 raysNumber, float3 origin, float4x4 unprojectionMatrix)
+{
+	float4 screenPosition = float4(((float2)rayIndex + 0.5f.xx) / (float2)raysNumber, 0.0f, 1.0f);
+	screenPosition.xy *= 2.0f.xx;
+	screenPosition.xy -= 1.0f.xx;
+	screenPosition.y = -screenPosition.y;
+	
+	float4 worldPosition = mul(unprojectionMatrix, screenPosition).xyz;
+	worldPosition.xyz /= worldPosition.w;
+	
+	RayDesc rayDesc;
+	rayDesc.Origin = origin;
+	rayDesc.TMin = 0.0f;
+	rayDesc.Direction = normalize(worldPosition.xyz - origin);
+	rayDesc.TMax = 10000.0f;
+	
+	return rayDesc;
 }
 
-[shader("raygeneration")]
-void RayGenerationShader()
+RayDesc BuildShadowRay(float3 origin, float3 lightPosition)
 {
-    float2 lerpValues = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
+	float3 pointToLight = lightPosition - origin;
+	float pointToLightLength = length(pointToLight);
+	
+	RayDesc rayDesc;
+	rayDesc.Origin = origin;
+	rayDesc.TMin = 0.0f;
+	rayDesc.Direction = pointToLight / pointToLightLength;
+	rayDesc.TMax = pointToLightLength;
+	
+	return rayDesc;
+}
 
-    // Orthographic projection since we're raytracing in screen space.
-    float3 rayDir = float3(0, 0, 1);
-    float3 origin = float3(
-        lerp(g_rayGenCB.viewport.left, g_rayGenCB.viewport.right, lerpValues.x),
-        lerp(g_rayGenCB.viewport.top, g_rayGenCB.viewport.bottom, lerpValues.y),
-        0.0f);
+RayDesc BuildReflectRay(float3 origin, float3 incidentRayDirection, float3 normal)
+{
+	RayDesc rayDesc;
+	rayDesc.Origin = origin;
+	rayDesc.TMin = 0.0f;
+	rayDesc.Direction = reflect(incidentRayDirection, normal);
+	rayDesc.TMax = 10000.0f;
+	
+	return rayDesc;
+}
 
-    if (IsInsideViewport(origin.xy, g_rayGenCB.stencil))
+uint3 GetIndices(uint byteIndex, ByteAddressBuffer rawIndexBuffer)
+{
+	uint3 indices;
+	
+	uint alignedIndex = byteIndex & ~3u;
+    uint2 packedIndices = rawIndexBuffer.Load2(alignedIndex);
+	
+    if (alignedIndex == byteIndex)
     {
-        // Trace the ray.
-        // Set the ray's extents.
-        RayDesc ray;
-        ray.Origin = origin;
-        ray.Direction = rayDir;
-        // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
-        // TMin should be kept small to prevent missing geometry at close contact areas.
-        ray.TMin = 0.001;
-        ray.TMax = 10000.0;
-        RayPayload payload = { float4(0, 0, 0, 0) };
-        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
-
-        // Write the raytraced color to the output texture.
-        RenderTarget[DispatchRaysIndex().xy] = payload.color;
+        indices.x = packedIndices.x & 0xffff;
+        indices.y = (packedIndices.x >> 16) & 0xffff;
+        indices.z = packedIndices.y & 0xffff;
     }
     else
     {
-        // Render interpolated DispatchRaysIndex outside the stencil window
-        RenderTarget[DispatchRaysIndex().xy] = float4(lerpValues, 0, 1);
+        indices.x = (packedIndices.x >> 16) & 0xffff;
+        indices.y = packedIndices.y & 0xffff;
+        indices.z = (packedIndices.y >> 16) & 0xffff;
     }
+
+    return indices;
+}
+
+UnpackedData UnpackVertex(Vertex vertex)
+{
+	UnpackedData unpackedData = (UnpackedData)0;
+	unpackedData.normal.x = f16tof32((vertex.normalXY >> 16) & 0xffff);
+	unpackedData.normal.y = f16tof32(vertex.normalXY & 0xffff);
+	unpackedData.normal.z = f16tof32((vertex.normalZW >> 16) & 0xffff);
+	unpackedData.tangent.x = f16tof32((vertex.tangentXY >> 16) & 0xffff);
+	unpackedData.tangent.y = f16tof32(vertex.tangentXY & 0xffff);
+	unpackedData.tangent.z = f16tof32((vertex.tangentZW >> 16) & 0xffff);
+	unpackedData.texCoord.x = f16tof32((vertex.texCoordXY >> 16) & 0xffff);
+	unpackedData.texCoord.y = f16tof32(vertex.texCoordXY & 0xffff);
+	
+	return unpackedData;
+}
+
+Payload TraceLightRay(RayDesc ray, uint recursionDepth)
+{
+	if (recursionDepth >= MAX_RECURSION_DEPTH)
+		return 0.0f.xxx;
+	
+	Payload payload;
+	payload.color = 0.0f.xxx;
+	payload.hitT = 0.0f;
+	payload.recursionDepth = recursionDepth + 1u;
+	
+	TraceRay(sceneStructure,
+		RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+		INSTANCE_INCLUSION_MASK,
+		HIT_GROUP_GEOMETRY_INDEX,
+		HIT_GROUP_NUMBER,
+		MISS_GEOMETRY_INDEX,
+		rayDesc,
+		payload);
+	
+	return payload;
+}
+
+bool TraceShadowRay(RayDesc ray, uint recursionDepth)
+{
+	if (recursionDepth >= MAX_RECURSION_DEPTH)
+		return false;
+	
+	PayloadShadow payload;
+	payload.isShadow = true;
+	
+	TraceRay(sceneStructure,
+		RAY_FLAG_CULL_BACK_FACING_TRIANGLES
+        | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
+        | RAY_FLAG_FORCE_OPAQUE
+        | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+		INSTANCE_INCLUSION_MASK,
+		HIT_GROUP_SHADOW_INDEX,
+		HIT_GROUP_NUMBER,
+		MISS_SHADOW_INDEX,
+		rayDesc,
+		payload);
+	
+	return payload.isShadow;
+}
+
+float3 ProcessLightSource(PointLight lightSource, Surface surface, Material material, float3 rayDirection, uint recursionDepth)
+{
+	RayDesc shadowRay = BuildShadowRay(hitPosition, lightSource.position);
+	bool isShadow = TraceShadowRay(shadowRay, recursionDepth);
+	
+	RayDesc reflectRay = BuildReflectRay(hitPosition, rayDirection, surface.normal);
+	Payload reflectLightPayload = TraceLightRay(reflectRay, recursionDepth);
+	
+	PointLight reflectLightSource = (PointLight)0;
+	reflectLightSource.position = surface.position + reflectRay * reflectLightPayload.hitT;
+	reflectLightSource.color = reflectLightPayload.color;
+	
+	float3 reflectLight = 0.0f.xxx;
+	CalculatePointLight(reflectLightSource, surface, material, reflectRay, reflectLight);
+	
+	float3 light = 0.0f.xxx;
+	CalculatePointLight(lightSource, surface, material, rayDirection, light);
+	
+	return light + reflectLight;
+}
+
+[shader("raygeneration")]
+void RayGeneration()
+{
+	uint2 rayIndex = DispatchRaysIndex().xy;
+	uint2 raysNumber = DispatchRaysDimensions().xy;
+	RayDesc rayDesc = BuildRay(rayIndex, raysNumber, cameraPosition, invViewProjection);
+	
+	Payload resultPayload = TraceLightRay(rayDesc, 0u);
+	
+	resultTarget[rayIndex] = float4(resultPayload.color, 1.0f);
 }
 
 [shader("closesthit")]
-void ClosestHitShader(inout RayPayload payload, in MyAttributes attr)
+void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
 {
-    float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-    payload.color = float4(barycentrics, 1);
+    float3 barycentrics;
+	barycentrics.x = 1.0f - attributes.barycentrics.x - attributes.barycentrics.y;
+	barycentrics.y = attributes.barycentrics.x;
+	barycentrics.z = attributes.barycentrics.y;
+	
+    uint byteIndex = GEOMETRY_TRIANGLE_STRIDE * PrimitiveIndex();
+	uint3 indices = GetIndices(byteIndex, sceneIndices);
+	
+	Vertex vertex0 = sceneGeometry[indices.x];
+	Vertex vertex1 = sceneGeometry[indices.y];
+	Vertex vertex2 = sceneGeometry[indices.z];
+	
+	UnpackedData unpackedData0 = UnpackVertex(vertex0);
+	UnpackedData unpackedData1 = UnpackVertex(vertex1);
+	UnpackedData unpackedData2 = UnpackVertex(vertex2);
+	
+	float3 macroNormal = barycentrics.x * unpackedData0.normal;
+	macroNormal += barycentrics.y * unpackedData1.normal;
+	macroNormal += barycentrics.z * unpackedData2.normal;
+	macroNormal = normalize(macroNormal);
+	
+	float3 tangent = barycentrics.x * unpackedData0.tangent;
+	tangent += barycentrics.y * unpackedData1.tangent;
+	tangent += barycentrics.z * unpackedData2.tangent;
+	tangent = normalize(macroNormal);
+	
+	float3 binormal = cross(tangent, macroNormal);
+	
+	float2 texCoord = barycentrics.x * unpackedData0.texCoord;
+	texCoord += barycentrics.y * unpackedData1.texCoord;
+	texCoord += barycentrics.z * unpackedData2.texCoord;
+	
+	float4 albedoRoughness = sceneAlbedoRoughness.SampleLevel(samplerLinear, texCoord, 0.0f);
+	float4 normalMetalness = sceneNormalMetalness.SampleLevel(samplerLinear, texCoord, 0.0f);
+	
+	float3 albedo = albedoRoughness.xyz;
+	float roughness = albedoRoughness.w;
+	float3 normal = normalize(normalMetalness.xyz * 2.0f - 1.0f.xxx);
+	float metalness = normalMetalness.w;
+	
+	normal = BumpMapping(normal, macroNormal, binormal, tangent);
+	
+	float3 rayDirection = WorldRayDirection();
+	float hitT = RayTCurrent();
+	float3 hitPosition = WorldRayOrigin() + hitT * rayDirection;
+	
+	Surface surface;
+	surface.position = hitPosition;
+	surface.normal = normal;
+	
+	Material material;
+	Material.albedo = albedo;
+	Material.f0 = 0.1f.xxx;
+	Material.f90 = 1.0f;
+	Material.metalness = metalness;
+	Material.roughness = roughness;
+	
+	float3 resultColor = 0.0f.xxx;
+	
+	[unroll]
+	for (uint lightSourceIndex = 0u; lightSourceIndex < LIGHT_SOURCE_NUMBER; lightSourceIndex++)
+		resultColor += ProcessLightSource(lightSources[lightSourceIndex], surface, material, rayDirection, payload.recursionDepth);
+	
+    payload.color = float4(resultColor, 1.0f);
+	payload.hitT = hitT;
 }
 
 [shader("miss")]
-void MissShader(inout RayPayload payload)
+void Miss(inout Payload payload)
 {
     payload.color = float4(0.0f, 0.0f, 0.0f, 1.0f);
+}
+
+[shader("miss")]
+void Miss_Shadow(inout PayloadShadow payload)
+{
+    payload.isShadow = false;
 }

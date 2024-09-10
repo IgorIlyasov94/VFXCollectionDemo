@@ -36,6 +36,7 @@
     <ClInclude Include="Common\Logic\SceneManager.h" />
     <ClInclude Include="Common\Logic\Scene\IScene.h" />
     <ClInclude Include="Common\Logic\Scene\Scene_0_Lux.h" />
+    <ClInclude Include="Common\Logic\Scene\Scene_1_Whiteroom.h" />
     <ClInclude Include="Common\Logic\Scene\Scene_Empty.h" />
     <ClInclude Include="Common\ProcessHandler.h" />
     <ClInclude Include="Common\Utilities.h" />
@@ -92,6 +93,7 @@
     <ClCompile Include="Common\Logic\SceneEntity\VFXLuxSparkles.cpp" />
     <ClCompile Include="Common\Logic\SceneManager.cpp" />
     <ClCompile Include="Common\Logic\Scene\Scene_0_Lux.cpp" />
+    <ClCompile Include="Common\Logic\Scene\Scene_1_Whiteroom.cpp" />
     <ClCompile Include="Common\Logic\Scene\Scene_Empty.cpp" />
     <ClCompile Include="Common\ProcessHandler.cpp" />
     <ClCompile Include="Common\Window.cpp" />
