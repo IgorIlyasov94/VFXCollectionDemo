@@ -1,5 +1,6 @@
 #include "MainLogic.h"
 #include "Scene/Scene_0_Lux.h"
+#include "Scene/Scene_1_Whiteroom.h"
 
 Common::Logic::MainLogic::MainLogic(const RECT& windowPlacement, HWND windowHandler, bool isFullscreen)
 	: _isFullscreen(isFullscreen), needBackgroundUpdate(true)
@@ -8,8 +9,9 @@ Common::Logic::MainLogic::MainLogic(const RECT& windowPlacement, HWND windowHand
 	sceneManager = new SceneManager();
 
 	luxSceneId = sceneManager->AddScene(new Scene::Scene_0_Lux());
+	whiteroomSceneId = sceneManager->AddScene(new Scene::Scene_1_WhiteRoom());
 
-	sceneManager->LoadScene(luxSceneId, renderer);
+	sceneManager->LoadScene(whiteroomSceneId, renderer);
 }
 
 Common::Logic::MainLogic::~MainLogic()
@@ -58,7 +60,7 @@ void Common::Logic::MainLogic::Render()
 	renderer->EndFrame(commandList);
 }
 
-bool Common::Logic::MainLogic::NeedBackgroundUpdate()
+bool Common::Logic::MainLogic::NeedBackgroundUpdate() const
 {
 	return needBackgroundUpdate;
 }

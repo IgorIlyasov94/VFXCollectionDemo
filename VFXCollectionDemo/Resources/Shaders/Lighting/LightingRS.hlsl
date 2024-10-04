@@ -19,6 +19,18 @@ static const uint GEOMETRY_INDEX_STRIDE = 2u;
 static const uint GEOMETRY_INDICES_PER_TRIANGLE = 3u;
 static const uint GEOMETRY_TRIANGLE_STRIDE = GEOMETRY_INDEX_STRIDE * GEOMETRY_INDICES_PER_TRIANGLE;
 
+static const float SHADOW_BIAS = 0.00001f;
+static const float REFLECT_BIAS = 0.99999f;
+static const float REFRACT_BIAS = 1.00001f;
+
+//https://refractiveindex.info/
+static const float DIAMOND_IOR_R = 2.411f;
+static const float DIAMOND_IOR_G = 2.423f;
+static const float DIAMOND_IOR_B = 2.435f;
+static const float INV_DIAMOND_IOR_R = 0.415f;
+static const float INV_DIAMOND_IOR_G = 0.413f;
+static const float INV_DIAMOND_IOR_B = 0.411f;
+
 struct Vertex
 {
 	float3 position;
@@ -63,22 +75,34 @@ cbuffer MutableConstants : register(b1)
 RaytracingAccelerationStructure sceneStructure : register(t0);
 StructuredBuffer<Vertex> sceneGeometry : register(t1);
 ByteAddressBuffer sceneIndices : register(t2);
+StructuredBuffer<Vertex> crystalGeometry : register(t3);
+ByteAddressBuffer crystalIndices : register(t4);
 
-Texture2D sceneAlbedoRoughness : register(t3);
-Texture2D sceneNormalMetalness : register(t4);
+Texture2D sceneAlbedoRoughness : register(t5);
+Texture2D sceneNormalMetalness : register(t6);
+Texture2D noiseMap : register(t7);
 
 SamplerState samplerLinear : register(s0);
+SamplerState samplerPoint : register(s1);
 
-RWTexture2D resultTarget : register(u0);
+RWTexture2D<float4> resultTarget : register(u0);
+
+void CalculateTangents(float3 normal, out float3 tangent, out float3 binormal)
+{
+	tangent = abs(normal.y) < 0.999f ? float3(0.0f, -1.0f, 0.0f) : float3(0.0f, 0.0f, 1.0f);
+	tangent = normalize(cross(normal, tangent));
+	
+	binormal = cross(tangent, normal);
+}
 
 RayDesc BuildRay(uint2 rayIndex, uint2 raysNumber, float3 origin, float4x4 unprojectionMatrix)
 {
-	float4 screenPosition = float4(((float2)rayIndex + 0.5f.xx) / (float2)raysNumber, 0.0f, 1.0f);
+	float4 screenPosition = float4(((float2)rayIndex + 0.5f.xx) / raysNumber, 0.0f, 1.0f);
 	screenPosition.xy *= 2.0f.xx;
 	screenPosition.xy -= 1.0f.xx;
 	screenPosition.y = -screenPosition.y;
 	
-	float4 worldPosition = mul(unprojectionMatrix, screenPosition).xyz;
+	float4 worldPosition = mul(unprojectionMatrix, screenPosition);
 	worldPosition.xyz /= worldPosition.w;
 	
 	RayDesc rayDesc;
@@ -104,12 +128,38 @@ RayDesc BuildShadowRay(float3 origin, float3 lightPosition)
 	return rayDesc;
 }
 
-RayDesc BuildReflectRay(float3 origin, float3 incidentRayDirection, float3 normal)
+RayDesc BuildReflectRay(float3 origin, float3 incidentRayDirection, float3 normal, float3 random, float roughness)
 {
+	float3 rayDirection = reflect(incidentRayDirection, normal);
+	
+	float3 tangent = 0.0f.xxx;
+	float3 binormal = 0.0f.xxx;
+	CalculateTangents(rayDirection, tangent, binormal);
+	
+	float3 randomDirection = random;
+	randomDirection.xy = randomDirection.xy * 2.0f - 1.0f.xx;
+	randomDirection.z *= 0.5f;
+	
+	rayDirection = lerp(rayDirection, randomDirection, roughness * roughness);
+	rayDirection = normalize(rayDirection);
+	
 	RayDesc rayDesc;
 	rayDesc.Origin = origin;
 	rayDesc.TMin = 0.0f;
-	rayDesc.Direction = reflect(incidentRayDirection, normal);
+	rayDesc.Direction = rayDirection;
+	rayDesc.TMax = 10000.0f;
+	
+	return rayDesc;
+}
+
+RayDesc BuildRefractRay(float3 origin, float3 incidentRayDirection, float3 normal, float ior)
+{
+	float3 rayDirection = refract(incidentRayDirection, normal, ior);
+	
+	RayDesc rayDesc;
+	rayDesc.Origin = origin;
+	rayDesc.TMin = 0.0f;
+	rayDesc.Direction = rayDirection;
 	rayDesc.TMax = 10000.0f;
 	
 	return rayDesc;
@@ -141,24 +191,25 @@ uint3 GetIndices(uint byteIndex, ByteAddressBuffer rawIndexBuffer)
 UnpackedData UnpackVertex(Vertex vertex)
 {
 	UnpackedData unpackedData = (UnpackedData)0;
-	unpackedData.normal.x = f16tof32((vertex.normalXY >> 16) & 0xffff);
-	unpackedData.normal.y = f16tof32(vertex.normalXY & 0xffff);
-	unpackedData.normal.z = f16tof32((vertex.normalZW >> 16) & 0xffff);
-	unpackedData.tangent.x = f16tof32((vertex.tangentXY >> 16) & 0xffff);
-	unpackedData.tangent.y = f16tof32(vertex.tangentXY & 0xffff);
-	unpackedData.tangent.z = f16tof32((vertex.tangentZW >> 16) & 0xffff);
-	unpackedData.texCoord.x = f16tof32((vertex.texCoordXY >> 16) & 0xffff);
-	unpackedData.texCoord.y = f16tof32(vertex.texCoordXY & 0xffff);
+	unpackedData.normal.x = f16tof32(vertex.normalXY & 0xffff);
+	unpackedData.normal.y = f16tof32((vertex.normalXY >> 16) & 0xffff);
+	unpackedData.normal.z = f16tof32(vertex.normalZW & 0xffff);
+	unpackedData.tangent.x = f16tof32(vertex.tangentXY & 0xffff);
+	unpackedData.tangent.y = f16tof32((vertex.tangentXY >> 16) & 0xffff);
+	unpackedData.tangent.z = f16tof32(vertex.tangentZW & 0xffff);
+	unpackedData.texCoord.x = f16tof32(vertex.texCoordXY & 0xffff);
+	unpackedData.texCoord.y = f16tof32((vertex.texCoordXY >> 16) & 0xffff);
 	
 	return unpackedData;
 }
 
-Payload TraceLightRay(RayDesc ray, uint recursionDepth)
+Payload TraceLightRay(RayDesc rayDesc, uint recursionDepth)
 {
-	if (recursionDepth >= MAX_RECURSION_DEPTH)
-		return 0.0f.xxx;
+	Payload payload = (Payload)0;
 	
-	Payload payload;
+	if (recursionDepth >= MAX_RECURSION_DEPTH)
+		return payload;
+	
 	payload.color = 0.0f.xxx;
 	payload.hitT = 0.0f;
 	payload.recursionDepth = recursionDepth + 1u;
@@ -175,19 +226,18 @@ Payload TraceLightRay(RayDesc ray, uint recursionDepth)
 	return payload;
 }
 
-bool TraceShadowRay(RayDesc ray, uint recursionDepth)
+bool TraceShadowRay(RayDesc rayDesc, uint recursionDepth)
 {
-	if (recursionDepth >= MAX_RECURSION_DEPTH)
+	if (recursionDepth > MAX_RECURSION_DEPTH)
 		return false;
 	
 	PayloadShadow payload;
 	payload.isShadow = true;
 	
 	TraceRay(sceneStructure,
-		RAY_FLAG_CULL_BACK_FACING_TRIANGLES
-        | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
-        | RAY_FLAG_FORCE_OPAQUE
-        | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+		RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH |
+		RAY_FLAG_SKIP_CLOSEST_HIT_SHADER |
+		RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 		INSTANCE_INCLUSION_MASK,
 		HIT_GROUP_SHADOW_INDEX,
 		HIT_GROUP_NUMBER,
@@ -198,25 +248,28 @@ bool TraceShadowRay(RayDesc ray, uint recursionDepth)
 	return payload.isShadow;
 }
 
-float3 ProcessLightSource(PointLight lightSource, Surface surface, Material material, float3 rayDirection, uint recursionDepth)
+float3 ProcessLightSource(PointLight lightSource, Surface surface, Material material, float3 rayDirection, uint recursionDepth, float3 random)
 {
-	RayDesc shadowRay = BuildShadowRay(hitPosition, lightSource.position);
+	float3 biasedSurfacePosition = surface.position;
+	biasedSurfacePosition -= rayDirection * SHADOW_BIAS;
+	
+	RayDesc shadowRay = BuildShadowRay(biasedSurfacePosition, lightSource.position);
 	bool isShadow = TraceShadowRay(shadowRay, recursionDepth);
 	
-	RayDesc reflectRay = BuildReflectRay(hitPosition, rayDirection, surface.normal);
+	RayDesc reflectRay = BuildReflectRay(biasedSurfacePosition, rayDirection, surface.normal, random, material.roughness);
 	Payload reflectLightPayload = TraceLightRay(reflectRay, recursionDepth);
 	
 	PointLight reflectLightSource = (PointLight)0;
-	reflectLightSource.position = surface.position + reflectRay * reflectLightPayload.hitT;
+	reflectLightSource.position = surface.position + reflectRay.Direction * reflectLightPayload.hitT * REFLECT_BIAS;
 	reflectLightSource.color = reflectLightPayload.color;
 	
 	float3 reflectLight = 0.0f.xxx;
-	CalculatePointLight(reflectLightSource, surface, material, reflectRay, reflectLight);
+	CalculatePointLight(reflectLightSource, surface, material, reflectRay.Direction, reflectLight);
 	
 	float3 light = 0.0f.xxx;
 	CalculatePointLight(lightSource, surface, material, rayDirection, light);
 	
-	return light + reflectLight;
+	return isShadow ? reflectLight : light + reflectLight;
 }
 
 [shader("raygeneration")]
@@ -232,7 +285,7 @@ void RayGeneration()
 }
 
 [shader("closesthit")]
-void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
+void ClosestHit(inout Payload payload, in BuiltInTriangleIntersectionAttributes attributes)
 {
     float3 barycentrics;
 	barycentrics.x = 1.0f - attributes.barycentrics.x - attributes.barycentrics.y;
@@ -285,26 +338,87 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
 	surface.normal = normal;
 	
 	Material material;
-	Material.albedo = albedo;
-	Material.f0 = 0.1f.xxx;
-	Material.f90 = 1.0f;
-	Material.metalness = metalness;
-	Material.roughness = roughness;
+	material.albedo = albedo;
+	material.f0 = 0.1f;
+	material.f90 = 1.0f;
+	material.metalness = metalness;
+	material.roughness = roughness;
 	
 	float3 resultColor = 0.0f.xxx;
 	
+	float3 random = noiseMap.SampleLevel(samplerLinear, texCoord * 5.0f * payload.recursionDepth, 0.0f).xyz;
+	
 	[unroll]
 	for (uint lightSourceIndex = 0u; lightSourceIndex < LIGHT_SOURCE_NUMBER; lightSourceIndex++)
-		resultColor += ProcessLightSource(lightSources[lightSourceIndex], surface, material, rayDirection, payload.recursionDepth);
+		resultColor += ProcessLightSource(lightSources[lightSourceIndex], surface, material, rayDirection, payload.recursionDepth, random);
 	
-    payload.color = float4(resultColor, 1.0f);
+    payload.color += resultColor;
 	payload.hitT = hitT;
+}
+
+[shader("closesthit")]
+void CrystalClosestHit(inout Payload payload, in BuiltInTriangleIntersectionAttributes attributes)
+{
+	float3 barycentrics;
+	barycentrics.x = 1.0f - attributes.barycentrics.x - attributes.barycentrics.y;
+	barycentrics.y = attributes.barycentrics.x;
+	barycentrics.z = attributes.barycentrics.y;
+	
+    uint byteIndex = GEOMETRY_TRIANGLE_STRIDE * PrimitiveIndex();
+	uint3 indices = GetIndices(byteIndex, crystalIndices);
+	
+	Vertex vertex0 = crystalGeometry[indices.x];
+	Vertex vertex1 = crystalGeometry[indices.y];
+	Vertex vertex2 = crystalGeometry[indices.z];
+	
+	UnpackedData unpackedData0 = UnpackVertex(vertex0);
+	UnpackedData unpackedData1 = UnpackVertex(vertex1);
+	UnpackedData unpackedData2 = UnpackVertex(vertex2);
+	
+	float3 normal = barycentrics.x * unpackedData0.normal;
+	normal += barycentrics.y * unpackedData1.normal;
+	normal += barycentrics.z * unpackedData2.normal;
+	normal = normalize(normal);
+	
+	float3 rayDirection = WorldRayDirection();
+	float hitT = RayTCurrent();
+	float3 hitPosition = WorldRayOrigin() + hitT * rayDirection * REFRACT_BIAS;
+	
+	bool isIncident = payload.recursionDepth == 1u;
+	normal = isIncident ? normal : -normal;
+	float iorR = isIncident ? INV_DIAMOND_IOR_R : DIAMOND_IOR_R;
+	float iorG = isIncident ? INV_DIAMOND_IOR_G : DIAMOND_IOR_G;
+	float iorB = isIncident ? INV_DIAMOND_IOR_B : DIAMOND_IOR_B;
+	
+	RayDesc rayRedDesc = BuildRefractRay(hitPosition, rayDirection, normal, iorR);
+	RayDesc rayBlueDesc = BuildRefractRay(hitPosition, rayDirection, normal, iorG);
+	RayDesc rayGreenDesc = BuildRefractRay(hitPosition, rayDirection, normal, iorB);
+	
+	Payload payloadRed = TraceLightRay(rayRedDesc, payload.recursionDepth);
+	Payload payloadGreen = TraceLightRay(rayBlueDesc, payload.recursionDepth);
+	Payload payloadBlue = TraceLightRay(rayGreenDesc, payload.recursionDepth);
+	
+    payload.color = float3(payloadRed.color.x, payloadGreen.color.y, payloadBlue.color.z);
+	payload.hitT = hitT;
+	payload.recursionDepth = payloadRed.recursionDepth;
+}
+
+[shader("anyhit")]
+void CrystalAnyHit(inout Payload payload, in BuiltInTriangleIntersectionAttributes attributes)
+{
+	AcceptHitAndEndSearch();
+}
+
+[shader("anyhit")]
+void CrystalAnyHit_Shadow(inout PayloadShadow payload, in BuiltInTriangleIntersectionAttributes attributes)
+{
+	IgnoreHit();
 }
 
 [shader("miss")]
 void Miss(inout Payload payload)
 {
-    payload.color = float4(0.0f, 0.0f, 0.0f, 1.0f);
+    payload.color = 0.0f.xxx;
 }
 
 [shader("miss")]

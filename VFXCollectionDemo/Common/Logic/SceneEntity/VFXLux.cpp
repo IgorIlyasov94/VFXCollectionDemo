@@ -44,10 +44,10 @@ void Common::Logic::SceneEntity::VFXLux::Update(float time, float deltaTime)
 	haloConstants->time = time;
 	haloConstants->colorIntensity = haloColorIntensity * (std::sin(time * 0.5f) * 0.3f + 0.7f);
 
-	if (colorIntensity < 1.0f)
+	if (colorIntensity < 2.0f)
 		colorIntensity += deltaTime* COLOR_INTENSITY_INCREMENT_SPEED;
 
-	if (haloColorIntensity < 4.5f)
+	if (haloColorIntensity < 6.5f)
 		haloColorIntensity += deltaTime* HALO_INTENSITY_INCREMENT_SPEED;
 }
 

@@ -27,6 +27,15 @@ StructuredBuffer<float4> sceneBuffer : register(t0);
 StructuredBuffer<float> luminanceBuffer : register(t1);
 StructuredBuffer<float4> bloomBuffer : register(t2);
 
+float3 ToneMapping(float3 color, float luminance)
+{
+	//luminance = dot(color, LUMINANCE_VECTOR);
+	color *= (1.0f.xxx + luminance / (whiteCutoff * whiteCutoff)) / (1.0f.xxx + luminance);
+	color = pow(color, 1.0f / 2.2f);
+	
+	return color;
+}
+
 Output main(Input input)
 {
 	Output output = (Output)0;
@@ -41,14 +50,11 @@ Output main(Input input)
 	float luminance = luminanceBuffer[0u] / (float)area;
 	
 	float gray = dot(color, LUMINANCE_VECTOR);
-	float3 rodColor = float3(3.4f, 2.4f, 3.7f);
+	float3 rodColor = float3(1.0f, 0.9f, 1.5f);
 	float colorShiftFactor = 0.75f;
 	
 	color = lerp(gray * rodColor, color, colorShiftFactor);
-	
-	color *= middleGray / (luminance + 0.001f);
-	color *= 1.0f + color / whiteCutoff;
-	color /= 1.0f + color;
+	color = ToneMapping(color, luminance);
 	
 	maxCoordValue = quartArea - 1;
 	

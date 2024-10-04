@@ -19,7 +19,7 @@ namespace Common::Logic
 		void Update();
 		void Render();
 
-		bool NeedBackgroundUpdate();
+		bool NeedBackgroundUpdate() const;
 
 	private:
 		MainLogic() = delete;
@@ -29,6 +29,7 @@ namespace Common::Logic
 		MainLogic& operator=(MainLogic&&) = delete;
 
 		Scene::SceneID luxSceneId;
+		Scene::SceneID whiteroomSceneId;
 
 		SceneManager* sceneManager;
 		Graphics::DirectX12Renderer* renderer;

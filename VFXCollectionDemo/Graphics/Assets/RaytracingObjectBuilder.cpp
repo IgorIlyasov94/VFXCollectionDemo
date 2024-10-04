@@ -1,9 +1,12 @@
 #include "RaytracingObjectBuilder.h"
+#include "Raytracing/RaytracingShaderTable.h"
 
 using namespace DirectX;
+using namespace Graphics::Assets::Raytracing;
 
 Graphics::Assets::RaytracingObjectBuilder::RaytracingObjectBuilder()
-	: raytracingLibraryDesc{}
+	: raytracingLibraryDesc{}, libraryDesc{}, raytracingConfig{},
+	assotiation{}, globalSignature{}, pipelineConfig{}, rootSignatureIndexCounter{}
 {
 	SetBuffer(0u, 0u);
 }
@@ -17,7 +20,7 @@ void Graphics::Assets::RaytracingObjectBuilder::AddAccelerationStructure(const A
 {
 	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
 	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	geometryDesc.Flags = desc.isOpaque ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+	geometryDesc.Flags = desc.isOpaque ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION;
 	geometryDesc.Triangles.VertexBuffer.StartAddress = desc.vertexBufferAddress;
 	geometryDesc.Triangles.VertexBuffer.StrideInBytes = desc.vertexStride;
 	geometryDesc.Triangles.VertexCount = desc.verticesNumber;
@@ -34,7 +37,7 @@ void Graphics::Assets::RaytracingObjectBuilder::AddAccelerationStructure(const A
 {
 	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
 	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
-	geometryDesc.Flags = desc.isOpaque ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+	geometryDesc.Flags = desc.isOpaque ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION;
 	geometryDesc.AABBs.AABBCount = desc.instancesNumber;
 	geometryDesc.AABBs.AABBs.StartAddress = desc.aabbBufferAddress;
 	geometryDesc.AABBs.AABBs.StrideInBytes = sizeof(D3D12_RAYTRACING_AABB);
@@ -51,7 +54,7 @@ void Graphics::Assets::RaytracingObjectBuilder::SetRootConstants(uint32_t regist
 	rootParameter.Constants.Num32BitValues = constantsNumber;
 	rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-	auto rootParameterIndex = static_cast<uint32_t>(rootParameters.size());
+	auto rootParameterIndex = rootSignatureIndexCounter++;
 	rootConstantIndices.insert({ registerIndex, rootParameterIndex });
 
 	auto signatureVariant = static_cast<uint64_t>(RootSignatureUsing::GLOBAL);
@@ -108,21 +111,23 @@ void Graphics::Assets::RaytracingObjectBuilder::SetLocalRootConstants(uint32_t r
 	rootParameter.Constants.Num32BitValues = constantsNumber;
 	rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-	auto rootParameterIndex = static_cast<uint32_t>(rootParameters.size());
+	auto rootParameterIndex = rootSignatureIndexCounter++;
 
 	RootSignatureVariant signatureVariant{};
 	signatureVariant.signatureUsing = signatureUsing;
 	signatureVariant.variantIndex = variantIndex;
 
-	if (!rootParameters.contains(signatureVariant.GetHash()))
-		rootParameters.insert({ signatureVariant.GetHash(), {} });
+	auto hash = signatureVariant.GetHash();
 
-	rootParameters[signatureVariant.GetHash()].push_back(std::move(rootParameter));
+	if (!rootParameters.contains(hash))
+		rootParameters.insert({ hash, {} });
 
-	if (!localRootData.contains(signatureVariant.GetHash()))
-		localRootData.insert({ signatureVariant.GetHash(), {} });
+	rootParameters[hash].push_back(std::move(rootParameter));
 
-	auto& localRootConstants = localRootData[signatureVariant.GetHash()].rootConstants;
+	if (!localRootData.contains(hash))
+		localRootData.insert({ hash, {} });
+
+	auto& localRootConstants = localRootData[hash].rootConstants;
 	localRootConstants.insert({ registerIndex, {} });
 	auto& localRootConstantsData = localRootConstants[registerIndex];
 	localRootConstantsData.rootParameterIndex = rootParameterIndex;
@@ -132,7 +137,7 @@ void Graphics::Assets::RaytracingObjectBuilder::SetLocalRootConstants(uint32_t r
 	auto endAddress = startAddress + constantsNumber;
 	std::copy(startAddress, endAddress, localRootConstantsData.data.data());
 
-	localRootParametersOrder.push_back({ registerIndex, variantIndex, RootParameterOrder::ROOT_CONSTANTS });
+	localRootData[hash].localRootParametersOrder.push_back({ registerIndex, variantIndex, RootParameterOrder::ROOT_CONSTANTS });
 }
 
 void Graphics::Assets::RaytracingObjectBuilder::SetLocalConstantBuffer(uint32_t registerIndex,
@@ -142,16 +147,18 @@ void Graphics::Assets::RaytracingObjectBuilder::SetLocalConstantBuffer(uint32_t 
 	signatureVariant.signatureUsing = signatureUsing;
 	signatureVariant.variantIndex = variantIndex;
 
-	if (!localRootData.contains(signatureVariant.GetHash()))
-		localRootData.insert({ signatureVariant.GetHash(), {} });
+	auto hash = signatureVariant.GetHash();
 
-	auto& localConstantBufferSlots = localRootData[signatureVariant.GetHash()].constantBufferSlots;
+	if (!localRootData.contains(hash))
+		localRootData.insert({ hash, {} });
+
+	auto& localConstantBufferSlots = localRootData[hash].constantBufferSlots;
 	auto slotIndex = static_cast<uint32_t>(localConstantBufferSlots.size());
 
 	SetDescriptorParameter(registerIndex, D3D12_ROOT_PARAMETER_TYPE_CBV, gpuAddress,
 		localConstantBufferSlots, signatureVariant);
 
-	localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::CONSTANT_BUFFER });
+	localRootData[hash].localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::CONSTANT_BUFFER });
 }
 
 void Graphics::Assets::RaytracingObjectBuilder::SetLocalTexture(uint32_t registerIndex,
@@ -161,16 +168,18 @@ void Graphics::Assets::RaytracingObjectBuilder::SetLocalTexture(uint32_t registe
 	signatureVariant.signatureUsing = signatureUsing;
 	signatureVariant.variantIndex = variantIndex;
 
-	if (!localRootData.contains(signatureVariant.GetHash()))
-		localRootData.insert({ signatureVariant.GetHash(), {} });
+	auto hash = signatureVariant.GetHash();
 
-	auto& localTextureSlots = localRootData[signatureVariant.GetHash()].textureSlots;
+	if (!localRootData.contains(hash))
+		localRootData.insert({ hash, {} });
+
+	auto& localTextureSlots = localRootData[hash].textureSlots;
 	auto slotIndex = static_cast<uint32_t>(localTextureSlots.size());
 
 	SetDescriptorTableParameter(registerIndex, D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
 		gpuDescriptor, localTextureSlots, signatureVariant);
 
-	localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::TEXTURE });
+	localRootData[hash].localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::TEXTURE });
 }
 
 void Graphics::Assets::RaytracingObjectBuilder::SetLocalBuffer(uint32_t registerIndex,
@@ -180,16 +189,18 @@ void Graphics::Assets::RaytracingObjectBuilder::SetLocalBuffer(uint32_t register
 	signatureVariant.signatureUsing = signatureUsing;
 	signatureVariant.variantIndex = variantIndex;
 
-	if (!localRootData.contains(signatureVariant.GetHash()))
-		localRootData.insert({ signatureVariant.GetHash(), {} });
+	auto hash = signatureVariant.GetHash();
 
-	auto& localBufferSlots = localRootData[signatureVariant.GetHash()].bufferSlots;
+	if (!localRootData.contains(hash))
+		localRootData.insert({ hash, {} });
+
+	auto& localBufferSlots = localRootData[hash].bufferSlots;
 	auto slotIndex = static_cast<uint32_t>(localBufferSlots.size());
 
 	SetDescriptorParameter(registerIndex, D3D12_ROOT_PARAMETER_TYPE_SRV, gpuAddress,
 		localBufferSlots, signatureVariant);
 
-	localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::BUFFER });
+	localRootData[hash].localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::BUFFER });
 }
 
 void Graphics::Assets::RaytracingObjectBuilder::SetLocalRWTexture(uint32_t registerIndex,
@@ -199,16 +210,18 @@ void Graphics::Assets::RaytracingObjectBuilder::SetLocalRWTexture(uint32_t regis
 	signatureVariant.signatureUsing = signatureUsing;
 	signatureVariant.variantIndex = variantIndex;
 
-	if (!localRootData.contains(signatureVariant.GetHash()))
-		localRootData.insert({ signatureVariant.GetHash(), {} });
+	auto hash = signatureVariant.GetHash();
 
-	auto& localTextureSlots = localRootData[signatureVariant.GetHash()].textureSlots;
+	if (!localRootData.contains(hash))
+		localRootData.insert({ hash, {} });
+
+	auto& localTextureSlots = localRootData[hash].textureSlots;
 	auto slotIndex = static_cast<uint32_t>(localTextureSlots.size());
 
 	SetDescriptorTableParameter(registerIndex, D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
 		gpuDescriptor, localTextureSlots, signatureVariant);
 
-	localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::TEXTURE });
+	localRootData[hash].localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::TEXTURE });
 }
 
 void Graphics::Assets::RaytracingObjectBuilder::SetLocalRWBuffer(uint32_t registerIndex,
@@ -218,16 +231,18 @@ void Graphics::Assets::RaytracingObjectBuilder::SetLocalRWBuffer(uint32_t regist
 	signatureVariant.signatureUsing = signatureUsing;
 	signatureVariant.variantIndex = variantIndex;
 
-	if (!localRootData.contains(signatureVariant.GetHash()))
-		localRootData.insert({ signatureVariant.GetHash(), {} });
+	auto hash = signatureVariant.GetHash();
 
-	auto& localRWBufferSlots = localRootData[signatureVariant.GetHash()].rwBufferSlots;
+	if (!localRootData.contains(hash))
+		localRootData.insert({ hash, {} });
+
+	auto& localRWBufferSlots = localRootData[hash].rwBufferSlots;
 	auto slotIndex = static_cast<uint32_t>(localRWBufferSlots.size());
 
 	SetDescriptorParameter(registerIndex, D3D12_ROOT_PARAMETER_TYPE_UAV, gpuAddress,
 		localRWBufferSlots, signatureVariant);
 
-	localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::RW_BUFFER });
+	localRootData[hash].localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::RW_BUFFER });
 }
 
 void Graphics::Assets::RaytracingObjectBuilder::SetLocalSampler(uint32_t registerIndex,
@@ -237,16 +252,18 @@ void Graphics::Assets::RaytracingObjectBuilder::SetLocalSampler(uint32_t registe
 	signatureVariant.signatureUsing = signatureUsing;
 	signatureVariant.variantIndex = variantIndex;
 
-	if (!localRootData.contains(signatureVariant.GetHash()))
-		localRootData.insert({ signatureVariant.GetHash(), {} });
+	auto hash = signatureVariant.GetHash();
 
-	auto& localTextureSlots = localRootData[signatureVariant.GetHash()].textureSlots;
+	if (!localRootData.contains(hash))
+		localRootData.insert({ hash, {} });
+
+	auto& localTextureSlots = localRootData[hash].textureSlots;
 	auto slotIndex = static_cast<uint32_t>(localTextureSlots.size());
 
 	SetDescriptorTableParameter(registerIndex, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
 		gpuDescriptor, localTextureSlots, signatureVariant);
 
-	localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::TEXTURE });
+	localRootData[hash].localRootParametersOrder.push_back({ slotIndex, variantIndex, RootParameterOrder::TEXTURE });
 }
 
 void Graphics::Assets::RaytracingObjectBuilder::SetShader(const RaytracingLibraryDesc& desc)
@@ -309,6 +326,8 @@ void Graphics::Assets::RaytracingObjectBuilder::Reset()
 	rootParameters.clear();
 	libraryExports.clear();
 	geometryDescs.clear();
+	hitGroupDescs.clear();
+	localSignatures.clear();
 
 	SetBuffer(0u, 0u);
 }
@@ -319,7 +338,7 @@ void Graphics::Assets::RaytracingObjectBuilder::SetDescriptorParameter(uint32_t 
 {
 	DescriptorSlot slot{};
 	slot.shaderRegisterIndex = registerIndex;
-	slot.rootParameterIndex = static_cast<uint32_t>(rootParameters.size());
+	slot.rootParameterIndex = rootSignatureIndexCounter++;
 	slot.gpuAddress = gpuAddress;
 
 	slots.push_back(std::move(slot));
@@ -341,7 +360,7 @@ void Graphics::Assets::RaytracingObjectBuilder::SetDescriptorTableParameter(uint
 	std::vector<DescriptorTableSlot>& slots, RootSignatureVariant signatureVariant)
 {
 	DescriptorTableSlot slot{};
-	slot.rootParameterIndex = static_cast<uint32_t>(rootParameters.size());
+	slot.rootParameterIndex = rootSignatureIndexCounter++;
 	slot.gpuDescriptor = gpuDescriptor;
 
 	slots.push_back(std::move(slot));
@@ -387,78 +406,71 @@ Graphics::Assets::RaytracingObjectDesc Graphics::Assets::RaytracingObjectBuilder
 	ID3D12StateObjectProperties* stateObjectProperties;
 	stateObject->QueryInterface(IID_PPV_ARGS(&stateObjectProperties));
 
+	RaytracingShaderTable shaderTable{};
+
 	auto rayGenerationIdentifier = stateObjectProperties->GetShaderIdentifier(raytracingLibraryDesc.rayGenerationShaderName);
-	
-	uint64_t rayGenerationSize = 0u;
-	uint64_t missStride = 0u;
-	uint64_t missSize = 0u;
-	uint64_t hitStride = 0u;
-	uint64_t hitSize = 0u;
-
-	auto shaderTablesSize = CalculateShaderTablesSize(rayGenerationSize, missStride, missSize, hitStride, hitSize);
-	auto bufferAllocation = bufferManager->Allocate(device, shaderTablesSize, BufferAllocationType::SHADER_TABLES);
-
-	auto startAddress = bufferAllocation.gpuAddress;
-	auto destAddress = bufferAllocation.cpuAddress;
-
-	D3D12_DISPATCH_RAYS_DESC dipatchDesc{};
-
-	dipatchDesc.RayGenerationShaderRecord.StartAddress = startAddress;
-	dipatchDesc.RayGenerationShaderRecord.SizeInBytes = rayGenerationSize;
-
-	FillShaderTable({ 0u, RootSignatureUsing::RAY_GENERATION }, reinterpret_cast<uint8_t*>(rayGenerationIdentifier),
-		destAddress);
-
-	startAddress += rayGenerationSize;
-	destAddress += rayGenerationSize;
-
-	dipatchDesc.MissShaderTable.StartAddress = startAddress;
-	dipatchDesc.MissShaderTable.StrideInBytes = missStride;
-	dipatchDesc.MissShaderTable.SizeInBytes = missSize;
+	auto rayGenerationShaderRecord = CreateShaderRecord({ 0u, RootSignatureUsing::RAY_GENERATION }, rayGenerationIdentifier);
+	shaderTable.AddRecord(std::move(rayGenerationShaderRecord), RaytracingShaderRecordKind::RAY_GENERATION_SHADER_RECORD);
 
 	for (uint32_t variantIndex = 0u; variantIndex < raytracingLibraryDesc.missShaderNames.size(); variantIndex++)
 	{
 		auto& missShaderName = raytracingLibraryDesc.missShaderNames[variantIndex];
 		auto missIdentifier = stateObjectProperties->GetShaderIdentifier(missShaderName);
 
-		FillShaderTable({ variantIndex, RootSignatureUsing::MISS }, reinterpret_cast<uint8_t*>(missIdentifier),
-			destAddress);
-
-		destAddress += missStride;
+		auto missShaderRecord = CreateShaderRecord({ variantIndex, RootSignatureUsing::MISS }, missIdentifier);
+		shaderTable.AddRecord(std::move(missShaderRecord), RaytracingShaderRecordKind::MISS_SHADER_RECORD);
 	}
-
-	startAddress += missSize;
-	destAddress = bufferAllocation.cpuAddress + rayGenerationSize + missSize;
-
-	dipatchDesc.HitGroupTable.StartAddress = startAddress;
-	dipatchDesc.HitGroupTable.StrideInBytes = hitStride;
-	dipatchDesc.HitGroupTable.SizeInBytes = hitSize;
 
 	for (uint32_t variantIndex = 0u; variantIndex < raytracingLibraryDesc.triangleHitGroups.size(); variantIndex++)
 	{
+		void* hitGroupIdentifier = nullptr;
 		auto& hitGroup = raytracingLibraryDesc.triangleHitGroups[variantIndex];
-		auto hitGroupIdentifier = stateObjectProperties->GetShaderIdentifier(hitGroup.hitGroupName);
 
-		FillShaderTable({ variantIndex, RootSignatureUsing::TRIANGLE_HIT_GROUP },
-			reinterpret_cast<uint8_t*>(hitGroupIdentifier), destAddress);
-
-		destAddress += hitStride;
+		auto& hitGroupName = hitGroup.hitGroupName;
+		hitGroupIdentifier = stateObjectProperties->GetShaderIdentifier(hitGroupName);
+		
+		auto hitGroupRecord = CreateShaderRecord({ variantIndex, RootSignatureUsing::TRIANGLE_HIT_GROUP }, hitGroupIdentifier);
+		shaderTable.AddRecord(std::move(hitGroupRecord), RaytracingShaderRecordKind::HIT_GROUP_SHADER_RECORD);
 	}
 
 	for (uint32_t variantIndex = 0u; variantIndex < raytracingLibraryDesc.aabbHitGroups.size(); variantIndex++)
 	{
+		void* hitGroupIdentifier = nullptr;
 		auto& hitGroup = raytracingLibraryDesc.aabbHitGroups[variantIndex];
-		auto hitGroupIdentifier = stateObjectProperties->GetShaderIdentifier(hitGroup.hitGroupName);
 
-		FillShaderTable({ variantIndex, RootSignatureUsing::AABB_HIT_GROUP },
-			reinterpret_cast<uint8_t*>(hitGroupIdentifier), destAddress);
-
-		destAddress += hitStride;
+		auto& hitGroupName = hitGroup.hitGroupName;
+		hitGroupIdentifier = stateObjectProperties->GetShaderIdentifier(hitGroupName);
+		
+		auto hitGroupRecord = CreateShaderRecord({ variantIndex, RootSignatureUsing::AABB_HIT_GROUP }, hitGroupIdentifier);
+		shaderTable.AddRecord(std::move(hitGroupRecord), RaytracingShaderRecordKind::HIT_GROUP_SHADER_RECORD);
 	}
 
-	dipatchDesc.Width = 1u;
-	dipatchDesc.Height = 1u;
-	dipatchDesc.Depth = 1u;
+	stateObjectProperties->Release();
+
+	auto shaderTableRawBuffer = shaderTable.Compose();
+
+	auto bufferAllocation = bufferManager->Allocate(device, shaderTableRawBuffer.size(), BufferAllocationType::SHADER_TABLES);
+
+	auto startAddress = shaderTableRawBuffer.data();
+	auto endAddress = startAddress + shaderTableRawBuffer.size();
+	auto destAddress = bufferAllocation.cpuAddress;
+
+	std::copy(startAddress, endAddress, destAddress);
+
+	bufferAllocation.resource->Unmap();
+	
+	D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
+	dispatchDesc.RayGenerationShaderRecord.StartAddress = bufferAllocation.gpuAddress;
+	dispatchDesc.RayGenerationShaderRecord.SizeInBytes = shaderTable.GetRayGenerationShaderRecordSize();
+	dispatchDesc.MissShaderTable.StartAddress = bufferAllocation.gpuAddress + shaderTable.GetRayGenerationShaderTableSize();
+	dispatchDesc.MissShaderTable.StrideInBytes = shaderTable.GetMissShaderRecordSize();
+	dispatchDesc.MissShaderTable.SizeInBytes = shaderTable.GetMissTableSize();
+	dispatchDesc.HitGroupTable.StartAddress = dispatchDesc.MissShaderTable.StartAddress + shaderTable.GetMissTableSize();
+	dispatchDesc.HitGroupTable.StrideInBytes = shaderTable.GetHitGroupShaderRecordSize();
+	dispatchDesc.HitGroupTable.SizeInBytes = shaderTable.GetHitGroupTableSize();
+	dispatchDesc.Width = 1u;
+	dispatchDesc.Height = 1u;
+	dispatchDesc.Depth = 1u;
 
 	std::vector<ID3D12RootSignature*> rootSignatures;
 	rootSignatures.reserve(localRootSignatures.size());
@@ -500,7 +512,7 @@ Graphics::Assets::RaytracingObjectDesc Graphics::Assets::RaytracingObjectBuilder
 		bufferSlots,
 		rwBufferSlots,
 		textureSlots,
-		dipatchDesc,
+		dispatchDesc,
 		bufferAllocation,
 		bottomLevelStructure,
 		bottomLevelStructureAABB,
@@ -535,7 +547,7 @@ ID3D12RootSignature* Graphics::Assets::RaytracingObjectBuilder::CreateRootSignat
 		error->Release();
 	}
 
-	device->CreateRootSignature(0u, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+	device->CreateRootSignature(1u, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 
 	signature->Release();
 
@@ -550,6 +562,9 @@ ID3D12StateObject* Graphics::Assets::RaytracingObjectBuilder::CreateStateObject(
 	std::vector<D3D12_STATE_SUBOBJECT> subobjects;
 	subobjects.push_back(CreateDXILLibrarySubobject());
 
+	auto hitGroupsTotalNumber = raytracingLibraryDesc.triangleHitGroups.size() + raytracingLibraryDesc.aabbHitGroups.size();
+	hitGroupDescs.reserve(hitGroupsTotalNumber);
+
 	for (auto& hitGroup : raytracingLibraryDesc.triangleHitGroups)
 		subobjects.push_back(CreateHitGroupSubobject(hitGroup, true));
 
@@ -557,6 +572,8 @@ ID3D12StateObject* Graphics::Assets::RaytracingObjectBuilder::CreateStateObject(
 		subobjects.push_back(CreateHitGroupSubobject(hitGroup, false));
 
 	subobjects.push_back(CreateRaytracingConfigSubobject());
+
+	localSignatures.reserve(localRootSignatures.size());
 
 	for (auto& localRootSignature : localRootSignatures)
 	{
@@ -578,7 +595,7 @@ ID3D12StateObject* Graphics::Assets::RaytracingObjectBuilder::CreateStateObject(
 	stateObjectDesc.NumSubobjects = static_cast<uint32_t>(subobjects.size());
 	stateObjectDesc.pSubobjects = subobjects.data();
 
-	device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&stateObject));
+	auto hr = device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&stateObject));
 
 	return stateObject;
 }
@@ -587,34 +604,31 @@ D3D12_STATE_SUBOBJECT Graphics::Assets::RaytracingObjectBuilder::CreateDXILLibra
 {
 	AddLibraryExport(raytracingLibraryDesc.rayGenerationShaderName);
 
-	for (auto& missShaderName : raytracingLibraryDesc.missShaderNames)
-		AddLibraryExport(missShaderName);
-
 	for (auto& hitGroup : raytracingLibraryDesc.triangleHitGroups)
 	{
-		if (hitGroup.anyHitShaderName != L"")
+		if (hitGroup.anyHitShaderName != nullptr && hitGroup.anyHitShaderName != L"")
 			AddLibraryExport(hitGroup.anyHitShaderName);
 
-		if (hitGroup.closestHitShaderName != L"")
+		if (hitGroup.closestHitShaderName != nullptr && hitGroup.closestHitShaderName != L"")
 			AddLibraryExport(hitGroup.closestHitShaderName);
-
-		if (hitGroup.intersectionShaderName != L"")
-			AddLibraryExport(hitGroup.intersectionShaderName);
 	}
 
 	for (auto& hitGroup : raytracingLibraryDesc.aabbHitGroups)
 	{
-		if (hitGroup.anyHitShaderName != L"")
+		if (hitGroup.anyHitShaderName != nullptr && hitGroup.anyHitShaderName != L"")
 			AddLibraryExport(hitGroup.anyHitShaderName);
 
-		if (hitGroup.closestHitShaderName != L"")
+		if (hitGroup.closestHitShaderName != nullptr && hitGroup.closestHitShaderName != L"")
 			AddLibraryExport(hitGroup.closestHitShaderName);
 
-		if (hitGroup.intersectionShaderName != L"")
+		if (hitGroup.intersectionShaderName != nullptr && hitGroup.intersectionShaderName != L"")
 			AddLibraryExport(hitGroup.intersectionShaderName);
 	}
 
-	D3D12_DXIL_LIBRARY_DESC libraryDesc{};
+	for (auto& missShaderName : raytracingLibraryDesc.missShaderNames)
+		AddLibraryExport(missShaderName);
+
+	libraryDesc = {};
 	libraryDesc.DXILLibrary = raytracingLibraryDesc.dxilLibrary;
 	libraryDesc.NumExports = static_cast<uint32_t>(libraryExports.size());
 	libraryDesc.pExports = libraryExports.data();
@@ -629,7 +643,9 @@ D3D12_STATE_SUBOBJECT Graphics::Assets::RaytracingObjectBuilder::CreateDXILLibra
 D3D12_STATE_SUBOBJECT Graphics::Assets::RaytracingObjectBuilder::CreateHitGroupSubobject(const RaytracingHitGroup& hitGroup,
 	bool isTriangle)
 {
-	D3D12_HIT_GROUP_DESC hitGroupDesc{};
+	hitGroupDescs.push_back({});
+
+	auto& hitGroupDesc = hitGroupDescs[hitGroupDescs.size() - 1];
 	hitGroupDesc.Type = isTriangle ? D3D12_HIT_GROUP_TYPE_TRIANGLES : D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
 	hitGroupDesc.HitGroupExport = hitGroup.hitGroupName;
 
@@ -644,14 +660,14 @@ D3D12_STATE_SUBOBJECT Graphics::Assets::RaytracingObjectBuilder::CreateHitGroupS
 
 	D3D12_STATE_SUBOBJECT subobject{};
 	subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-	subobject.pDesc = &hitGroupDesc;
+	subobject.pDesc = &hitGroupDescs[hitGroupDescs.size() - 1];
 
 	return subobject;
 }
 
 D3D12_STATE_SUBOBJECT Graphics::Assets::RaytracingObjectBuilder::CreateRaytracingConfigSubobject()
 {
-	D3D12_RAYTRACING_SHADER_CONFIG raytracingConfig{};
+	raytracingConfig = {};
 	raytracingConfig.MaxPayloadSizeInBytes = raytracingLibraryDesc.payloadStride;
 	raytracingConfig.MaxAttributeSizeInBytes = raytracingLibraryDesc.attributeStride;
 
@@ -666,13 +682,15 @@ void Graphics::Assets::RaytracingObjectBuilder::CreateLocalRootSignatureSubobjec
 	RootSignatureVariant signatureVariant, D3D12_STATE_SUBOBJECT& localRootSubobject,
 	D3D12_STATE_SUBOBJECT& assotiationSubobject)
 {
-	D3D12_LOCAL_ROOT_SIGNATURE localSignature{};
+	localSignatures.push_back({});
+
+	auto& localSignature = localSignatures[localSignatures.size() - 1];
 	localSignature.pLocalRootSignature = rootSignature;
 
 	localRootSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
 	localRootSubobject.pDesc = &localSignature;
 
-	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION assotiation{};
+	assotiation = {};
 	assotiation.pSubobjectToAssociate = &localRootSubobject;
 	assotiation.NumExports = 1u;
 
@@ -691,7 +709,7 @@ void Graphics::Assets::RaytracingObjectBuilder::CreateLocalRootSignatureSubobjec
 
 D3D12_STATE_SUBOBJECT Graphics::Assets::RaytracingObjectBuilder::CreateGlobalRootSignatureSubobject(ID3D12RootSignature* rootSignature)
 {
-	D3D12_GLOBAL_ROOT_SIGNATURE globalSignature{};
+	globalSignature = {};
 	globalSignature.pGlobalRootSignature = rootSignature;
 
 	D3D12_STATE_SUBOBJECT subobject{};
@@ -703,7 +721,7 @@ D3D12_STATE_SUBOBJECT Graphics::Assets::RaytracingObjectBuilder::CreateGlobalRoo
 
 D3D12_STATE_SUBOBJECT Graphics::Assets::RaytracingObjectBuilder::CreatePipelineConfigSubobject()
 {
-	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig{};
+	pipelineConfig = {};
 	pipelineConfig.MaxTraceRecursionDepth = raytracingLibraryDesc.maxRecursionLevel;
 
 	D3D12_STATE_SUBOBJECT subobject{};
@@ -728,101 +746,57 @@ void Graphics::Assets::RaytracingObjectBuilder::AddLibraryExport(const LPCWSTR& 
 	}
 }
 
-uint64_t Graphics::Assets::RaytracingObjectBuilder::CalculateShaderTablesSize(uint64_t& rayGenerationSize,
-	uint64_t& missStride, uint64_t& missSize, uint64_t& hitStride, uint64_t& hitSize)
+RaytracingShaderRecord Graphics::Assets::RaytracingObjectBuilder::CreateShaderRecord(RootSignatureVariant signatureVariant,
+	const void* shaderIdentifier)
 {
-	rayGenerationSize = 0u;
-	missStride = 0u;
-	missSize = 0u;
-	hitStride = 0u;
-	hitSize = 0u;
-	
-	for (auto& localRootDataElement : localRootData)
+	RaytracingShaderRecord shaderRecord{};
+
+	if (shaderIdentifier == nullptr)
 	{
-		if (RootSignatureVariant::Compare(localRootDataElement.first, RootSignatureUsing::GLOBAL))
-			continue;
+		std::array<uint8_t, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES> zeroData{};
 
-		uint64_t recordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+		shaderRecord.AddData(zeroData.data(), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+	}
+	else
+		shaderRecord.AddData(shaderIdentifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 
-		auto& rootData = localRootDataElement.second;
+	auto hash = signatureVariant.GetHash();
 
-		for (auto& rootConstant : rootData.rootConstants)
-			recordSize += rootConstant.second.data.size() * sizeof(uint32_t);
+	if (localRootData.contains(hash))
+	{
+		auto& rootData = localRootData[hash];
 
-		recordSize += rootData.constantBufferSlots.size() * sizeof(D3D12_GPU_VIRTUAL_ADDRESS);
-		recordSize += rootData.bufferSlots.size() * sizeof(D3D12_GPU_VIRTUAL_ADDRESS);
-		recordSize += rootData.rwBufferSlots.size() * sizeof(D3D12_GPU_VIRTUAL_ADDRESS);
-		recordSize += rootData.textureSlots.size() * sizeof(D3D12_GPU_DESCRIPTOR_HANDLE);
-		recordSize = AlignSize(recordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-
-		if (RootSignatureVariant::Compare(localRootDataElement.first, RootSignatureUsing::RAY_GENERATION))
-			rayGenerationSize = recordSize;
-		else if (RootSignatureVariant::Compare(localRootDataElement.first, RootSignatureUsing::MISS))
+		for (auto& order : rootData.localRootParametersOrder)
 		{
-			missStride = missStride < recordSize ? recordSize : missStride;
-			missSize += recordSize;
-		}
-		else if (RootSignatureVariant::Compare(localRootDataElement.first, RootSignatureUsing::TRIANGLE_HIT_GROUP) ||
-			RootSignatureVariant::Compare(localRootDataElement.first, RootSignatureUsing::AABB_HIT_GROUP))
-		{
-			hitStride = hitStride < recordSize ? recordSize : hitStride;
-			hitSize += recordSize;
+			if (order.order == RootParameterOrder::ROOT_CONSTANTS)
+			{
+				auto& rootConstants = rootData.rootConstants[order.index];
+				shaderRecord.AddData(rootConstants.data.data(), rootConstants.data.size());
+			}
+			else if (order.order == RootParameterOrder::CONSTANT_BUFFER)
+			{
+				auto& slot = rootData.constantBufferSlots[order.index];
+				shaderRecord.AddData(&slot.gpuAddress, sizeof(D3D12_GPU_VIRTUAL_ADDRESS));
+			}
+			else if (order.order == RootParameterOrder::TEXTURE)
+			{
+				auto& slot = rootData.textureSlots[order.index];
+				shaderRecord.AddData(&slot.gpuDescriptor, sizeof(D3D12_GPU_DESCRIPTOR_HANDLE));
+			}
+			else if (order.order == RootParameterOrder::BUFFER)
+			{
+				auto& slot = rootData.bufferSlots[order.index];
+				shaderRecord.AddData(&slot.gpuAddress, sizeof(D3D12_GPU_VIRTUAL_ADDRESS));
+			}
+			else if (order.order == RootParameterOrder::RW_BUFFER)
+			{
+				auto& slot = rootData.rwBufferSlots[order.index];
+				shaderRecord.AddData(&slot.gpuAddress, sizeof(D3D12_GPU_VIRTUAL_ADDRESS));
+			}
 		}
 	}
 
-	rayGenerationSize = AlignSize(rayGenerationSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-	missSize = AlignSize(missSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-	hitSize = AlignSize(hitSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-
-	return rayGenerationSize + missSize + hitSize;
-}
-
-void Graphics::Assets::RaytracingObjectBuilder::FillShaderTable(RootSignatureVariant signatureVariant,
-	const uint8_t* shaderIdentifier, uint8_t* destBuffer)
-{
-	auto destAddress = destBuffer;
-	std::copy(shaderIdentifier, shaderIdentifier + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, destAddress);
-	destAddress += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-
-	auto& rootData = localRootData[signatureVariant.GetHash()];
-
-	for (auto& order : localRootParametersOrder)
-	{
-		if (order.order == RootParameterOrder::ROOT_CONSTANTS)
-		{
-			auto& rootConstants = rootData.rootConstants[order.index];
-			
-			auto startAddress = rootConstants.data.data();
-			auto endAddress = startAddress + rootConstants.data.size();
-			std::copy(startAddress, endAddress, reinterpret_cast<uint32_t*>(destAddress));
-
-			destAddress += rootConstants.data.size() * sizeof(uint32_t);
-		}
-		else if (order.order == RootParameterOrder::CONSTANT_BUFFER)
-		{
-			auto& slot = rootData.constantBufferSlots[order.index];
-			*reinterpret_cast<D3D12_GPU_VIRTUAL_ADDRESS*>(destAddress) = slot.gpuAddress;
-			destAddress += sizeof(D3D12_GPU_VIRTUAL_ADDRESS);
-		}
-		else if (order.order == RootParameterOrder::TEXTURE)
-		{
-			auto& slot = rootData.textureSlots[order.index];
-			*reinterpret_cast<D3D12_GPU_DESCRIPTOR_HANDLE*>(destAddress) = slot.gpuDescriptor;
-			destAddress += sizeof(D3D12_GPU_DESCRIPTOR_HANDLE);
-		}
-		else if (order.order == RootParameterOrder::BUFFER)
-		{
-			auto& slot = rootData.bufferSlots[order.index];
-			*reinterpret_cast<D3D12_GPU_VIRTUAL_ADDRESS*>(destAddress) = slot.gpuAddress;
-			destAddress += sizeof(D3D12_GPU_VIRTUAL_ADDRESS);
-		}
-		else if (order.order == RootParameterOrder::RW_BUFFER)
-		{
-			auto& slot = rootData.rwBufferSlots[order.index];
-			*reinterpret_cast<D3D12_GPU_VIRTUAL_ADDRESS*>(destAddress) = slot.gpuAddress;
-			destAddress += sizeof(D3D12_GPU_VIRTUAL_ADDRESS);
-		}
-	}
+	return shaderRecord;
 }
 
 void Graphics::Assets::RaytracingObjectBuilder::CreateBottomLevelAccelerationStructure(ID3D12Device5* device,
@@ -840,13 +814,11 @@ void Graphics::Assets::RaytracingObjectBuilder::CreateBottomLevelAccelerationStr
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo{};
 	device->GetRaytracingAccelerationStructurePrebuildInfo(&desc.Inputs, &prebuildInfo);
 
-
-
 	auto scratchBuffer = bufferManager->Allocate(device, prebuildInfo.ScratchDataSizeInBytes,
 		BufferAllocationType::UNORDERED_ACCESS_TEMP);
 
 	bottomLevelStructure = bufferManager->Allocate(device, prebuildInfo.ResultDataMaxSizeInBytes,
-		BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL);
+		BufferAllocationType::ACCELERATION_STRUCTURE);
 
 	desc.ScratchAccelerationStructureData = scratchBuffer.gpuAddress;
 	desc.DestAccelerationStructureData = bottomLevelStructure.gpuAddress;
@@ -867,7 +839,7 @@ void Graphics::Assets::RaytracingObjectBuilder::CreateTopLevelAccelerationStruct
 	desc.Inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
 	desc.Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	desc.Inputs.NumDescs = hasStruct && hasStructAABB ? 2u : 1u;
-
+	
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo{};
 	device->GetRaytracingAccelerationStructurePrebuildInfo(&desc.Inputs, &prebuildInfo);
 
@@ -877,7 +849,7 @@ void Graphics::Assets::RaytracingObjectBuilder::CreateTopLevelAccelerationStruct
 	desc.ScratchAccelerationStructureData = scratchBuffer.gpuAddress;
 
 	topLevelStructure = bufferManager->Allocate(device, prebuildInfo.ResultDataMaxSizeInBytes,
-		BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL);
+		BufferAllocationType::ACCELERATION_STRUCTURE);
 
 	desc.DestAccelerationStructureData = topLevelStructure.gpuAddress;
 
@@ -886,23 +858,23 @@ void Graphics::Assets::RaytracingObjectBuilder::CreateTopLevelAccelerationStruct
 	if (hasStruct)
 	{
 		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc{};
-
 		instanceDesc.InstanceMask = 1u;
 		instanceDesc.InstanceContributionToHitGroupIndex = 0u;
 		instanceDesc.AccelerationStructure = bottomLevelStructure.gpuAddress;
+		instanceDesc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), XMMatrixIdentity());
-
+		
 		instanceDescs.push_back(instanceDesc);
 	}
 
 	if (hasStructAABB)
 	{
 		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc{};
-
 		instanceDesc.InstanceMask = 1u;
 		instanceDesc.InstanceContributionToHitGroupIndex = raytracingLibraryDesc.triangleHitGroups.size();
 		instanceDesc.AccelerationStructure = bottomLevelStructureAABB.gpuAddress;
+		instanceDesc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), XMMatrixIdentity());
 
@@ -911,7 +883,7 @@ void Graphics::Assets::RaytracingObjectBuilder::CreateTopLevelAccelerationStruct
 
 	auto instanceDescBufferSize = instanceDescs.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
 	auto instanceDescBuffer = bufferManager->Allocate(device, instanceDescBufferSize, BufferAllocationType::UPLOAD);
-	
+
 	auto startAddress = reinterpret_cast<const uint8_t*>(instanceDescs.data());
 	auto endAddress = startAddress + instanceDescBufferSize;
 	std::copy(startAddress, endAddress, instanceDescBuffer.cpuAddress);
@@ -921,7 +893,12 @@ void Graphics::Assets::RaytracingObjectBuilder::CreateTopLevelAccelerationStruct
 	commandList->BuildRaytracingAccelerationStructure(&desc, 0u, nullptr);
 }
 
-uint64_t Graphics::Assets::RaytracingObjectBuilder::AlignSize(uint64_t size, uint64_t alignment)
+bool Graphics::Assets::RaytracingObjectBuilder::HitGroupIsEmpty(const RaytracingHitGroup& hitGroup)
 {
-	return (size + alignment - 1u) & ~(alignment - 1u);
+	if ((hitGroup.closestHitShaderName == nullptr || hitGroup.closestHitShaderName == L"") &&
+		(hitGroup.anyHitShaderName == nullptr || hitGroup.anyHitShaderName == L"") &&
+		(hitGroup.intersectionShaderName == nullptr || hitGroup.intersectionShaderName == L""))
+		return true;
+
+	return false;
 }

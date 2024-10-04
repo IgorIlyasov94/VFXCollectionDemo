@@ -59,7 +59,7 @@ namespace Common::Logic::Scene
 		static constexpr float FOV_Y = DirectX::XM_PI / 4.0f;
 		static constexpr float Z_NEAR = 0.01f;
 		static constexpr float Z_FAR = 1000.0f;
-		static constexpr float AREA_LIGHT_INTENSITY_INCREMENT_SPEED = 0.075f;
+		static constexpr float AREA_LIGHT_INTENSITY_INCREMENT_SPEED = 1.5f;
 		static constexpr float AMBIENT_LIGHT_INTENSITY_INCREMENT_SPEED = 0.01f;
 
 		struct MutableConstants

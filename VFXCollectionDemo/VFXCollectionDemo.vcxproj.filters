@@ -61,6 +61,12 @@
     <Filter Include="Исходные файлы\Common\Logic\Scene">
       <UniqueIdentifier>{4dead331-8f14-4c2e-8d8a-571a0c1b6bcf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Файлы заголовков\Graphics\Assets\Raytracing">
+      <UniqueIdentifier>{e3ccdcef-add6-4cee-bd37-b8707da7769e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Graphics\Assets\Raytracing">
+      <UniqueIdentifier>{35f0b4ed-2744-4d00-bcbe-b0e939e7352d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -206,6 +212,12 @@
     </ClCompile>
     <ClCompile Include="Common\Logic\Scene\Scene_1_Whiteroom.cpp">
       <Filter>Исходные файлы\Common\Logic\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Assets\Raytracing\RaytracingShaderRecord.cpp">
+      <Filter>Исходные файлы\Graphics\Assets\Raytracing</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Assets\Raytracing\RaytracingShaderTable.cpp">
+      <Filter>Исходные файлы\Graphics\Assets\Raytracing</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -382,6 +394,12 @@
     </ClInclude>
     <ClInclude Include="Common\Logic\Scene\Scene_1_Whiteroom.h">
       <Filter>Файлы заголовков\Common\Logic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Assets\Raytracing\RaytracingShaderRecord.h">
+      <Filter>Файлы заголовков\Graphics\Assets\Raytracing</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Assets\Raytracing\RaytracingShaderTable.h">
+      <Filter>Файлы заголовков\Graphics\Assets\Raytracing</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

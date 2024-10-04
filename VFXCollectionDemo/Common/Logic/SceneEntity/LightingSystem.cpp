@@ -299,7 +299,7 @@ void Common::Logic::SceneEntity::LightingSystem::CreateConstantBuffers()
 	}
 
 	BufferDesc bufferDesc{};
-	bufferDesc.data.resize(sizeof(float4x4) * lightMatricesNumber, 0u);
+	bufferDesc.data.resize(std::max(sizeof(float4x4) * lightMatricesNumber, 1ull), 0u);
 	bufferDesc.flag = BufferFlag::IS_CONSTANT_DYNAMIC;
 
 	lightMatricesConstantBufferId = resourceManager->CreateBufferResource(_renderer->GetDevice(), nullptr,

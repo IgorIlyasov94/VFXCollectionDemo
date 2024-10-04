@@ -499,7 +499,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 	materialBuilder.SetBuffer(2u, bloomBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
-	materialBuilder.SetDepthStencilFormat(0u, false);
+	materialBuilder.SetDepthStencilFormat(0u, false, true);
 	materialBuilder.SetRenderTargetFormat(0u, renderer->BACK_BUFFER_FORMAT);
 	materialBuilder.SetGeometryFormat(quadMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	materialBuilder.SetVertexShader(quadVS->bytecode);

@@ -37,6 +37,14 @@ float Weight(int x, float sigma)
 	return exp(-x * x / (2.0f * sigma * sigma)) / (sigma * sqrt(2.0f * PI));
 }
 
+float3 ToneMapping(float3 color, float luminance)
+{
+	color *= (1.0f.xxx + luminance / (whiteCutoff * whiteCutoff)) / (1.0f.xxx + luminance);
+	color = pow(color, 1.0f / 2.2f);
+	
+	return color;
+}
+
 [numthreads(NUM_THREADS, 1, 1)]
 void main(Input input)
 {
@@ -60,10 +68,8 @@ void main(Input input)
 	color += sceneBuffer[texIndex.z].xyz;
 	color += sceneBuffer[texIndex.w].xyz;
 	
-	color = max(color - brightThreshold, 0.0f.xxx) * 0.25f;
-	color *= middleGray / (luminance + 0.001f);
-	color *= 1.0f.xxx + color / whiteCutoff;
-	color /= 1.0f.xxx + color;
+	color = max(color - brightThreshold, 0.0f.xxx);
+	color = ToneMapping(color, luminance);
 	
 	groupBuffer[input.groupIndex] = color;
 	

@@ -48,7 +48,7 @@ D3D12_SHADER_RESOURCE_VIEW_DESC Graphics::DirectX12Utilities::CreateSRVDesc(cons
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc{};
 	shaderResourceViewDesc.Format = desc.dataStride == 0 ? desc.format : (desc.dataStride == 1) ?
-		DXGI_FORMAT_R32_UINT : DXGI_FORMAT_UNKNOWN;
+		DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_UNKNOWN;
 	shaderResourceViewDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 	shaderResourceViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	shaderResourceViewDesc.Buffer.Flags = (desc.dataStride == 1) ? D3D12_BUFFER_SRV_FLAG_RAW : D3D12_BUFFER_SRV_FLAG_NONE;

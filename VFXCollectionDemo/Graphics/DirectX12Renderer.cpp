@@ -288,6 +288,23 @@ void Graphics::DirectX12Renderer::CreateGPUResources(uint32_t width, uint32_t he
 
 ID3D12Device2* Graphics::DirectX12Renderer::CreateDevice(IDXGIFactory4* factory)
 {
+#if defined(_DEBUG)
+    ID3D12Debug* debugController = nullptr;
+    //ID3D12Debug1* debugController1 = nullptr;
+
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+    {
+        //if (SUCCEEDED(debugController->QueryInterface(IID_PPV_ARGS(&debugController1))))
+        //{
+        //    debugController1->SetEnableGPUBasedValidation(true);
+        //    debugController1->Release();
+        //}
+
+        debugController->EnableDebugLayer();
+        debugController->Release();
+    }
+#endif
+
     ID3D12Device2* newDevice = nullptr;
 
     auto adapter = FindHighestPerformanceAdapter(factory);
@@ -304,16 +321,7 @@ IDXGIFactory4* Graphics::DirectX12Renderer::CreateFactory()
     UINT dxgiFactoryFlags = 0;
 
 #if defined(_DEBUG)
-    ID3D12Debug* debugController = nullptr;
-
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-    {
-        debugController->EnableDebugLayer();
-
-        dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-
-        debugController->Release();
-    }
+    dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 #endif
 
     IDXGIFactory4* factory = nullptr;

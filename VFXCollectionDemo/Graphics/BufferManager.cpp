@@ -31,7 +31,7 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 	if (type != BufferAllocationType::UPLOAD &&
 		type != BufferAllocationType::COMMON &&
 		type != BufferAllocationType::UNORDERED_ACCESS &&
-		type != BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL &&
+		type != BufferAllocationType::ACCELERATION_STRUCTURE &&
 		type != BufferAllocationType::UNORDERED_ACCESS_TEMP)
 		for (auto& buffer : buffers)
 		{
@@ -92,7 +92,7 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 	resourceDesc.Alignment = DEFAULT_BUFFER_ALIGNMENT;
 
 	if (type == BufferAllocationType::UNORDERED_ACCESS ||
-		type == BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL ||
+		type == BufferAllocationType::ACCELERATION_STRUCTURE ||
 		type == BufferAllocationType::UNORDERED_ACCESS_TEMP)
 		resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
@@ -112,7 +112,7 @@ Graphics::BufferAllocation Graphics::BufferManager::Allocate(ID3D12Device* devic
 	else if (type == BufferAllocationType::UNORDERED_ACCESS ||
 		type == BufferAllocationType::UNORDERED_ACCESS_TEMP)
 		state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-	else if (type == BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL)
+	else if (type == BufferAllocationType::ACCELERATION_STRUCTURE)
 		state = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
 	else
 		state = D3D12_RESOURCE_STATE_COPY_DEST;
@@ -159,11 +159,10 @@ void Graphics::BufferManager::Deallocate(Resources::GPUResource* allocatedResour
 				buffer.type == BufferAllocationType::COMMON ||
 				buffer.type == BufferAllocationType::UNORDERED_ACCESS ||
 				buffer.type == BufferAllocationType::SHADER_TABLES ||
-				buffer.type == BufferAllocationType::ACCELERATION_STRUCTURE_BOTTOM_LEVEL ||
+				buffer.type == BufferAllocationType::ACCELERATION_STRUCTURE ||
 				buffer.type == BufferAllocationType::UNORDERED_ACCESS_TEMP)
 			{
-				if (buffer.type == BufferAllocationType::DYNAMIC_CONSTANT ||
-					buffer.type == BufferAllocationType::SHADER_TABLES)
+				if (buffer.type == BufferAllocationType::DYNAMIC_CONSTANT)
 					buffer.resource->Unmap();
 
 				delete buffer.resource;

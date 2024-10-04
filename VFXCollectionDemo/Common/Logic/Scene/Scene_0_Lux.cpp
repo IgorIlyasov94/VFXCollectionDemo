@@ -181,17 +181,17 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 	vegetationSystem->Update(timer, _deltaTime);
 
 	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
-	areaLightDesc.intensity = std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 60.0f) * 3.0f + areaLightIntensity;
+	areaLightDesc.intensity = std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 60.0f) * 8.0f + areaLightIntensity;
 
 	lightingSystem->UpdateSourceDesc(areaLightId);
 
 	auto& ambientLightDesc = lightingSystem->GetSourceDesc(ambientLightId);
-	ambientLightDesc.intensity = std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 120.0f) * 0.2f + ambientLightIntensity;
+	ambientLightDesc.intensity = std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 120.0f) * 0.01f + ambientLightIntensity;
 
 	lightingSystem->UpdateSourceDesc(ambientLightId);
 
-	if (areaLightIntensity < 2.0f)
-		areaLightIntensity += _deltaTime* AREA_LIGHT_INTENSITY_INCREMENT_SPEED;
+	if (areaLightIntensity < 5.0f)
+		areaLightIntensity += _deltaTime * AREA_LIGHT_INTENSITY_INCREMENT_SPEED;
 }
 
 void Common::Logic::Scene::Scene_0_Lux::RenderShadows(ID3D12GraphicsCommandList* commandList)

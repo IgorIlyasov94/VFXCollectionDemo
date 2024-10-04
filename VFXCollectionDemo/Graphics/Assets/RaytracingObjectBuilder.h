@@ -4,6 +4,7 @@
 #include "../Resources/IResource.h"
 #include "../BufferManager.h"
 #include "../Resources/ResourceManager.h"
+#include "Raytracing/RaytracingShaderTable.h"
 #include "Mesh.h"
 #include "RaytracingObject.h"
 
@@ -165,11 +166,9 @@ namespace Graphics::Assets
 		D3D12_STATE_SUBOBJECT CreatePipelineConfigSubobject();
 
 		void AddLibraryExport(const LPCWSTR& name);
-		uint64_t CalculateShaderTablesSize(uint64_t& rayGenerationSize, uint64_t& missStride, uint64_t& missSize,
-			uint64_t& hitStride, uint64_t& hitSize);
-
-		void FillShaderTable(RootSignatureVariant signatureVariant, const uint8_t* shaderIdentifier,
-			uint8_t* destBuffer);
+		
+		Graphics::Assets::Raytracing::RaytracingShaderRecord CreateShaderRecord(RootSignatureVariant signatureVariant,
+			const void* shaderIdentifier);
 
 		void CreateBottomLevelAccelerationStructure(ID3D12Device5* device, ID3D12GraphicsCommandList5* commandList,
 			BufferManager* bufferManager, const std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>& geometryDescArray,
@@ -180,15 +179,33 @@ namespace Graphics::Assets
 			const BufferAllocation& bottomLevelStructure, const BufferAllocation& bottomLevelStructureAABB,
 			BufferAllocation& topLevelStructure);
 
-		uint64_t AlignSize(uint64_t size, uint64_t alignment);
+		bool HitGroupIsEmpty(const RaytracingHitGroup& hitGroup);
 
 		RaytracingLibraryDesc raytracingLibraryDesc;
+		D3D12_DXIL_LIBRARY_DESC libraryDesc;
+		std::vector<D3D12_HIT_GROUP_DESC> hitGroupDescs;
+		D3D12_RAYTRACING_SHADER_CONFIG raytracingConfig;
+		D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
+		std::vector<D3D12_LOCAL_ROOT_SIGNATURE> localSignatures;
+		D3D12_GLOBAL_ROOT_SIGNATURE globalSignature;
+		D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION assotiation;
+		
+		uint32_t rootSignatureIndexCounter;
 
 		std::map<uint32_t, uint32_t> rootConstantIndices;
 		std::vector<DescriptorSlot> constantBufferSlots;
 		std::vector<DescriptorSlot> bufferSlots;
 		std::vector<DescriptorSlot> rwBufferSlots;
 		std::vector<DescriptorTableSlot> textureSlots;
+
+		enum class RootParameterOrder : uint32_t
+		{
+			ROOT_CONSTANTS = 0u,
+			CONSTANT_BUFFER = 1u,
+			BUFFER = 2u,
+			RW_BUFFER = 3u,
+			TEXTURE = 4u
+		};
 
 		struct LocalRootConstants
 		{
@@ -203,25 +220,6 @@ namespace Graphics::Assets
 			std::vector<uint32_t> data;
 		};
 
-		struct LocalRootData
-		{
-		public:
-			std::unordered_map<uint32_t, LocalRootConstants> rootConstants;
-			std::vector<DescriptorSlot> constantBufferSlots;
-			std::vector<DescriptorSlot> bufferSlots;
-			std::vector<DescriptorSlot> rwBufferSlots;
-			std::vector<DescriptorTableSlot> textureSlots;
-		};
-
-		enum class RootParameterOrder : uint32_t
-		{
-			ROOT_CONSTANTS = 0u,
-			CONSTANT_BUFFER = 1u,
-			BUFFER = 2u,
-			RW_BUFFER = 3u,
-			TEXTURE = 4u
-		};
-
 		struct RootParameterOrderIndex
 		{
 		public:
@@ -230,11 +228,21 @@ namespace Graphics::Assets
 			RootParameterOrder order;
 		};
 
+		struct LocalRootData
+		{
+		public:
+			std::unordered_map<uint32_t, LocalRootConstants> rootConstants;
+			std::vector<DescriptorSlot> constantBufferSlots;
+			std::vector<DescriptorSlot> bufferSlots;
+			std::vector<DescriptorSlot> rwBufferSlots;
+			std::vector<DescriptorTableSlot> textureSlots;
+			std::vector<RootParameterOrderIndex> localRootParametersOrder;
+		};
+
 		std::unordered_map<uint64_t, std::vector<D3D12_ROOT_PARAMETER>> rootParameters;
 
 		std::unordered_map<uint64_t, LocalRootData> localRootData;
-		std::vector<RootParameterOrderIndex> localRootParametersOrder;
-
+		
 		std::vector<D3D12_EXPORT_DESC> libraryExports;
 		std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs;
 		std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> aabbGeometryDescs;

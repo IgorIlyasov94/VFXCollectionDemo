@@ -51,6 +51,9 @@ Graphics::DescriptorAllocation Graphics::DescriptorManager::Allocate(DescriptorT
 
 void Graphics::DescriptorManager::Deallocate(DescriptorType type, const DescriptorAllocation& allocation)
 {
+	if (allocation.cpuDescriptor.ptr == 0ull || allocation.gpuDescriptor.ptr == 0ull)
+		return;
+
 	auto& descriptor = descriptors[type];
 
 	DescriptorOffset offset{};

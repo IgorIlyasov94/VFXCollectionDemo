@@ -21,7 +21,7 @@ namespace Graphics::Assets
 
 		const D3D12_DISPATCH_RAYS_DESC& dispatchRaysDesc;
 
-		BufferAllocation shaderLibraryGPUAllocation;
+		BufferAllocation shaderTable;
 		BufferAllocation bottomLevelStructure;
 		BufferAllocation bottomLevelStructureAABB;
 		BufferAllocation topLevelStructure;
@@ -60,7 +60,7 @@ namespace Graphics::Assets
 		std::vector<DescriptorSlot> _rwBufferSlots;
 		std::vector<DescriptorTableSlot> _textureSlots;
 
-		BufferAllocation shaderLibraryGPUAllocation;
+		BufferAllocation shaderTable;
 		BufferAllocation bottomLevelStructure;
 		BufferAllocation bottomLevelStructureAABB;
 		BufferAllocation topLevelStructure;

@@ -54,6 +54,8 @@
     <ClInclude Include="Graphics\Assets\MeshDesc.h" />
     <ClInclude Include="Graphics\Assets\RaytracingObject.h" />
     <ClInclude Include="Graphics\Assets\RaytracingObjectBuilder.h" />
+    <ClInclude Include="Graphics\Assets\Raytracing\RaytracingShaderRecord.h" />
+    <ClInclude Include="Graphics\Assets\Raytracing\RaytracingShaderTable.h" />
     <ClInclude Include="Graphics\BufferManager.h" />
     <ClInclude Include="Graphics\CommandManager.h" />
     <ClInclude Include="Graphics\DescriptorManager.h" />
@@ -109,6 +111,8 @@
     <ClCompile Include="Graphics\Assets\Mesh.cpp" />
     <ClCompile Include="Graphics\Assets\RaytracingObject.cpp" />
     <ClCompile Include="Graphics\Assets\RaytracingObjectBuilder.cpp" />
+    <ClCompile Include="Graphics\Assets\Raytracing\RaytracingShaderRecord.cpp" />
+    <ClCompile Include="Graphics\Assets\Raytracing\RaytracingShaderTable.cpp" />
     <ClCompile Include="Graphics\BufferManager.cpp" />
     <ClCompile Include="Graphics\CommandManager.cpp" />
     <ClCompile Include="Graphics\DescriptorManager.cpp" />

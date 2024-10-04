@@ -5,6 +5,8 @@ static const float EPSILON = 0.59604645E-7f;
 
 static const float AREA_LIGHT_SAMPLE_WEIGHT = 1.0f / AREA_LIGHT_SAMPLES_NUMBER;
 
+static const float3 LUMINANCE_VECTOR = float3(0.2126f, 0.7152f, 0.0722f);
+
 static const float3 AREA_LIGHT_SAMPLES[AREA_LIGHT_SAMPLES_NUMBER] =
 {
 	float3(0.154508f, 0.475528f, 0.000000f),
@@ -177,19 +179,24 @@ void CalculatePBRLighting(LightingDesc lightingDesc, float3 viewDir, out float3 
 	float3 normal = lightingDesc.surface.normal;
 	float3 lightVec = lightingDesc.lightData.vector;
 	float3 lightDir = normalize(lightVec);
-	float3 albedo = lerp(lightingDesc.material.albedo, 0.0f.xxx, lightingDesc.material.metalness);
+	float3 albedo = lightingDesc.material.albedo;
 	
-	float attenuation = lightingDesc.lightData.attenuationCoeff / max(dot(lightVec, lightVec), 0.01f);
+	float attenuation = lightingDesc.lightData.attenuationCoeff / max(1.0f + dot(lightVec, lightVec), 0.01f);
 	
 	float3 F;
-	float3 F0 = lightingDesc.material.f0;
+	float3 F0 = lerp(lightingDesc.material.f0, albedo, lightingDesc.material.metalness);
 	float3 F90 = lightingDesc.material.f90;
 	float roughness = lightingDesc.material.roughness;
 	
 	float3 specular = max(GGX_Specular(normal, viewDir, lightDir, roughness, F0, F90, F), 0.0f.xxx);
 	float3 diffuse = max(GGX_Diffuse(normal, lightDir, F), 0.0f.xxx);
 	
-	light = (albedo * diffuse + specular) * lightingDesc.lightData.color * attenuation;
+	float intensity = dot(lightingDesc.lightData.color, LUMINANCE_VECTOR);
+	
+	float3 diffuseColor = lightingDesc.lightData.color;
+	float3 specularColor = lerp(intensity.xxx, lightingDesc.lightData.color, lightingDesc.material.metalness);
+	
+	light = (albedo * diffuse * diffuseColor + specular * specularColor) * attenuation;
 }
 
 void CalculatePBRAmbient(LightingDesc lightingDesc, float3 viewDir, out float3 light)
