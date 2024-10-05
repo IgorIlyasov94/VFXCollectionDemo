@@ -92,7 +92,7 @@ namespace Common::Logic::Scene
 		struct PayloadShadow
 		{
 		public:
-			bool isShadow;
+			float3 lightFactor;
 		};
 
 		struct BuiltInTriangleIntersectionAttributes

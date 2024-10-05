@@ -153,14 +153,14 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Update()
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 
 	auto& light0Desc = lightingSystem->GetSourceDesc(pointLight0Id);
-	light0Desc.intensity = std::cos(timer * 0.8f) * 5.0f + 10.0f;
+	light0Desc.intensity = std::sin(timer * 1.8f) * 0.5f + 4.0f;
 	lightingSystem->UpdateSourceDesc(pointLight0Id);
 	
 	auto& light1Desc = lightingSystem->GetSourceDesc(pointLight1Id);
-	light1Desc.intensity = std::cos(timer * 0.8f) * 2.0f + 4.0f;
+	light1Desc.intensity = std::cos(timer * 1.8f) * 0.5f + 4.0f;
 	light1Desc.position.x = -3.0f;
-	light1Desc.position.y = 2.5f + std::sin(timer * 0.9f) * 2.0f;
-	light1Desc.position.z = 2.5f + std::cos(timer * 0.9f) * 2.0f;
+	light1Desc.position.y = 2.5f + std::sin(timer * 0.9f) * 1.5f;
+	light1Desc.position.z = 2.5f + std::cos(timer * 0.9f) * 1.5f;
 
 	lightingSystem->UpdateSourceDesc(pointLight1Id);
 
@@ -348,8 +348,8 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateLights(Graphics::DirectX12Re
 	lightingSystem = new LightingSystem(renderer);
 
 	LightDesc pointLight0{};
-	pointLight0.position = float3(1.0f, -4.0f, 1.5f);
-	pointLight0.color = float3(1.0f, 0.7f, 0.4f);
+	pointLight0.position = float3(-3.75f, 2.5f, 2.5f);
+	pointLight0.color = float3(1.0f, 0.8f, 0.8f);
 	pointLight0.intensity = lightIntensity0;
 	pointLight0.type = LightType::POINT_LIGHT;
 
@@ -357,7 +357,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateLights(Graphics::DirectX12Re
 
 	LightDesc pointLight1{};
 	pointLight1.position = float3(-4.0f, 1.5f, 2.5f);
-	pointLight1.color = float3(0.8f, 0.7f, 1.0f);
+	pointLight1.color = float3(0.8f, 0.8f, 1.0f);
 	pointLight1.intensity = lightIntensity1;
 	pointLight1.type = LightType::POINT_LIGHT;
 
@@ -414,7 +414,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateObjects(ID3D12Device* device
 	auto whiteroomNormal = resourceManager->GetResource<Texture>(whiteroomNormalId);
 	auto noise = resourceManager->GetResource<Texture>(noiseId);
 	auto resultTarget = resourceManager->GetResource<RWTexture>(resultTargetId);
-	auto linearSampler = resourceManager->GetDefaultSampler(device, DefaultFilterSetup::FILTER_BILINEAR_CLAMP);
+	auto linearSampler = resourceManager->GetDefaultSampler(device, DefaultFilterSetup::FILTER_BILINEAR_WRAP);
 	auto pointSampler = resourceManager->GetDefaultSampler(device, DefaultFilterSetup::FILTER_POINT_WRAP);
 
 	auto lightingRS = resourceManager->GetResource<Shader>(lightingRSId);
@@ -435,7 +435,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateObjects(ID3D12Device* device
 	crystalShadowHitGroup.anyHitShaderName = L"CrystalAnyHit_Shadow";
 
 	RaytracingLibraryDesc libraryDesc{};
-	libraryDesc.maxRecursionLevel = 3u;
+	libraryDesc.maxRecursionLevel = 4u;
 	libraryDesc.dxilLibrary = lightingRS->bytecode;
 	libraryDesc.triangleHitGroups.push_back(hitGroup);
 	libraryDesc.triangleHitGroups.push_back(shadowHitGroup);
