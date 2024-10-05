@@ -19,11 +19,11 @@ Common::Logic::Scene::Scene_1_WhiteRoom::Scene_1_WhiteRoom()
 	whiteroomIndexBufferId{}, whiteroomVertexBufferResource{}, whiteroomIndexBufferResource{}, lightingRSId{},
 	postProcessManager{}, groupsNumberX(1u), groupsNumberY(1u), accelerationStructureDesc{},
 	accelerationStructureCrystalDesc{}, lightIntensity0{}, lightIntensity1{}, quadMesh{}, pointLight0Id{}, pointLight1Id{},
-	quadVSId{}, quadPSId{}, texturedQuadMaterial{}, noiseId{}, crystalVertexBufferResource{}, crystalIndexBufferResource{}
+	quadVSId{}, quadPSId{}, texturedQuadMaterial{}, noiseId{}, crystalVertexBufferResource{}, crystalIndexBufferResource{},
+	crystalVertexBufferId{}, crystalIndexBufferId{}
 {
 	cameraPosition = float3(5.5f, 5.5f, 2.5f);
-
-	cameraLookAt = float3(0.0f, 0.0f, 2.5f);
+	cameraLookAt = float3(-2.5f, 2.5f, 2.5f);
 
 	cameraUpVector = float3(0.0f, 0.0f, 1.0f);
 	auto cameraUpVectorN = DirectX::XMLoadFloat3(&cameraUpVector);
@@ -53,8 +53,8 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Load(Graphics::DirectX12Renderer* 
 	groupsNumberX = width == 0u ? 1u : width;
 	groupsNumberY = height == 0u ? 1u : height;
 
-	lightIntensity0 = 3.0f;
-	lightIntensity1 = 3.0f;
+	lightIntensity0 = 10.0f;
+	lightIntensity1 = 5.0f;
 
 	CreateLights(renderer);
 	LoadMeshes(device, commandList, resourceManager);
@@ -139,9 +139,9 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::OnResize(Graphics::DirectX12Render
 
 void Common::Logic::Scene::Scene_1_WhiteRoom::Update()
 {
-	cameraPosition.x = std::abs(std::cos(timer * 0.2f)) * 5.0f;
-	cameraPosition.y = std::abs(std::sin(timer * 0.2f)) * 5.0f;
-	cameraPosition.z = 4.0f;
+	cameraPosition.x = -2.5f + std::cos(timer * 0.4f) * 2.5f;
+	cameraPosition.y = 2.5f + std::sin(timer * 0.4f) * 2.5f;
+	cameraPosition.z = 3.0f;
 
 	cameraUpVector = float3(0.0f, 0.0f, 1.0f);
 	auto cameraUpVectorN = DirectX::XMLoadFloat3(&cameraUpVector);
@@ -152,19 +152,17 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Update()
 
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 
-	//auto& light0Desc = lightingSystem->GetSourceDesc(pointLight0Id);
-	//light0Desc.position.x = 4.5f;
-	//light0Desc.position.y = std::cos(timer) * 2.0f;
-	//light0Desc.position.z = 2.5f + std::sin(timer) * 2.0f;
-	//
-	//lightingSystem->UpdateSourceDesc(pointLight0Id);
-	//
-	//auto& light1Desc = lightingSystem->GetSourceDesc(pointLight1Id);
-	//light1Desc.position.x = std::cos(timer * 0.9f) * 2.0f;
-	//light1Desc.position.y = 4.5f;
-	//light1Desc.position.z = 2.5f + std::sin(timer * 0.9f) * 2.0f;
-	//
-	//lightingSystem->UpdateSourceDesc(pointLight1Id);
+	auto& light0Desc = lightingSystem->GetSourceDesc(pointLight0Id);
+	light0Desc.intensity = std::cos(timer * 0.8f) * 5.0f + 10.0f;
+	lightingSystem->UpdateSourceDesc(pointLight0Id);
+	
+	auto& light1Desc = lightingSystem->GetSourceDesc(pointLight1Id);
+	light1Desc.intensity = std::cos(timer * 0.8f) * 2.0f + 4.0f;
+	light1Desc.position.x = -3.0f;
+	light1Desc.position.y = 2.5f + std::sin(timer * 0.9f) * 2.0f;
+	light1Desc.position.z = 2.5f + std::cos(timer * 0.9f) * 2.0f;
+
+	lightingSystem->UpdateSourceDesc(pointLight1Id);
 
 	mutableConstantsBuffer->invViewProjection = camera->GetInvViewProjection();
 	mutableConstantsBuffer->cameraPosition = camera->GetPosition();
@@ -350,7 +348,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateLights(Graphics::DirectX12Re
 	lightingSystem = new LightingSystem(renderer);
 
 	LightDesc pointLight0{};
-	pointLight0.position = float3(4.0f, -4.0f, 1.5f);
+	pointLight0.position = float3(1.0f, -4.0f, 1.5f);
 	pointLight0.color = float3(1.0f, 0.7f, 0.4f);
 	pointLight0.intensity = lightIntensity0;
 	pointLight0.type = LightType::POINT_LIGHT;
@@ -359,7 +357,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateLights(Graphics::DirectX12Re
 
 	LightDesc pointLight1{};
 	pointLight1.position = float3(-4.0f, 1.5f, 2.5f);
-	pointLight1.color = float3(0.4f, 0.7f, 1.0f);
+	pointLight1.color = float3(0.8f, 0.7f, 1.0f);
 	pointLight1.intensity = lightIntensity1;
 	pointLight1.type = LightType::POINT_LIGHT;
 
@@ -430,7 +428,6 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateObjects(ID3D12Device* device
 
 	RaytracingHitGroup crystalHitGroup{};
 	crystalHitGroup.hitGroupName = L"CrystalTriangleHitGroup";
-	crystalHitGroup.anyHitShaderName = L"CrystalAnyHit";
 	crystalHitGroup.closestHitShaderName = L"CrystalClosestHit";
 
 	RaytracingHitGroup crystalShadowHitGroup{};

@@ -24,12 +24,10 @@ static const float REFLECT_BIAS = 0.99999f;
 static const float REFRACT_BIAS = 1.00001f;
 
 //https://refractiveindex.info/
-static const float DIAMOND_IOR_R = 2.411f;
-static const float DIAMOND_IOR_G = 2.423f;
-static const float DIAMOND_IOR_B = 2.435f;
-static const float INV_DIAMOND_IOR_R = 0.415f;
-static const float INV_DIAMOND_IOR_G = 0.413f;
-static const float INV_DIAMOND_IOR_B = 0.411f;
+static const float3 SAPPHIRE_IOR = float3(1.766f, 1.771f, 1.778f);
+static const float3 SAPPHIRE_INV_IOR = float3(0.566f, 0.565f, 0.562f);
+static const float3 SAPPHIRE_F0 = float3(0.1711f, 0.1730f, 0.1746f);
+static const float3 SAPPHIRE_ABSORPTION_COEFF = float3(398930.0f * 1E-4, 479810.0f * 1E-5, 568740.0f * 1E-6);
 
 struct Vertex
 {
@@ -137,7 +135,7 @@ RayDesc BuildReflectRay(float3 origin, float3 incidentRayDirection, float3 norma
 	CalculateTangents(rayDirection, tangent, binormal);
 	
 	float3 randomDirection = random;
-	randomDirection.xy = randomDirection.xy * 2.0f - 1.0f.xx;
+	randomDirection.xy = (randomDirection.xy * 2.0f - 1.0f.xx) * 0.5f;
 	randomDirection.z *= 0.5f;
 	
 	rayDirection = lerp(rayDirection, randomDirection, roughness * roughness);
@@ -203,7 +201,7 @@ UnpackedData UnpackVertex(Vertex vertex)
 	return unpackedData;
 }
 
-Payload TraceLightRay(RayDesc rayDesc, uint recursionDepth)
+Payload TraceLightRay(RayDesc rayDesc, uint recursionDepth, uint rayFlags)
 {
 	Payload payload = (Payload)0;
 	
@@ -257,7 +255,7 @@ float3 ProcessLightSource(PointLight lightSource, Surface surface, Material mate
 	bool isShadow = TraceShadowRay(shadowRay, recursionDepth);
 	
 	RayDesc reflectRay = BuildReflectRay(biasedSurfacePosition, rayDirection, surface.normal, random, material.roughness);
-	Payload reflectLightPayload = TraceLightRay(reflectRay, recursionDepth);
+	Payload reflectLightPayload = TraceLightRay(reflectRay, recursionDepth, RAY_FLAG_CULL_BACK_FACING_TRIANGLES);
 	
 	PointLight reflectLightSource = (PointLight)0;
 	reflectLightSource.position = surface.position + reflectRay.Direction * reflectLightPayload.hitT * REFLECT_BIAS;
@@ -272,6 +270,11 @@ float3 ProcessLightSource(PointLight lightSource, Surface surface, Material mate
 	return isShadow ? reflectLight : light + reflectLight;
 }
 
+float3 BouguerLambertBeerLaw(float3 radiance, float thickness, float3 absorptionCoeff)
+{
+	return radiance * exp(-absorptionCoeff * thickness);
+}
+
 [shader("raygeneration")]
 void RayGeneration()
 {
@@ -279,7 +282,7 @@ void RayGeneration()
 	uint2 raysNumber = DispatchRaysDimensions().xy;
 	RayDesc rayDesc = BuildRay(rayIndex, raysNumber, cameraPosition, invViewProjection);
 	
-	Payload resultPayload = TraceLightRay(rayDesc, 0u);
+	Payload resultPayload = TraceLightRay(rayDesc, 0u, RAY_FLAG_CULL_BACK_FACING_TRIANGLES);
 	
 	resultTarget[rayIndex] = float4(resultPayload.color, 1.0f);
 }
@@ -385,28 +388,41 @@ void CrystalClosestHit(inout Payload payload, in BuiltInTriangleIntersectionAttr
 	float3 hitPosition = WorldRayOrigin() + hitT * rayDirection * REFRACT_BIAS;
 	
 	bool isIncident = payload.recursionDepth == 1u;
+	bool isInner = payload.recursionDepth == 1u;
+	
 	normal = isIncident ? normal : -normal;
-	float iorR = isIncident ? INV_DIAMOND_IOR_R : DIAMOND_IOR_R;
-	float iorG = isIncident ? INV_DIAMOND_IOR_G : DIAMOND_IOR_G;
-	float iorB = isIncident ? INV_DIAMOND_IOR_B : DIAMOND_IOR_B;
+	float3 ior = isIncident ? SAPPHIRE_INV_IOR : SAPPHIRE_IOR;
+	uint rayFlag = isIncident ? RAY_FLAG_NONE : RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
 	
-	RayDesc rayRedDesc = BuildRefractRay(hitPosition, rayDirection, normal, iorR);
-	RayDesc rayBlueDesc = BuildRefractRay(hitPosition, rayDirection, normal, iorG);
-	RayDesc rayGreenDesc = BuildRefractRay(hitPosition, rayDirection, normal, iorB);
+	Surface surface;
+	surface.position = hitPosition;
+	surface.normal = normal;
 	
-	Payload payloadRed = TraceLightRay(rayRedDesc, payload.recursionDepth);
-	Payload payloadGreen = TraceLightRay(rayBlueDesc, payload.recursionDepth);
-	Payload payloadBlue = TraceLightRay(rayGreenDesc, payload.recursionDepth);
+	Material material;
+	material.albedo = 1.0f.xxx;
+	material.f0 = SAPPHIRE_F0;
+	material.f90 = 1.0f;
+	material.metalness = 0.0f;
+	material.roughness = 0.01f;
 	
-    payload.color = float3(payloadRed.color.x, payloadGreen.color.y, payloadBlue.color.z);
-	payload.hitT = hitT;
+	float3 lighting = 0.0f.xxx;
+	[unroll]
+	for (uint lightSourceIndex = 0u; lightSourceIndex < LIGHT_SOURCE_NUMBER; lightSourceIndex++)
+		lighting += ProcessLightSource(lightSources[lightSourceIndex], surface, material, rayDirection, payload.recursionDepth, 0.5f.xxx);
+	
+	RayDesc rayRedDesc = BuildRefractRay(hitPosition, rayDirection, normal, ior.x);
+	RayDesc rayBlueDesc = BuildRefractRay(hitPosition, rayDirection, normal, ior.y);
+	RayDesc rayGreenDesc = BuildRefractRay(hitPosition, rayDirection, normal, ior.z);
+	
+	Payload payloadRed = TraceLightRay(rayRedDesc, payload.recursionDepth, rayFlag);
+	Payload payloadGreen = TraceLightRay(rayBlueDesc, payload.recursionDepth, rayFlag);
+	Payload payloadBlue = TraceLightRay(rayGreenDesc, payload.recursionDepth, rayFlag);
+	
+	payload.color = float3(payloadRed.color.x, payloadGreen.color.y, payloadBlue.color.z);
+	payload.color *= isInner ? BouguerLambertBeerLaw(payload.color, hitT, SAPPHIRE_ABSORPTION_COEFF) : 1.0f;
+	payload.color += lighting;
 	payload.recursionDepth = payloadRed.recursionDepth;
-}
-
-[shader("anyhit")]
-void CrystalAnyHit(inout Payload payload, in BuiltInTriangleIntersectionAttributes attributes)
-{
-	AcceptHitAndEndSearch();
+	payload.hitT = hitT;
 }
 
 [shader("anyhit")]

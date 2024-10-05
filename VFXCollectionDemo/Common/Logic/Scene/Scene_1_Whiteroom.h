@@ -67,7 +67,7 @@ namespace Common::Logic::Scene
 
 		bool isLoaded;
 		
-		static constexpr float FOV_Y = DirectX::XM_PI / 4.0f;
+		static constexpr float FOV_Y = DirectX::XM_PI / 2.5f;
 		static constexpr float Z_NEAR = 0.01f;
 		static constexpr float Z_FAR = 1000.0f;
 

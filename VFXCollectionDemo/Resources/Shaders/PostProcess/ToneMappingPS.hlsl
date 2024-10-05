@@ -29,7 +29,6 @@ StructuredBuffer<float4> bloomBuffer : register(t2);
 
 float3 ToneMapping(float3 color, float luminance)
 {
-	//luminance = dot(color, LUMINANCE_VECTOR);
 	color *= (1.0f.xxx + luminance / (whiteCutoff * whiteCutoff)) / (1.0f.xxx + luminance);
 	color = pow(color, 1.0f / 2.2f);
 	
