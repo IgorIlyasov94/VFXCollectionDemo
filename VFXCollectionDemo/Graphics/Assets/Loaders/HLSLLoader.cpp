@@ -221,9 +221,23 @@ HRESULT STDMETHODCALLTYPE Graphics::Assets::Loaders::HLSLLoader::CustomIncludeHa
 	_COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource)
 {
 	CComPtr<IDxcBlobEncoding> pEncoding;
+	std::filesystem::path currentPath = std::filesystem::current_path();
+	std::filesystem::path absolutePathPart = std::filesystem::path(_filePath).remove_filename();
+
+	std::filesystem::current_path(absolutePathPart);
 	std::filesystem::path path(pFilename);
-	path = std::filesystem::weakly_canonical(path).make_preferred();
-	path = std::filesystem::path(_filePath).remove_filename().string() + path.string();
+	std::filesystem::path tempPath;
+	std::error_code error;
+	tempPath = std::filesystem::canonical(path, error);
+	std::filesystem::current_path(currentPath);
+
+	if (error.value() > 0)
+	{
+		path = std::filesystem::weakly_canonical(path).make_preferred();
+		path = absolutePathPart.string() + path.string();
+	}
+	else
+		path = tempPath.make_preferred();
 
 	if (includedFiles.find(path) != includedFiles.end())
 	{

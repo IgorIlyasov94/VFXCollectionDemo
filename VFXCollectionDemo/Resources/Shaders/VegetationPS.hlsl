@@ -52,6 +52,10 @@ TextureCube shadowMap : register(t4);
 Texture2D shadowMap : register(t4);
 #endif
 
+#if (PARTICLE_LIGHT_SOURCE_NUMBER > 0)
+StructuredBuffer<PointLight> particleLightBuffer : register(t5);
+#endif
+
 SamplerState samplerLinear : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
 
@@ -80,7 +84,7 @@ Output main(Input input)
 	Material material;
 	material.albedo = albedo;
 	material.f0 = albedo;
-	material.f90 = 1.00f.xxx;
+	material.f90 = 0.05f.xxx;
 	material.metalness = 0.0f;
 	material.roughness = roughness;
 	
@@ -105,6 +109,15 @@ Output main(Input input)
 #else
 	CalculateDirectionalLight(directionalLight, surface, material, view, light);
 	lightSum += light;
+#endif
+	
+#if (PARTICLE_LIGHT_SOURCE_NUMBER > 0)
+	[unroll]
+	for (uint particleIndex = 0u; particleIndex < PARTICLE_LIGHT_SOURCE_NUMBER; particleIndex++)
+	{
+		CalculatePointLight(particleLightBuffer[particleIndex], surface, material, view, light);
+		lightSum += light;
+	}
 #endif
 	
 	output.color = float4(lightSum, 1.0f);

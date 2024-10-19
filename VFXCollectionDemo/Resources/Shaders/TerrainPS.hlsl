@@ -60,7 +60,11 @@ TextureCube shadowMap : register(t9);
 Texture2D shadowMap : register(t9);
 #endif
 
-SamplerState samplerLinear : register(s0);
+#if (PARTICLE_LIGHT_SOURCE_NUMBER > 0)
+StructuredBuffer<PointLight> particleLightBuffer : register(t10);
+#endif
+
+SamplerState samplerAnisotropic : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
 
 [earlydepthstencil]
@@ -68,22 +72,22 @@ Output main(Input input)
 {
 	Output output = (Output)0;
 	
-	float4 blendFactor = blendMap.Sample(samplerLinear, input.texCoord);
-	blendFactor = blendFactor + float4(0.001f, 0.0f, 0.0f, 0.0f);
-	blendFactor /= blendFactor.x + blendFactor.y + blendFactor.z + blendFactor.w;
+	float4 blendFactor = blendMap.Sample(samplerAnisotropic, input.texCoord);
+	blendFactor = blendFactor;
+	blendFactor /= max(blendFactor.x + blendFactor.y + blendFactor.z + blendFactor.w, 0.001f);
 	
-	float4 texData = albedoRoughness0.Sample(samplerLinear, input.texCoord01.xy) * blendFactor.x;
-	texData += albedoRoughness1.Sample(samplerLinear, input.texCoord01.zw) * blendFactor.y;
-	texData += albedoRoughness2.Sample(samplerLinear, input.texCoord23.xy) * blendFactor.z;
-	texData += albedoRoughness3.Sample(samplerLinear, input.texCoord23.zw) * blendFactor.w;
+	float4 texData = albedoRoughness0.Sample(samplerAnisotropic, input.texCoord01.xy) * blendFactor.x;
+	texData += albedoRoughness1.Sample(samplerAnisotropic, input.texCoord01.zw) * blendFactor.y;
+	texData += albedoRoughness2.Sample(samplerAnisotropic, input.texCoord23.xy) * blendFactor.z;
+	texData += albedoRoughness3.Sample(samplerAnisotropic, input.texCoord23.zw) * blendFactor.w;
 	
 	float3 albedo = texData.xyz;
 	float roughness = texData.w * texData.w;
 	
-	texData = normalMetalness0.Sample(samplerLinear, input.texCoord01.xy) * blendFactor.x;
-	texData += normalMetalness1.Sample(samplerLinear, input.texCoord01.zw) * blendFactor.y;
-	texData += normalMetalness2.Sample(samplerLinear, input.texCoord23.xy) * blendFactor.z;
-	texData += normalMetalness3.Sample(samplerLinear, input.texCoord23.zw) * blendFactor.w;
+	texData = normalMetalness0.Sample(samplerAnisotropic, input.texCoord01.xy) * blendFactor.x;
+	texData += normalMetalness1.Sample(samplerAnisotropic, input.texCoord01.zw) * blendFactor.y;
+	texData += normalMetalness2.Sample(samplerAnisotropic, input.texCoord23.xy) * blendFactor.z;
+	texData += normalMetalness3.Sample(samplerAnisotropic, input.texCoord23.zw) * blendFactor.w;
 	
 	float3 normal = texData.xyz * 2.0f - 1.0f.xxx;
 	normal = BumpMapping(normal, input.normal, input.binormal, input.tangent);
@@ -96,7 +100,7 @@ Output main(Input input)
 	Material material;
 	material.albedo = albedo;
 	material.f0 = float3(0.0609f, 0.0617f, 0.0634f);
-	material.f90 = 1.00f.xxx;
+	material.f90 = 0.01f.xxx;
 	material.metalness = metalness;
 	material.roughness = roughness;
 	
@@ -121,6 +125,15 @@ Output main(Input input)
 #else
 	CalculateDirectionalLight(directionalLight, surface, material, view, light);
 	lightSum += light;
+#endif
+	
+#if (PARTICLE_LIGHT_SOURCE_NUMBER > 0)
+	[unroll]
+	for (uint particleIndex = 0u; particleIndex < PARTICLE_LIGHT_SOURCE_NUMBER; particleIndex++)
+	{
+		CalculatePointLight(particleLightBuffer[particleIndex], surface, material, view, light);
+		lightSum += light;
+	}
 #endif
 	
 	output.color = float4(lightSum, 1.0f);

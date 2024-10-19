@@ -67,6 +67,12 @@
     <Filter Include="Исходные файлы\Graphics\Assets\Raytracing">
       <UniqueIdentifier>{35f0b4ed-2744-4d00-bcbe-b0e939e7352d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Файлы заголовков\Graphics\Assets\Generators">
+      <UniqueIdentifier>{193e3111-c6a9-4bc5-a1fd-79bcb47897ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Graphics\Assets\Generators">
+      <UniqueIdentifier>{05aa8e20-27da-4b92-b442-51e994bdca93}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -218,6 +224,9 @@
     </ClCompile>
     <ClCompile Include="Graphics\Assets\Raytracing\RaytracingShaderTable.cpp">
       <Filter>Исходные файлы\Graphics\Assets\Raytracing</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Assets\Generators\NoiseGenerator.cpp">
+      <Filter>Исходные файлы\Graphics\Assets\Generators</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -400,6 +409,9 @@
     </ClInclude>
     <ClInclude Include="Graphics\Assets\Raytracing\RaytracingShaderTable.h">
       <Filter>Файлы заголовков\Graphics\Assets\Raytracing</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Assets\Generators\NoiseGenerator.h">
+      <Filter>Файлы заголовков\Graphics\Assets\Generators</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

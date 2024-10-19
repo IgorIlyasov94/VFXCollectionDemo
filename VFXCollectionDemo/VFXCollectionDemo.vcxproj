@@ -44,6 +44,7 @@
     <ClInclude Include="Common\WindowProcedure.h" />
     <ClInclude Include="Graphics\Assets\ComputeObject.h" />
     <ClInclude Include="Graphics\Assets\ComputeObjectBuilder.h" />
+    <ClInclude Include="Graphics\Assets\Generators\NoiseGenerator.h" />
     <ClInclude Include="Graphics\Assets\GeometryUtilities.h" />
     <ClInclude Include="Graphics\Assets\Loaders\DDSLoader.h" />
     <ClInclude Include="Graphics\Assets\Loaders\HLSLLoader.h" />
@@ -102,6 +103,7 @@
     <ClCompile Include="Common\WindowProcedure.cpp" />
     <ClCompile Include="Graphics\Assets\ComputeObject.cpp" />
     <ClCompile Include="Graphics\Assets\ComputeObjectBuilder.cpp" />
+    <ClCompile Include="Graphics\Assets\Generators\NoiseGenerator.cpp" />
     <ClCompile Include="Graphics\Assets\GeometryUtilities.cpp" />
     <ClCompile Include="Graphics\Assets\Loaders\DDSLoader.cpp" />
     <ClCompile Include="Graphics\Assets\Loaders\HLSLLoader.cpp" />

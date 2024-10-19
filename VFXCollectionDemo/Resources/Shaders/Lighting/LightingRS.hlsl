@@ -273,11 +273,6 @@ float3 ProcessLightSource(PointLight lightSource, Surface surface, Material mate
 	return light * lightFactor + reflectLight;
 }
 
-float3 BouguerLambertBeerLaw(float3 radiance, float thickness, float3 absorptionCoeff)
-{
-	return radiance * exp(-absorptionCoeff * thickness);
-}
-
 [shader("raygeneration")]
 void RayGeneration()
 {

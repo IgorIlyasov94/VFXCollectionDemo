@@ -6,7 +6,8 @@ using namespace DirectX;
 
 Common::Logic::SceneEntity::LightingSystem::LightingSystem(DirectX12Renderer* renderer)
 	: _renderer(renderer), isLightConstantBufferBuilded(false), lightConstantBufferId{},
-	lightMatricesConstantBufferId{}, lightMatricesNumber{}
+	lightMatricesConstantBufferId{}, lightParticleBufferId{}, lightMatricesNumber{},
+	lightParticleNumber{}, isLightParticleBufferBuilded{}
 {
 	viewport.TopLeftX = 0.0f;
 	viewport.TopLeftY = 0.0f;
@@ -61,6 +62,34 @@ Common::Logic::SceneEntity::LightID Common::Logic::SceneEntity::LightingSystem::
 	}
 
 	return id;
+}
+
+Graphics::Resources::ResourceID Common::Logic::SceneEntity::LightingSystem::CreateLightParticleBuffer(ID3D12GraphicsCommandList* commandList,
+	uint32_t particleNumber)
+{
+	if (!isLightParticleBufferBuilded)
+	{
+		lightParticleNumber = std::max(particleNumber, 1u);
+
+		BufferDesc particleBufferDesc{};
+		particleBufferDesc.data.resize(lightParticleNumber * sizeof(PointLight), 0u);
+		particleBufferDesc.dataStride = sizeof(PointLight);
+		particleBufferDesc.numElements = static_cast<uint32_t>(particleBufferDesc.data.size() / particleBufferDesc.dataStride);
+		particleBufferDesc.flag = BufferFlag::STRUCTURED;
+
+		auto resourceManager = _renderer->GetResourceManager();
+		lightParticleBufferId = resourceManager->CreateBufferResource(_renderer->GetDevice(), commandList,
+			BufferResourceType::RW_BUFFER, particleBufferDesc);
+
+		isLightParticleBufferBuilded = true;
+	}
+
+	return lightParticleBufferId;
+}
+
+Graphics::Resources::ResourceID Common::Logic::SceneEntity::LightingSystem::GetLightParticleBuffer()
+{
+	return lightParticleBufferId;
 }
 
 void Common::Logic::SceneEntity::LightingSystem::UpdateSourceDesc(LightID id)
@@ -193,6 +222,9 @@ void Common::Logic::SceneEntity::LightingSystem::Clear()
 
 	resourceManager->DeleteResource<ConstantBuffer>(lightConstantBufferId);
 	resourceManager->DeleteResource<ConstantBuffer>(lightMatricesConstantBufferId);
+
+	if (lightParticleNumber > 0u)
+		resourceManager->DeleteResource<RWBuffer>(lightParticleBufferId);
 }
 
 uint32_t Common::Logic::SceneEntity::LightingSystem::GetSizeOfType(LightType type)

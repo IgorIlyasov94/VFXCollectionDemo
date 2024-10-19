@@ -49,10 +49,14 @@ Output main(Input input)
 	float luminance = luminanceBuffer[0u] / (float)area;
 	
 	float gray = dot(color, LUMINANCE_VECTOR);
-	float3 rodColor = float3(1.0f, 0.9f, 1.5f);
+	float3 сolorGrade = float3(1.0f, 1.1f, 1.4f);
 	float colorShiftFactor = 0.75f;
 	
-	color = lerp(gray * rodColor, color, colorShiftFactor);
+	float3 gradedColor = gray * сolorGrade;
+	
+	color = lerp(gradedColor, color, colorShiftFactor);
+	luminance = lerp(dot(gradedColor, LUMINANCE_VECTOR), luminance, colorShiftFactor);
+	
 	color = ToneMapping(color, luminance);
 	
 	maxCoordValue = quartArea - 1;
@@ -62,7 +66,7 @@ Output main(Input input)
 	
 	float3 bloom = bloomBuffer[bufferIndex].xyz;
 	
-	output.color = float4(saturate(bloom * bloomIntensity + color), 1.0f);
+	output.color = float4(saturate(bloom * bloomIntensity*0 + color), 1.0f);
 	
 	return output;
 }

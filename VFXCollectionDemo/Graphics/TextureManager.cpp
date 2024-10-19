@@ -75,7 +75,7 @@ Graphics::TextureAllocation Graphics::TextureManager::AllocateUploadBuffer(ID3D1
 	resourceDesc.Width = desc.width;
 
 	uint64_t requiredUploadBufferSize;
-	uint32_t numSubresources = desc.depth * desc.mipLevels;
+	uint32_t numSubresources = (desc.dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1u : desc.depth) * desc.mipLevels;
 
 	device->GetCopyableFootprints(&resourceDesc, 0u, numSubresources, 0u, nullptr, nullptr, nullptr, &requiredUploadBufferSize);
 

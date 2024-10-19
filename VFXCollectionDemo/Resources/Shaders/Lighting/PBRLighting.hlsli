@@ -3,6 +3,28 @@ static const uint AREA_LIGHT_SAMPLES_NUMBER = 8;
 static const float PI = 3.14159265f;
 static const float EPSILON = 0.59604645E-7f;
 
+static const float MIE_G = -0.99f;
+static const float MIE_G2 = 0.9801f;
+
+static const float HG_G = -0.99f;
+static const float HG_FORWARD_G = HG_G;
+static const float HG_BACKWARD_G = -HG_G / 2.0f;
+static const float HG_LERP_FACTOR = 1.0f - HG_BACKWARD_G * HG_BACKWARD_G;
+
+static const float AIR_PARTICLE_SIZE = 0.1578E-9;
+static const float FOG_WATER_PARTICLE_SIZE = 10E-6;
+static const float CLOUD_LOWER_WATER_PARTICLE_SIZE = 5E-6;
+static const float CLOUD_UPPER_WATER_PARTICLE_SIZE = 30E-6;
+
+static const float3 AIR_IOR = float3(1.00027657f, 1.00027784f, 1.00028004f);
+static const float3 WATER_IOR = float3(1.3318f, 1.3330f, 1.3364f);
+
+static const float3 AIR_ABSORPTION_COEFF = float3(2E-3, 2E-3, 2E-3);
+static const float3 AIR_WET_ABSORPTION_COEFF = float3(4E-3, 4E-3, 4E-3);
+static const float3 WATER_ABSORPTION_COEFF = float3(2.8723E-5, 4.4782E-6, 2.6335E-6);
+
+static const float3 INV_WAVELENGTH_4 = 1.0f.xxx / pow(float3(630E-9, 550E-9, 464E-9), 4.0f);
+
 static const float AREA_LIGHT_SAMPLE_WEIGHT = 1.0f / AREA_LIGHT_SAMPLES_NUMBER;
 
 static const float3 LUMINANCE_VECTOR = float3(0.2126f, 0.7152f, 0.0722f);
@@ -181,7 +203,7 @@ void CalculatePBRLighting(LightingDesc lightingDesc, float3 viewDir, out float3 
 	float3 lightDir = normalize(lightVec);
 	float3 albedo = lightingDesc.material.albedo;
 	
-	float attenuation = lightingDesc.lightData.attenuationCoeff / max(1.0f + dot(lightVec, lightVec), 0.01f);
+	float attenuation = lightingDesc.lightData.attenuationCoeff / max(dot(lightVec, lightVec), 0.01f);
 	
 	float3 F;
 	float3 F0 = lerp(lightingDesc.material.f0, albedo, lightingDesc.material.metalness);
@@ -234,6 +256,45 @@ float CalculateShadowCube(ShadowCubeData shadowData, float3 worldPosition, float
 	float4 occlusions = shadowData.shadowMap.GatherCmpRed(shadowData.shadowSampler, direction, sceneDepth, status);
 	
 	return dot(occlusions, 0.25f.xxxx);
+}
+
+float RayleighScatteringPhase(float cosAngle2)
+{
+	return 1.0f + cosAngle2;
+}
+
+float MieScatteringPhase(float cosAngle, float cosAngle2)
+{
+	float phase = max(1.0f - 2.0f * MIE_G * cosAngle + MIE_G2, 1.0E-4);
+	phase = 1.5f * ((1.0f - MIE_G2) / (2.0f + MIE_G2)) * (1.0f + cosAngle2) / phase;
+	
+	return phase;
+}
+
+float HenyeyGreensteinPhase(float cosAngle, float g)
+{
+	float phase = 1.0f - g * g;
+	phase *= pow(1.0f - 2.0f * g * cosAngle + g * g, -1.5f);
+	
+	return phase;
+}
+
+float DoubleHenyeyGreensteinPhase(float cosAngle)
+{
+	float forwardPhase = HenyeyGreensteinPhase(cosAngle, HG_FORWARD_G);
+	float backwardPhase = HenyeyGreensteinPhase(cosAngle, HG_BACKWARD_G);
+	
+	return lerp(backwardPhase, forwardPhase, HG_LERP_FACTOR);
+}
+
+float3 BouguerLambertBeerLaw(float3 radiance, float thickness, float3 absorptionCoeff)
+{
+	return radiance * exp(-absorptionCoeff * thickness);
+}
+
+float3 BouguerLambertBeerLaw(float thickness, float3 absorptionCoeff)
+{
+	return exp(-absorptionCoeff * thickness);
 }
 
 void CalculateDirectionalLight(DirectionalLight directionalLight, Surface surface, Material material, float3 viewDir, out float3 light)

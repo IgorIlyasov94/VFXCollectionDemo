@@ -61,6 +61,9 @@ cbuffer MutableConstants : register(b0)
 	float4 random0;
 	float4 random1;
 	
+	float maxLightIntensity;
+	float3 padding;
+	
 	ParticleSystemForce forces[MAX_FORCES_NUMBER];
 };
 
@@ -111,7 +114,7 @@ Particle EmitParticle(float4 random0_0, float4 random1_0)
 {
 	Particle newParticle = (Particle)0;
 	newParticle.position = emitterOrigin + RandomSpherePoint(random0_0.xyz) * emitterRadius;
-	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, random1_0.wxy);
+	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, float3(random0_0.w, random1_0.wx));
 	
 	newParticle.rotation = lerp(minRotation, maxRotation, random1_0.x);
 	newParticle.rotationSpeed = lerp(minRotationSpeed, maxRotationSpeed, random1_0.y);

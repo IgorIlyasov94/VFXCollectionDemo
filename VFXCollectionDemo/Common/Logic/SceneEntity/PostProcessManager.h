@@ -1,7 +1,8 @@
 #pragma once
 
 #include "../../../Includes.h"
-
+#include "Camera.h"
+#include "LightingSystem.h"
 #include "../../../Graphics/DirectX12Renderer.h"
 #include "../../../Graphics/Assets/Material.h"
 #include "../../../Graphics/Assets/ComputeObject.h"
@@ -12,7 +13,8 @@ namespace Common::Logic::SceneEntity
 	class PostProcessManager
 	{
 	public:
-		PostProcessManager(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer);
+		PostProcessManager(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer,
+			Camera* camera, LightingSystem* lightingSystem, const std::vector<DxcDefine>& lightDefines);
 		~PostProcessManager();
 
 		void Release(Graphics::Resources::ResourceManager* resourceManager);
@@ -32,6 +34,9 @@ namespace Common::Logic::SceneEntity
 	private:
 		PostProcessManager() = delete;
 
+		void CreateConstantBuffers(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			uint32_t width, uint32_t height);
+
 		void CreateQuad(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager);
 
@@ -41,16 +46,41 @@ namespace Common::Logic::SceneEntity
 		void CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager, uint32_t width, uint32_t height);
 
-		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
+		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			const std::vector<DxcDefine>& lightDefines);
+
+		void CreateTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			Graphics::Resources::ResourceManager* resourceManager);
+
 		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			Graphics::DirectX12Renderer* renderer);
-		void CreateComputeObjects(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager);
+		void CreateComputeObjects(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
+			LightingSystem* lightingSystem);
 
 		struct QuadVertex
 		{
 		public:
 			float3 position;
 			DirectX::PackedVector::XMHALF2 texCoord;
+		};
+
+		struct VolumetricFogConstants
+		{
+		public:
+			float4x4 invViewProjection;
+
+			uint32_t widthU;
+			uint32_t area;
+			float width;
+			float height;
+
+			float3 cameraPosition;
+			float distanceFalloffExponent;
+
+			float distanceFalloffStart;
+			float distanceFalloffLength;
+			float fogTiling;
+			float padding;
 		};
 
 		struct MotionBlurConstants
@@ -92,13 +122,25 @@ namespace Common::Logic::SceneEntity
 		static constexpr float BRIGHT_THRESHOLD = 5.0f;
 		static constexpr float BLOOM_INTENSITY = 1.0f;
 
+		static constexpr float FOG_DISTANCE_FALLOFF_START = 3.0f;
+		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 1.0f;
+		static constexpr float FOG_DISTANCE_FALLOFF_EXPONENT = 2.0f;
+		static constexpr float FOG_TILING = 5.0f;
+
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
 		static constexpr uint32_t MAX_SIMULTANEOUS_BARRIER_NUMBER = 5u;
 
+		static constexpr uint32_t NOISE_SIZE_X = 128u;
+		static constexpr uint32_t NOISE_SIZE_Y = 128u;
+		static constexpr uint32_t NOISE_SIZE_Z = 64u;
+
+		VolumetricFogConstants* volumetricFogConstants;
 		MotionBlurConstants motionBlurConstants;
 		HDRConstants hdrConstants;
 		ToneMappingConstants toneMappingConstants;
+
+		Camera* _camera;
 
 		uint32_t _width;
 		uint32_t _height;
@@ -114,6 +156,7 @@ namespace Common::Logic::SceneEntity
 		std::vector<D3D12_RESOURCE_BARRIER> barriers;
 
 		Graphics::Resources::GPUResource* sceneColorTargetGPUResource;
+		Graphics::Resources::GPUResource* sceneDepthTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneMotionTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneBufferGPUResource;
 		Graphics::Resources::GPUResource* luminanceBufferGPUResource;
@@ -122,13 +165,17 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID sceneColorTargetId;
 		Graphics::Resources::ResourceID sceneDepthTargetId;
 
+		Graphics::Resources::ResourceID volumetricFogConstantBufferId;
 		Graphics::Resources::ResourceID sceneMotionTargetId;
 		Graphics::Resources::ResourceID sceneBufferId;
 		Graphics::Resources::ResourceID luminanceBufferId;
 		Graphics::Resources::ResourceID bloomBufferId;
 
+		Graphics::Resources::ResourceID fogMapId;
+
 		Graphics::Resources::ResourceID quadVSId;
 		Graphics::Resources::ResourceID motionBlurCSId;
+		Graphics::Resources::ResourceID volumetricFogCSId;
 		Graphics::Resources::ResourceID luminanceCSId;
 		Graphics::Resources::ResourceID luminanceIterationCSId;
 		Graphics::Resources::ResourceID bloomHorizontalCSId;
@@ -137,6 +184,7 @@ namespace Common::Logic::SceneEntity
 
 		Graphics::Assets::Mesh* quadMesh;
 		Graphics::Assets::ComputeObject* motionBlurComputeObject;
+		Graphics::Assets::ComputeObject* volumetricFogComputeObject;
 		Graphics::Assets::ComputeObject* luminanceComputeObject;
 		Graphics::Assets::ComputeObject* luminanceIterationComputeObject;
 		Graphics::Assets::ComputeObject* bloomHorizontalObject;

@@ -9,26 +9,26 @@
 
 namespace Common::Logic::SceneEntity
 {
+	struct VegetationSystemTable
+	{
+	public:
+		float3 grassSizeMin;
+		float3 grassSizeMax;
+		float windInfluence;
+	};
+
 	struct VegetationSystemDesc
 	{
 	public:
-		uint32_t smallGrassNumber;
-		uint32_t mediumGrassNumber;
-		uint32_t largeGrassNumber;
-
 		uint32_t atlasRows;
 		uint32_t atlasColumns;
 
-		float3 smallGrassSizeMin;
-		float3 mediumGrassSizeMin;
-		float3 largeGrassSizeMin;
-
-		float3 smallGrassSizeMax;
-		float3 mediumGrassSizeMax;
-		float3 largeGrassSizeMax;
+		float3 grassSizeMin;
+		float3 grassSizeMax;
 
 		bool hasDepthPass;
 		bool hasDepthCubePass;
+		bool hasParticleLighting;
 
 		uint32_t lightMatricesNumber;
 
@@ -41,11 +41,14 @@ namespace Common::Logic::SceneEntity
 
 		Graphics::Resources::ResourceID perlinNoiseId;
 		Graphics::Resources::ResourceID lightConstantBufferId;
+		Graphics::Resources::ResourceID lightParticleBufferId;
 		Graphics::Resources::ResourceID lightMatricesConstantBufferId;
-
+		
 		std::vector<Graphics::Resources::ResourceID> shadowMapIds;
 		const std::vector<DxcDefine>* lightDefines;
 		
+		std::map<uint32_t, VegetationSystemTable> grassTable;
+
 		std::filesystem::path vegetationCacheFileName;
 		std::filesystem::path vegetationMapFileName;
 		std::filesystem::path albedoMapFileName;
@@ -97,14 +100,8 @@ namespace Common::Logic::SceneEntity
 			uint8_t* buffer;
 			const Graphics::Resources::TextureDesc& vegetationMapDesc;
 			const VegetationSystemDesc& vegetationSystemDesc;
-			uint32_t elementNumber;
-			uint32_t offset;
-			uint32_t capOffset;
-			uint32_t quadNumber;
-			DirectX::PackedVector::XMUBYTE4 mask;
 			float3 grassSizeMin;
 			float3 grassSizeMax;
-			float tiltAmplitude;
 		};
 
 		struct GrassVertex
@@ -118,10 +115,9 @@ namespace Common::Logic::SceneEntity
 			DirectX::PackedVector::XMHALF2 texCoord;
 		};
 
-		void FillVegetationBuffer(const VegetationBufferDesc& desc, uint32_t& capNumber);
-
-		void GetRandomData(const VegetationBufferDesc& desc, floatN& position,
-			floatN& upVector, float2& atlasOffset, float2& capAtlasOffset, bool& hasCap);
+		void FillVegetationBuffer(const VegetationBufferDesc& desc, uint32_t& resultGrassNumber);
+		void GetLocationData(const VegetationBufferDesc& desc, uint32_t mapPointIndex, bool isCap,
+			floatN& position, floatN& upVector);
 
 		floatN CalculateRotation(const floatN& upVector, const floatN& upVectorTarget);
 
@@ -137,7 +133,7 @@ namespace Common::Logic::SceneEntity
 			float4x4 world;
 
 			float2 atlasElementOffset;
-			float tiltAmplitude;
+			float windInfluence;
 			float height;
 		};
 
@@ -160,13 +156,11 @@ namespace Common::Logic::SceneEntity
 			float2 padding;
 		};
 
-		static constexpr uint32_t QUADS_PER_SMALL_GRASS = 1u;
-		static constexpr uint32_t QUADS_PER_MEDIUM_GRASS = 3u;
-		static constexpr uint32_t QUADS_PER_LARGE_GRASS = 3u;
+		static constexpr uint32_t QUADS_PER_GRASS = 3u;
 
-		static constexpr float SMALL_GRASS_TILT_AMPLITUDE = 0.2f;
-		static constexpr float MEDIUM_GRASS_TILT_AMPLITUDE = 0.8f;
-		static constexpr float LARGE_GRASS_TILT_AMPLITUDE = 0.6f;
+		static constexpr float GRASS_WIND_INFLUENCE = 1.0f;
+		static constexpr float GRASS_CAP_WIND_INFLUENCE = 0.1f;
+		static constexpr float GRASS_SCATTERING = 0.01f;
 
 		uint32_t instancesNumber;
 

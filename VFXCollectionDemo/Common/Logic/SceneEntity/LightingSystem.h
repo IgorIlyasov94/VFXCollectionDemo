@@ -13,6 +13,10 @@ namespace Common::Logic::SceneEntity
 		~LightingSystem();
 
 		LightID CreateLight(const LightDesc& desc);
+		Graphics::Resources::ResourceID CreateLightParticleBuffer(ID3D12GraphicsCommandList* commandList,
+			uint32_t particleNumber);
+		Graphics::Resources::ResourceID GetLightParticleBuffer();
+
 		void UpdateSourceDesc(LightID id);
 		LightDesc& GetSourceDesc(LightID id);
 		
@@ -56,12 +60,15 @@ namespace Common::Logic::SceneEntity
 		D3D12_RECT cubeScissorRectangle;
 
 		bool isLightConstantBufferBuilded;
+		bool isLightParticleBufferBuilded;
+		uint32_t lightParticleNumber;
 		uint32_t lightMatricesNumber;
 
 		std::vector<LightDesc> lights;
 		std::vector<D3D12_RESOURCE_BARRIER> barriers;
 
 		Graphics::Resources::ResourceID lightConstantBufferId;
+		Graphics::Resources::ResourceID lightParticleBufferId;
 		Graphics::Resources::ResourceID lightMatricesConstantBufferId;
 
 		Graphics::DirectX12Renderer* _renderer;

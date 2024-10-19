@@ -35,7 +35,17 @@ Common::Logic::SceneEntity::Terrain::Terrain(ID3D12GraphicsCommandList* commandL
 	auto device = renderer->GetDevice();
 	auto resourceManager = renderer->GetResourceManager();
 
-	if (std::filesystem::exists(desc.terrainFileName))
+	auto loadCache = std::filesystem::exists(desc.terrainFileName);
+
+	if (loadCache)
+	{
+		auto heightMapFileTimestamp = std::filesystem::last_write_time(desc.heightMapFileName);
+		auto cacheFileTimestamp = std::filesystem::last_write_time(desc.terrainFileName);
+
+		loadCache = cacheFileTimestamp >= heightMapFileTimestamp;
+	}
+
+	if (loadCache)
 		LoadCache(desc.terrainFileName, device, commandList, resourceManager);
 	else
 	{
@@ -401,7 +411,7 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 	auto normal2Resource = resourceManager->GetResource<Texture>(normal2Id);
 	auto normal3Resource = resourceManager->GetResource<Texture>(normal3Id);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
-		Graphics::DefaultFilterSetup::FILTER_TRILINEAR_WRAP);
+		Graphics::DefaultFilterSetup::FILTER_ANISOTROPIC_WRAP);
 	auto samplerShadowResource = resourceManager->GetDefaultSampler(device,
 		Graphics::DefaultFilterSetup::FILTER_COMPARISON_POINT_CLAMP,
 		Graphics::DefaultFilterComparisonFunc::COMPARISON_LESS_EQUAL);
@@ -430,10 +440,16 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 		materialBuilder.SetTexture(9u + shadowMapIndex, shadowMapResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	}
 
+	if (desc.hasParticleLighting)
+	{
+		auto particleLightBufferResource = resourceManager->GetResource<RWBuffer>(desc.lightParticleBufferId);
+		materialBuilder.SetBuffer(10u, particleLightBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
+	}
+
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(1u, samplerShadowResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 
-	materialBuilder.SetDepthBias(-5.0f);
+	materialBuilder.SetDepthBias(-8.5f);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
 	materialBuilder.SetDepthStencilFormat(32u, true, true);

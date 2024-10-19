@@ -43,7 +43,7 @@ Graphics::Resources::IResource* Graphics::Resources::TextureFactory::CreateResou
 void Graphics::Resources::TextureFactory::UploadTexture(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	ID3D12Resource* uploadBuffer, ID3D12Resource* targetTexture, const TextureDesc& desc, uint8_t* uploadBufferCPUAddress)
 {
-	uint32_t numSubresources = desc.depth * desc.mipLevels;
+	uint32_t numSubresources = (desc.dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1u : desc.depth) * desc.mipLevels;
 
 	uint32_t layoutsSize = (sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(uint32_t) + sizeof(uint64_t)) * numSubresources;
 

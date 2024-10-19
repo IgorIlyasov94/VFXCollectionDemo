@@ -21,6 +21,8 @@ Common::Logic::SceneEntity::ParticleSystem::ParticleSystem(ID3D12GraphicsCommand
 	auto device = renderer->GetDevice();
 	auto resourceManager = renderer->GetResourceManager();
 
+	particleLightBufferGPUResource = resourceManager->GetResource<RWBuffer>(_desc.particleLightBufferId)->resource;
+
 	CreateConstantBuffers(device, commandList, resourceManager);
 	CreateBuffers(device, commandList, resourceManager);
 	CreateMesh(device, commandList, resourceManager);
@@ -53,12 +55,18 @@ void Common::Logic::SceneEntity::ParticleSystem::OnCompute(ID3D12GraphicsCommand
 {
 	auto numGroups = static_cast<uint32_t>(std::lroundf(std::ceilf(_desc.maxParticlesNumber / static_cast<float>(THREADS_PER_GROUP))));
 
+	if (_desc.hasLightSources)
+		particleLightBufferGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
 	particleBufferGPUResource->EndBarrier(commandList);
 
 	particleSimulation->Set(commandList);
 	particleSimulation->Dispatch(commandList, numGroups, 1u, 1u);
 
 	particleBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+	if (_desc.hasLightSources)
+		particleLightBufferGPUResource->Barrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
 void Common::Logic::SceneEntity::ParticleSystem::DrawDepthPrepass(ID3D12GraphicsCommandList* commandList)
@@ -127,6 +135,7 @@ void Common::Logic::SceneEntity::ParticleSystem::CreateConstantBuffers(ID3D12Dev
 	mutableConstantsBuffer->averageParticleEmit = _desc.averageParticleEmitPerSecond;
 	mutableConstantsBuffer->maxParticlesNumber = _desc.maxParticlesNumber;
 	mutableConstantsBuffer->perlinNoiseSize = _desc.perlinNoiseSize;
+	mutableConstantsBuffer->maxLightIntensity = _desc.maxLightIntensity;
 
 	mutableConstantsBuffer->random0 = Utilities::Random4(randomEngine);
 	mutableConstantsBuffer->random1 = Utilities::Random4(randomEngine);
@@ -214,6 +223,18 @@ void Common::Logic::SceneEntity::ParticleSystem::CreateComputeObject(ID3D12Devic
 	ComputeObjectBuilder computeObjectBuilder{};
 	computeObjectBuilder.SetConstantBuffer(0u, mutableConstantsResource->resourceGPUAddress);
 	computeObjectBuilder.SetRWBuffer(0u, particleBufferResource->resourceGPUAddress);
+
+	if (_desc.hasLightSources)
+	{
+		auto particleLightBufferResource = resourceManager->GetResource<RWBuffer>(_desc.particleLightBufferId);
+		auto particleAnimationTextureResource = resourceManager->GetResource<Texture>(_desc.animationTextureId);
+		auto samplerLinearResource = resourceManager->GetDefaultSampler(device, DefaultFilterSetup::FILTER_BILINEAR_WRAP);
+
+		computeObjectBuilder.SetRWBuffer(1u, particleLightBufferResource->resourceGPUAddress);
+		computeObjectBuilder.SetTexture(1u, particleAnimationTextureResource->srvDescriptor.gpuDescriptor);
+		computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+	}
+
 	computeObjectBuilder.SetTexture(0u, perlinNoiseResource->srvDescriptor.gpuDescriptor);
 	computeObjectBuilder.SetShader(particleSimulationResource->bytecode);
 

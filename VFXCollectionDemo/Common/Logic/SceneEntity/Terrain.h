@@ -21,7 +21,10 @@ namespace Common::Logic::SceneEntity
 		float2 map2Tiling;
 		float2 map3Tiling;
 
+		bool hasParticleLighting;
+
 		Graphics::Resources::ResourceID lightConstantBufferId;
+		Graphics::Resources::ResourceID lightParticleBufferId;
 		std::vector<Graphics::Resources::ResourceID> shadowMapIds;
 		const std::vector<DxcDefine>* lightDefines;
 		

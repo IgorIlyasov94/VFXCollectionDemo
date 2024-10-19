@@ -53,6 +53,28 @@ namespace Common
 			return random;
 		}
 
+		template<typename T>
+		static float3 RandomVector(T& generator)
+		{
+			auto random = DirectX::XMVectorSet
+			(
+				std::generate_canonical<float, std::numeric_limits<float>::digits>(generator),
+				std::generate_canonical<float, std::numeric_limits<float>::digits>(generator),
+				std::generate_canonical<float, std::numeric_limits<float>::digits>(generator),
+				0.0f
+			);
+
+			random.m128_f32[0] = random.m128_f32[0] * 2.0f - 1.0f;
+			random.m128_f32[1] = random.m128_f32[1] * 2.0f - 1.0f;
+			random.m128_f32[2] = random.m128_f32[2] * 2.0f - 1.0f;
+			random = DirectX::XMVector3Normalize(random);
+
+			float3 result{};
+			XMStoreFloat3(&result, random);
+
+			return result;
+		}
+
 	private:
 		Utilities() = delete;
 		~Utilities() = delete;

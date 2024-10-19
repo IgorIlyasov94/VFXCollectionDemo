@@ -52,7 +52,12 @@ namespace Common::Logic::SceneEntity
 
 		uint32_t averageParticleEmitPerSecond;
 		uint32_t maxParticlesNumber;
+		bool hasLightSources;
+		float maxLightIntensity;
+
 		Graphics::Resources::ResourceID perlinNoiseId;
+		Graphics::Resources::ResourceID animationTextureId;
+		Graphics::Resources::ResourceID particleLightBufferId;
 		Graphics::Resources::ResourceID particleSimulationCSId;
 
 		ParticleSystemForce* forces;
@@ -147,6 +152,9 @@ namespace Common::Logic::SceneEntity
 			float4 random0;
 			float4 random1;
 
+			float maxLightIntensity;
+			float3 padding;
+
 			ParticleSystemForce forces[MAX_FORCES_NUMBER];
 		};
 
@@ -157,6 +165,7 @@ namespace Common::Logic::SceneEntity
 		ParticleSystemDesc _desc;
 
 		Graphics::Resources::GPUResource* particleBufferGPUResource;
+		Graphics::Resources::GPUResource* particleLightBufferGPUResource;
 
 		Graphics::Resources::ResourceID mutableConstantsId;
 		Graphics::Resources::ResourceID particleBufferId;

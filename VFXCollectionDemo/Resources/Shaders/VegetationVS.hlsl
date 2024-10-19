@@ -2,7 +2,7 @@ struct Vegetation
 {
 	float4x4 world;
 	float2 atlasElementOffset;
-	float tiltAmplitude;
+	float windInfluence;
 	float height;
 };
 
@@ -57,8 +57,8 @@ Output main(Input input)
 	float4 localPosition = float4(input.position, 1.0f);
 	float4 worldPosition = mul(vegetation.world, localPosition);
 	
-	float2 noiseXZTexCoord = worldPosition.xz * perlinNoiseTiling;
-	float2 noiseYZTexCoord = worldPosition.yz * perlinNoiseTiling;
+	float2 noiseXZTexCoord = vegetation.world[3].xz * perlinNoiseTiling * 2.0f;
+	float2 noiseYZTexCoord = vegetation.world[3].yz * perlinNoiseTiling * 2.0f;
 	
 	float noiseXZ = perlinNoise.SampleLevel(samplerLinear, noiseXZTexCoord, 0.0f).x;
 	float noiseYZ = perlinNoise.SampleLevel(samplerLinear, noiseYZTexCoord, 0.0f).x;
@@ -69,10 +69,10 @@ Output main(Input input)
 	float height = abs(vegetation.height);
 	bool isCap = vegetation.height < 0.0f;
 	
-	float3 shift = min(windDirection, vegetation.tiltAmplitude.xxx) + float3(0.0f, 0.0f, 0.0001f);
+	float3 shift = windDirection;
 	shift.z -= 0.5f * height * dot(windDirection, windDirection);
-	shift = lerp(normalize(shift), 0.0f.xxx, t);
-	float shiftCoeff = (1.0f - (isCap ? 0.0f : input.texCoord.y)) * height;
+	shift = lerp(shift * vegetation.windInfluence, 0.0f.xxx, t);
+	float shiftCoeff = (1.0f - (isCap ? 0.5f : input.texCoord.y)) * height;
 	
 	worldPosition.xyz += shift * shiftCoeff;
 	

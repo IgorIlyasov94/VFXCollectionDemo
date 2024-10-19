@@ -15,7 +15,8 @@ namespace Common::Logic::SceneEntity
 	public:
 		VFXLuxSparkles(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer,
 			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID vfxAtlasId,
-			Graphics::Resources::ResourceID particleSimulationCSId, Camera* camera);
+			Graphics::Resources::ResourceID lightParticleBufferId, Graphics::Resources::ResourceID particleSimulationCSId,
+			uint32_t maxParticleNumber, Camera* camera);
 		~VFXLuxSparkles() override;
 
 		void Update(float time, float deltaTime) override;
@@ -44,7 +45,10 @@ namespace Common::Logic::SceneEntity
 			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID vfxAtlasId);
 
 		void CreateParticleSystems(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer,
-			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID particleSimulationCSId);
+			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID particleSimulationCSId,
+			Graphics::Resources::ResourceID lightParticleBufferId, uint32_t maxParticleNumber);
+
+		static constexpr float MAX_LIGHT_INTENSITY = 0.5f;
 
 		struct VFXSparklesConstants
 		{
@@ -75,7 +79,7 @@ namespace Common::Logic::SceneEntity
 
 		Graphics::Resources::ResourceID vfxLuxSparklesVSId;
 		Graphics::Resources::ResourceID vfxLuxSparklesPSId;
-
+		
 		Graphics::Assets::Material* sparklesMaterial;
 
 		SceneEntity::IDrawable* particleSystem;

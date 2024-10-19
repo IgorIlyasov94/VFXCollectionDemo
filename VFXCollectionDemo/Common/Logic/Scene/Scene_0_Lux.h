@@ -37,9 +37,6 @@ namespace Common::Logic::Scene
 		bool IsLoaded() override;
 
 	private:
-		void LoadMeshes(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-			Graphics::Resources::ResourceManager* resourceManager);
-
 		void CreateConstantBuffers(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			uint32_t width, uint32_t height);
 
@@ -48,7 +45,7 @@ namespace Common::Logic::Scene
 		void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager);
 
-		void CreateLights(Graphics::DirectX12Renderer* renderer);
+		void CreateLights(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer);
 
 		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			Graphics::DirectX12Renderer* renderer);
@@ -61,6 +58,8 @@ namespace Common::Logic::Scene
 		static constexpr float Z_FAR = 1000.0f;
 		static constexpr float AREA_LIGHT_INTENSITY_INCREMENT_SPEED = 1.5f;
 		static constexpr float AMBIENT_LIGHT_INTENSITY_INCREMENT_SPEED = 0.01f;
+
+		static constexpr uint32_t SPARKLES_NUMBER = 20u;
 
 		struct MutableConstants
 		{
@@ -96,12 +95,9 @@ namespace Common::Logic::Scene
 		MutableConstants* mutableConstantsBuffer;
 
 		Graphics::Resources::ResourceID mutableConstantsId;
-		Graphics::Resources::ResourceID environmentFloorAlbedoId;
-		Graphics::Resources::ResourceID environmentWallsAlbedoId;
-		Graphics::Resources::ResourceID environmentFloorNormalId;
-		Graphics::Resources::ResourceID environmentWallsNormalId;
 		Graphics::Resources::ResourceID vfxAtlasId;
 		Graphics::Resources::ResourceID perlinNoiseId;
+		Graphics::Resources::ResourceID lightParticleBufferId;
 
 		Graphics::Resources::ResourceID pbrStandardVSId;
 		Graphics::Resources::ResourceID pbrStandardPSId;
@@ -113,6 +109,7 @@ namespace Common::Logic::Scene
 		Graphics::Resources::ResourceID depthCubePassGSId;
 
 		Graphics::Resources::ResourceID particleSimulationCSId;
+		Graphics::Resources::ResourceID particleLightSimulationCSId;
 
 		SceneEntity::Camera* camera;
 
@@ -120,13 +117,9 @@ namespace Common::Logic::Scene
 		Graphics::Assets::Material* depthPassMaterial;
 		Graphics::Assets::Material* depthCubePassMaterial;
 
-		Graphics::Assets::Material* wallsMaterial;
-		Graphics::Assets::Mesh* wallsMesh;
-
 		SceneEntity::LightID areaLightId;
 		SceneEntity::LightID ambientLightId;
 
-		SceneEntity::IDrawable* wallsMeshObject;
 		SceneEntity::Terrain* terrain;
 		SceneEntity::VegatationSystem* vegetationSystem;
 		SceneEntity::LightingSystem* lightingSystem;

@@ -477,7 +477,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateObjects(ID3D12Device* device
 	device5->Release();
 	commandList5->Release();
 
-	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer);
+	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer, camera, lightingSystem, {});
 }
 
 void Common::Logic::Scene::Scene_1_WhiteRoom::LoadMesh(std::filesystem::path filePath,

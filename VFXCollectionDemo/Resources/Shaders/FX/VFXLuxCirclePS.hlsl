@@ -14,8 +14,8 @@ cbuffer MutableConstants : register(b0)
 	float2 scrollSpeed1;
 	float colorIntensity;
 	float alphaSharpness;
+	float spectralTransitionSharpness;
 	float distortionStrength;
-	float padding;
 };
 
 struct Input
@@ -47,16 +47,10 @@ Output main(Input input)
 	
 	float fading = input.color.r * input.color.w;
 	
-	float alphaR = pow(fading * noiseR, alphaSharpness);
-	float alphaG = pow(fading * noiseG, alphaSharpness);
-	float alphaB = pow(fading * noiseB, alphaSharpness);
+	float alpha =  pow(fading * max(noiseR, max(noiseG, noiseB)), alphaSharpness);
 	
-	float3 color;
-	color.x = lerp(color0.x, color1.x, alphaR);
-	color.y = lerp(color0.y, color1.y, alphaG);
-	color.z = lerp(color0.z, color1.z, alphaB);
-	
-	float alpha = max(alphaR, max(alphaG, alphaB));
+	float3 color = lerp(color0.xyz, color1.xyz, fading);
+	color = lerp(float3(noiseR, noiseG, noiseB), color, pow(input.color.g, spectralTransitionSharpness));
 	
 	output.color = float4(color * colorIntensity, saturate(alpha));
 	

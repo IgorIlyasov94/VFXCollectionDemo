@@ -221,19 +221,19 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateBuffers(ID3D12Device* d
 	ID3D12GraphicsCommandList* commandList, Graphics::Resources::ResourceManager* resourceManager,
 	const VegetationSystemDesc& desc)
 {
-	uint32_t smallGrassInstanceNumber = QUADS_PER_SMALL_GRASS * desc.smallGrassNumber;
-	uint32_t mediumGrassInstanceNumber = QUADS_PER_MEDIUM_GRASS * desc.mediumGrassNumber;
-	uint32_t largeGrassInstanceNumber = QUADS_PER_LARGE_GRASS * desc.largeGrassNumber;
-	uint32_t grassInstanceNumber = smallGrassInstanceNumber + mediumGrassInstanceNumber + largeGrassInstanceNumber;
-	uint32_t maxCapNumber = desc.smallGrassNumber + desc.mediumGrassNumber + desc.largeGrassNumber;
-
-	uint32_t largeGrassInstanceStartIndex = smallGrassInstanceNumber + mediumGrassInstanceNumber;
-
-	instancesNumber = grassInstanceNumber + maxCapNumber;
-
 	BufferDesc bufferDesc{};
 	bufferDesc.dataStride = sizeof(Vegetation);
-	
+
+	auto loadCache = std::filesystem::exists(desc.vegetationCacheFileName);
+
+	if (loadCache)
+	{
+		auto mapFileTimestamp = std::filesystem::last_write_time(desc.vegetationMapFileName);
+		auto cacheFileTimestamp = std::filesystem::last_write_time(desc.vegetationCacheFileName);
+
+		loadCache = cacheFileTimestamp >= mapFileTimestamp;
+	}
+
 	if (std::filesystem::exists(desc.vegetationCacheFileName))
 	{
 		LoadCache(desc.vegetationCacheFileName, bufferDesc.data);
@@ -244,55 +244,24 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateBuffers(ID3D12Device* d
 		TextureDesc vegetationMapDesc{};
 		DDSLoader::Load(desc.vegetationMapFileName, vegetationMapDesc);
 
+		instancesNumber = static_cast<uint32_t>(vegetationMapDesc.width * vegetationMapDesc.height * QUADS_PER_GRASS);
+
 		bufferDesc.data.resize(static_cast<size_t>(bufferDesc.dataStride) * instancesNumber);
 
 		XMUBYTE4 mask{};
 		mask.z = 255u;
-
-		uint32_t capOffset = grassInstanceNumber;
-		uint32_t capNumber = 0u;
 
 		VegetationBufferDesc vbDesc
 		{
 			bufferDesc.data.data(),
 			vegetationMapDesc,
 			desc,
-			smallGrassInstanceNumber,
-			0u,
-			capOffset,
-			QUADS_PER_SMALL_GRASS,
-			mask,
-			desc.smallGrassSizeMin,
-			desc.smallGrassSizeMax,
-			SMALL_GRASS_TILT_AMPLITUDE
+			desc.grassSizeMin,
+			desc.grassSizeMax
 		};
 
-		FillVegetationBuffer(vbDesc, capNumber);
+		FillVegetationBuffer(vbDesc, instancesNumber);
 		
-		vbDesc.elementNumber = mediumGrassInstanceNumber;
-		vbDesc.offset = smallGrassInstanceNumber;
-		vbDesc.quadNumber = QUADS_PER_MEDIUM_GRASS;
-		vbDesc.mask.z = 0u;
-		vbDesc.mask.y = 255u;
-		vbDesc.grassSizeMin = desc.mediumGrassSizeMin;
-		vbDesc.grassSizeMax = desc.mediumGrassSizeMax;
-		vbDesc.tiltAmplitude = MEDIUM_GRASS_TILT_AMPLITUDE;
-
-		FillVegetationBuffer(vbDesc, capNumber);
-		
-		vbDesc.elementNumber = largeGrassInstanceNumber;
-		vbDesc.offset = largeGrassInstanceStartIndex;
-		vbDesc.quadNumber = QUADS_PER_LARGE_GRASS;
-		vbDesc.mask.y = 0u;
-		vbDesc.mask.x = 255u;
-		vbDesc.grassSizeMin = desc.largeGrassSizeMin;
-		vbDesc.grassSizeMax = desc.largeGrassSizeMax;
-		vbDesc.tiltAmplitude = LARGE_GRASS_TILT_AMPLITUDE;
-
-		FillVegetationBuffer(vbDesc, capNumber);
-		
-		instancesNumber = grassInstanceNumber + capNumber;
-
 		bufferDesc.data.resize(static_cast<size_t>(bufferDesc.dataStride) * instancesNumber);
 
 		SaveCache(desc.vegetationCacheFileName, bufferDesc.data.data(), bufferDesc.data.size());
@@ -385,9 +354,15 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterials(ID3D12Device*
 		materialBuilder.SetTexture(4u + shadowMapIndex, shadowMapResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	}
 
+	if (desc.hasParticleLighting)
+	{
+		auto particleLightBufferResource = resourceManager->GetResource<RWBuffer>(desc.lightParticleBufferId);
+		materialBuilder.SetBuffer(5u, particleLightBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
+	}
+
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
 	materialBuilder.SetSampler(1u, samplerShadowResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetDepthBias(-7.5f);
+	materialBuilder.SetDepthBias(-6.5f);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_BACK);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
 	materialBuilder.SetDepthStencilFormat(32u, true, true);
@@ -468,150 +443,148 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterials(ID3D12Device*
 }
 
 void Common::Logic::SceneEntity::VegatationSystem::FillVegetationBuffer(const VegetationBufferDesc& desc,
-	uint32_t& capNumber)
+	uint32_t& resultGrassNumber)
 {
 	auto vegetations = reinterpret_cast<Vegetation*>(desc.buffer);
+	const auto& grassTable = desc.vegetationSystemDesc.grassTable;
 	
+	auto mapSize = static_cast<uint32_t>(desc.vegetationMapDesc.width * desc.vegetationMapDesc.height);
+	auto vegetationDataPtr = reinterpret_cast<const XMUBYTE4*>(desc.vegetationMapDesc.data.data());
+
 	auto origin = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
 	auto identityQuaternion = XMQuaternionIdentity();
 	auto capQuaternion = XMQuaternionRotationAxis(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
 		static_cast<float>(std::numbers::pi * 0.5f));
 
 	auto upVector = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-
+	
 	floatN position{};
 	floatN upVectorTarget{};
 	floatN rolling{};
 	floatN rotation{};
 	float2 atlasElementOffset{};
 	float2 capAtlasElementOffset{};
-	bool hasCap{};
+	float windInfluence{};
+	bool isCap{};
 
-	for (uint32_t grassIndex = 0u; grassIndex < desc.elementNumber; grassIndex++)
+	uint32_t grassIndex = 0u;
+
+	for (uint32_t mapPointIndex = 0u; mapPointIndex < mapSize; mapPointIndex++)
 	{
 		capAtlasElementOffset = {};
-		hasCap = false;
+		
+		auto vegetationDataV = *(vegetationDataPtr + mapPointIndex);
+		
+		if (vegetationDataV.z == 0u)
+			continue;
 
 		auto randomX = Utilities::Random(randomEngine);
 		auto randomY = Utilities::Random(randomEngine);
 		auto randomZ = Utilities::Random(randomEngine);
 
+		isCap = vegetationDataV.z > 16u;
+		uint32_t grassId = vegetationDataV.z - (isCap ? 17 : 1);
+
 		float3 grassSize{};
-		grassSize.x = std::lerp(desc.grassSizeMin.x, desc.grassSizeMax.x, randomX);
-		grassSize.y = std::lerp(desc.grassSizeMin.y, desc.grassSizeMax.y, randomY);
-		grassSize.z = std::lerp(desc.grassSizeMin.z, desc.grassSizeMax.z, randomZ);
-		auto scale = XMLoadFloat3(&grassSize);
 		
-		auto& vegetation = vegetations[grassIndex + desc.offset];
-
-		if (grassIndex % desc.quadNumber == 0u)
+		if (grassTable.contains(grassId + 1u))
 		{
-			GetRandomData(desc, position, upVectorTarget, atlasElementOffset, capAtlasElementOffset, hasCap);
-			rotation = CalculateRotation(upVector, upVectorTarget);
-			rolling = XMQuaternionRotationAxis(upVectorTarget, static_cast<float>(std::numbers::pi * 2.0 / 3.0));
+			const auto& grassData = grassTable.at(grassId + 1u);
 
-			if (hasCap)
-			{
-				auto maxScale = std::max(scale.m128_f32[0], std::max(scale.m128_f32[1], scale.m128_f32[2]));
-				auto capScale = XMVectorSet(maxScale, maxScale, maxScale, 1.0f);
-				auto capPosition = position;
-				capPosition.m128_f32[2] += grassSize.z * 0.25f;
-				auto capRotation = XMQuaternionMultiply(capQuaternion, rotation);
-				
-				auto& cap = vegetations[desc.capOffset + capNumber];
+			grassSize.x = std::lerp(grassData.grassSizeMin.x, grassData.grassSizeMax.x, vegetationDataV.y / 255.0f);
+			grassSize.y = std::lerp(grassData.grassSizeMin.y, grassData.grassSizeMax.y, vegetationDataV.x / 255.0f);
+			grassSize.z = std::lerp(grassData.grassSizeMin.z, grassData.grassSizeMax.z, vegetationDataV.w / 255.0f);
 
-				cap.world = XMMatrixTransformation(origin, identityQuaternion, capScale, origin, capRotation, capPosition);
-				cap.atlasElementOffset = capAtlasElementOffset;
-				cap.tiltAmplitude = desc.tiltAmplitude;
-				cap.height = -grassSize.z;
-
-				capNumber++;
-			}
+			windInfluence = grassData.windInfluence;
 		}
 		else
-			rotation = XMQuaternionMultiply(rotation, rolling);
+		{
+			grassSize.x = std::lerp(desc.grassSizeMin.x, desc.grassSizeMax.x, vegetationDataV.y / 255.0f);
+			grassSize.y = std::lerp(desc.grassSizeMin.y, desc.grassSizeMax.y, vegetationDataV.x / 255.0f);
+			grassSize.z = std::lerp(desc.grassSizeMin.z, desc.grassSizeMax.z, vegetationDataV.w / 255.0f);
 
-		vegetation.world = XMMatrixTransformation(origin, rotation, scale, origin, rotation, position);
-		vegetation.atlasElementOffset = atlasElementOffset;
-		vegetation.tiltAmplitude = desc.tiltAmplitude;
-		vegetation.height = grassSize.z;
+			windInfluence = isCap ? GRASS_CAP_WIND_INFLUENCE : GRASS_WIND_INFLUENCE;
+		}
+
+		auto scale = XMLoadFloat3(&grassSize);
+		
+		uint32_t quadsNumber = isCap ? 1u : QUADS_PER_GRASS;
+
+		for (uint32_t quadIndex = 0u; quadIndex < quadsNumber; quadIndex++)
+		{
+			auto& vegetation = vegetations[grassIndex];
+
+			if (quadIndex == 0u)
+			{
+				GetLocationData(desc, mapPointIndex, isCap, position, upVectorTarget);
+				rotation = CalculateRotation(upVector, upVectorTarget);
+				rolling = XMQuaternionRotationAxis(upVectorTarget, static_cast<float>(std::numbers::pi * 2.0 / 3.0));
+
+				atlasElementOffset.x = (grassId % desc.vegetationSystemDesc.atlasRows) /
+					static_cast<float>(desc.vegetationSystemDesc.atlasRows);
+
+				atlasElementOffset.y = static_cast<float>(grassId / desc.vegetationSystemDesc.atlasRows) /
+					desc.vegetationSystemDesc.atlasColumns;
+
+				if (isCap)
+				{
+					auto maxScale = std::max(scale.m128_f32[0], std::max(scale.m128_f32[1], scale.m128_f32[2]));
+					scale = XMVectorSet(maxScale, maxScale, maxScale, 1.0f);
+					position.m128_f32[2] += grassSize.z * 0.05f;
+					rotation = XMQuaternionMultiply(capQuaternion, rotation);
+				}
+			}
+			else
+				rotation = XMQuaternionMultiply(rotation, rolling);
+
+			vegetation.world = XMMatrixTransformation(origin, rotation, scale, origin, rotation, position);
+
+			vegetation.atlasElementOffset = atlasElementOffset;
+			vegetation.windInfluence = windInfluence;
+			vegetation.height = isCap ? -grassSize.z : grassSize.z;
+
+			grassIndex++;
+		}
 	}
+
+	resultGrassNumber = grassIndex;
 }
 
-void Common::Logic::SceneEntity::VegatationSystem::GetRandomData(const VegetationBufferDesc& desc,
-	floatN& position, floatN& upVector, float2& atlasOffset, float2& capAtlasOffset, bool& hasCap)
+void Common::Logic::SceneEntity::VegatationSystem::GetLocationData(const VegetationBufferDesc& desc,
+	uint32_t mapPointIndex, bool isCap, floatN& position, floatN& upVector)
 {
 	auto mapSize = static_cast<uint32_t>(desc.vegetationMapDesc.width * desc.vegetationMapDesc.height);
-	auto random = Utilities::Random(randomEngine);
+	auto randomX = Utilities::Random(randomEngine) * 2.0f - 1.0f;
+	auto randomY = Utilities::Random(randomEngine) * 2.0f - 1.0f;
+	auto offset = float2(randomX * GRASS_SCATTERING, randomY * GRASS_SCATTERING);
 
 	auto absoluteUpVector = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-
-	auto startIndex = std::min(static_cast<uint32_t>(random * mapSize), mapSize - 1u);
-
-	auto vegetationDataPtr = reinterpret_cast<const XMUBYTE4*>(desc.vegetationMapDesc.data.data());
 
 	auto terrain = desc.vegetationSystemDesc.terrain;
 	auto& minCorner = terrain->GetMinCorner();
 	auto& size = terrain->GetSize();
 
-	for (uint32_t pixelIndex = 0; pixelIndex < mapSize; pixelIndex++)
-	{
-		auto fetchedIndex = (pixelIndex * 32u + startIndex) % mapSize;
+	auto xCoeff = static_cast<float>(mapPointIndex % static_cast<uint32_t>(desc.vegetationMapDesc.width));
+	xCoeff /= desc.vegetationMapDesc.width;
 
-		auto vegetationDataV = *(vegetationDataPtr + fetchedIndex);
+	auto yCoeff = static_cast<float>(mapPointIndex / static_cast<uint32_t>(desc.vegetationMapDesc.width));
+	yCoeff /= desc.vegetationMapDesc.height;
 
-		int32_t vegetationData = (vegetationDataV.x & desc.mask.x) | (vegetationDataV.y & desc.mask.y) |
-			(vegetationDataV.z & desc.mask.z);
+	auto planarPosition = float2(minCorner.x + size.x * xCoeff + offset.x, minCorner.y + size.y * yCoeff + offset.y);
+	auto height = terrain->GetHeight(planarPosition);
+	auto normal = terrain->GetNormal(planarPosition);
 
-		int32_t capIndex = vegetationDataV.w;
-
-		if (vegetationData > 0)
-		{
-			atlasOffset.x = ((vegetationData - 1) % desc.vegetationSystemDesc.atlasRows) /
-				static_cast<float>(desc.vegetationSystemDesc.atlasRows);
-
-			atlasOffset.y = static_cast<float>((vegetationData - 1) / desc.vegetationSystemDesc.atlasRows) /
-				desc.vegetationSystemDesc.atlasColumns;
-
-			if (capIndex > 0)
-			{
-				capAtlasOffset.x = ((capIndex - 1) % desc.vegetationSystemDesc.atlasRows) /
-					static_cast<float>(desc.vegetationSystemDesc.atlasRows);
-
-				capAtlasOffset.y = static_cast<float>((capIndex - 1) / desc.vegetationSystemDesc.atlasRows) /
-					desc.vegetationSystemDesc.atlasColumns;
-
-				hasCap = true;
-			}
-
-			auto xCoeff = static_cast<float>(fetchedIndex % static_cast<uint32_t>(desc.vegetationMapDesc.width));
-			xCoeff /= desc.vegetationMapDesc.width;
-
-			auto yCoeff = static_cast<float>(fetchedIndex / static_cast<uint32_t>(desc.vegetationMapDesc.width));
-			yCoeff /= desc.vegetationMapDesc.height;
-
-			auto planarPosition = float2(minCorner.x + size.x * xCoeff, minCorner.y + size.y * yCoeff);
-			auto height = terrain->GetHeight(planarPosition);
-			auto normal = terrain->GetNormal(planarPosition);
-
-			auto normalV = XMLoadFloat3(&normal);
-			normalV = XMVectorLerp(normalV, absoluteUpVector, 0.75f);
-			normalV = XMVector3Normalize(normalV);
+	auto normalV = XMLoadFloat3(&normal);
+	normalV = XMVectorLerp(normalV, absoluteUpVector, 0.25f);
+	normalV = XMVector3Normalize(normalV);
 			
-			XMStoreFloat3(&normal, normalV);
+	XMStoreFloat3(&normal, normalV);
 
-			if (XMVector3Dot(normalV, normalV).m128_f32[0u] < std::numeric_limits<float>::epsilon())
-				normal = float3(0.0f, 0.0f, 1.0f);
+	if (XMVector3Dot(normalV, normalV).m128_f32[0u] < std::numeric_limits<float>::epsilon())
+		normal = float3(0.0f, 0.0f, 1.0f);
 
-			position = XMVectorSet(planarPosition.x, planarPosition.y, height, 0.0f);
-			upVector = XMLoadFloat3(&normal);
-
-			return;
-		}
-	}
-
-	position = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
-	upVector = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+	position = XMVectorSet(planarPosition.x, planarPosition.y, height, 0.0f);
+	upVector = XMLoadFloat3(&normal);
 }
 
 floatN Common::Logic::SceneEntity::VegatationSystem::CalculateRotation(const floatN& upVector, const floatN& upVectorTarget)

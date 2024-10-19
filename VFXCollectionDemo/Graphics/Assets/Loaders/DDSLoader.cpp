@@ -85,6 +85,58 @@ void Graphics::Assets::Loaders::DDSLoader::Load(std::filesystem::path filePath, 
     ddsFile.read(reinterpret_cast<char*>(textureDesc.data.data()), textureSizeInBytes);
 }
 
+void Graphics::Assets::Loaders::DDSLoader::Save(std::filesystem::path filePath, const DDSSaveDesc& saveDesc,
+    const std::vector<float4>& data)
+{
+    std::ofstream ddsFile(filePath, std::ios::binary);
+    
+    DDSHeader header{};
+    header.fileCode = 0x20534444u;
+    header.headerSize = sizeof(DDSHeader) - sizeof(uint32_t);
+
+    bool isCubeTexture = saveDesc.dimension == D3D12_SRV_DIMENSION_TEXTURECUBE ||
+        saveDesc.dimension == D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+
+    bool isVolumeTexture = saveDesc.dimension == D3D12_SRV_DIMENSION_TEXTURE3D;
+
+    header.flags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT;
+    header.flags |= DDSD_PITCH;
+    header.flags |= saveDesc.depth > 1u ? DDSD_DEPTH : 0u;
+
+    header.height = saveDesc.height;
+    header.width = saveDesc.width;
+    header.pitchOrLinearSize = CalculatePitch(saveDesc.width, saveDesc.targetFormat);
+    header.depth = saveDesc.depth;
+    header.mipMapCount = 1u;
+    header.pixelFormat = GetPixelFormat(saveDesc.targetFormat);
+
+    header.caps[0] = DDSCAPS_TEXTURE;
+    header.caps[0] |= isVolumeTexture ? DDSCAPS_COMPLEX : 0u;
+
+    header.caps[1] = isVolumeTexture ? DDSCAPS2_VOLUME : 0u;
+
+    ddsFile.write(reinterpret_cast<const char*>(&header), sizeof(DDSHeader));
+
+    DDSHeaderDXT10 headerDXT10{};
+    headerDXT10.format = GetFormat(saveDesc.targetFormat);
+
+    if (saveDesc.dimension == D3D12_SRV_DIMENSION_TEXTURE1D)
+        headerDXT10.dimension = D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+    else if (saveDesc.dimension == D3D12_SRV_DIMENSION_TEXTURE2D)
+        headerDXT10.dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    else
+        headerDXT10.dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+
+    headerDXT10.arraySize = 1u;
+
+    ddsFile.write(reinterpret_cast<const char*>(&headerDXT10), sizeof(DDSHeaderDXT10));
+
+    std::vector<uint8_t> covertedData;
+    Convert(saveDesc, data, covertedData);
+
+    ddsFile.write(reinterpret_cast<const char*>(covertedData.data()), covertedData.size());
+}
+
 constexpr uint32_t Graphics::Assets::Loaders::DDSLoader::MakeFourCC(const char&& ch0, const char&& ch1,
 	const char&& ch2, const char&& ch3) noexcept
 {
@@ -100,7 +152,7 @@ constexpr bool Graphics::Assets::Loaders::DDSLoader::CheckBitMask(const DDSPixel
 
 DXGI_FORMAT Graphics::Assets::Loaders::DDSLoader::GetFormat(const DDSPixelFormat& format) noexcept
 {
-    if ((format.flags & 0x40u) > 0)
+    if ((format.flags & DDPF_RGB) > 0)
     {
         if (format.rgbBitCount == 32)
         {
@@ -119,7 +171,7 @@ DXGI_FORMAT Graphics::Assets::Loaders::DDSLoader::GetFormat(const DDSPixelFormat
             if (CheckBitMask(format, 0x0000ffffu, 0xffff0000u, 0x00000000u, 0x00000000u))
                 return DXGI_FORMAT_R16G16_UNORM;
 
-            if (CheckBitMask(format, 0xffffffffu, 0xffff0000u, 0x00000000u, 0x00000000u))
+            if (CheckBitMask(format, 0xffffffffu, 0x00000000u, 0x00000000u, 0x00000000u))
                 return DXGI_FORMAT_R32_FLOAT;
         }
         else if (format.rgbBitCount == 16)
@@ -145,7 +197,7 @@ DXGI_FORMAT Graphics::Assets::Loaders::DDSLoader::GetFormat(const DDSPixelFormat
                 return DXGI_FORMAT_R8_UNORM;
         }
     }
-    else if ((format.flags & 0x20000u) > 0)
+    else if ((format.flags & DDPF_LUMINANCE) > 0)
     {
         if (format.rgbBitCount == 16)
         {
@@ -164,12 +216,12 @@ DXGI_FORMAT Graphics::Assets::Loaders::DDSLoader::GetFormat(const DDSPixelFormat
                 return DXGI_FORMAT_R8G8_UNORM;
         }
     }
-    else if ((format.flags & 0x2u) > 0)
+    else if ((format.flags & DDPF_ALPHA) > 0)
     {
         if (format.rgbBitCount == 8)
             return DXGI_FORMAT_A8_UNORM;
     }
-    else if ((format.flags & 0x00080000u) > 0)
+    else if ((format.flags & DDPF_BUMPDUDV) > 0)
     {
         if (format.rgbBitCount == 32)
         {
@@ -185,7 +237,7 @@ DXGI_FORMAT Graphics::Assets::Loaders::DDSLoader::GetFormat(const DDSPixelFormat
                 return DXGI_FORMAT_R8G8_SNORM;
         }
     }
-    else if ((format.flags & 0x4u) > 0)
+    else if ((format.flags & DDPF_FOURCC) > 0)
     {
         if (MakeFourCC('D', 'X', 'T', '1') == format.fourCC)
             return DXGI_FORMAT_BC1_UNORM;
@@ -255,4 +307,79 @@ DXGI_FORMAT Graphics::Assets::Loaders::DDSLoader::GetFormat(const DDSPixelFormat
     }
 
     return DXGI_FORMAT_UNKNOWN;
+}
+
+DXGI_FORMAT Graphics::Assets::Loaders::DDSLoader::GetFormat(DDSFormat format) noexcept
+{
+    if (format == DDSFormat::R8_UNORM)
+        return DXGI_FORMAT_R8_UNORM;
+    
+    return DXGI_FORMAT_R8G8B8A8_UNORM;
+}
+
+Graphics::Assets::Loaders::DDSLoader::DDSPixelFormat Graphics::Assets::Loaders::DDSLoader::GetPixelFormat(DDSFormat format) noexcept
+{
+    DDSPixelFormat pixelFormat{};
+    pixelFormat.size = sizeof(DDSPixelFormat);
+    pixelFormat.fourCC = MakeFourCC('D', 'X', '1', '0');
+    pixelFormat.flags = DDPF_FOURCC;
+
+    return pixelFormat;
+}
+
+uint32_t Graphics::Assets::Loaders::DDSLoader::CalculatePitch(uint32_t width, DDSFormat format) noexcept
+{
+    uint32_t pitch = 0u;
+
+    if (format == DDSFormat::R8_UNORM)
+        pitch = (width * 8u + 7u) / 8u;
+    else
+        pitch = (width * 32u + 7u) / 8u;
+
+    return pitch;
+}
+
+void Graphics::Assets::Loaders::DDSLoader::Convert(const DDSSaveDesc& desc, const std::vector<float4>& data,
+    std::vector<uint8_t>& convertedData)
+{
+    auto bytePerPixel = desc.targetFormat == DDSFormat::R8G8B8A8_UNORM ? 4u : 1u;
+    auto rowPitch = CalculatePitch(desc.width, desc.targetFormat);
+    auto slicePitch = rowPitch * desc.height;
+    
+    auto rowRemaindBytes = rowPitch - bytePerPixel * desc.width;
+
+    auto resultSize = bytePerPixel * slicePitch * desc.depth;
+    convertedData.resize(resultSize, 0u);
+    auto destAddress = convertedData.data();
+
+    for (uint32_t z = 0u; z < desc.depth; z++)
+        for (uint32_t y = 0u; y < desc.height; y++)
+        {
+            for (uint32_t x = 0u; x < desc.width; x++)
+            {
+                auto pixelIndex = (static_cast<uint64_t>(z) * desc.height + y) * desc.width + x;
+                const auto& pixelData = data[pixelIndex];
+
+                if (desc.targetFormat == DDSFormat::R8_UNORM)
+                    *destAddress = Float32ToUNorm8(pixelData.x);
+                else
+                {
+                    auto destAddress4 = reinterpret_cast<DirectX::PackedVector::XMUBYTE4*>(destAddress);
+
+                    destAddress4->x = Float32ToUNorm8(pixelData.x);
+                    destAddress4->y = Float32ToUNorm8(pixelData.y);
+                    destAddress4->z = Float32ToUNorm8(pixelData.z);
+                    destAddress4->w = Float32ToUNorm8(pixelData.w);
+                }
+
+                destAddress += bytePerPixel;
+            }
+
+            destAddress += rowRemaindBytes;
+        }
+}
+
+inline uint8_t Graphics::Assets::Loaders::DDSLoader::Float32ToUNorm8(float value)
+{
+    return static_cast<uint8_t>(std::clamp(static_cast<uint32_t>(std::round(value * 255.0f)), 0u, 255u));
 }
