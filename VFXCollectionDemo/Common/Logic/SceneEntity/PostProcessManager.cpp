@@ -188,8 +188,6 @@ void Common::Logic::SceneEntity::PostProcessManager::SetGBuffer(ID3D12GraphicsCo
 
 	if (sceneColorTargetGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
-	if (sceneDepthTargetGPUResource->GetEndBarrier(barrier))
-		barriers.push_back(barrier);
 
 	if (!barriers.empty())
 		commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
@@ -248,6 +246,7 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 
 	volumetricFogConstants->invViewProjection = _camera->GetInvViewProjection();
 	volumetricFogConstants->cameraPosition = _camera->GetPosition();
+	volumetricFogConstants->fogOffset += FOG_MOVING_SPEED;
 
 	sceneBufferGPUResource->GetUAVBarrier(barrier);
 	barriers.push_back(barrier);
@@ -413,7 +412,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateConstantBuffers(ID3D1
 	volumetricFogConstants->distanceFalloffStart = FOG_DISTANCE_FALLOFF_START;
 	volumetricFogConstants->distanceFalloffLength = FOG_DISTANCE_FALLOFF_LENGTH;
 	volumetricFogConstants->fogTiling = FOG_TILING;
-	volumetricFogConstants->padding = 0.0f;
+	volumetricFogConstants->fogOffset = 0.0f;
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateQuad(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -578,7 +577,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTextures(ID3D12Device
 		NoiseGenerator noiseGenerator{};
 
 		std::vector<float4> noiseData;
-		noiseGenerator.Generate(NOISE_SIZE_X, NOISE_SIZE_Y, NOISE_SIZE_Z, float3(0.5f, 0.5f, 0.5f), noiseData);
+		noiseGenerator.Generate(NOISE_SIZE_X, NOISE_SIZE_Y, NOISE_SIZE_Z, float3(4.0f, 4.0f, 4.0f), noiseData);
 
 		DDSSaveDesc ddsSaveDesc{};
 		ddsSaveDesc.width = NOISE_SIZE_X;
@@ -632,11 +631,12 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
-	auto lightParticleBufferResource = resourceManager->GetResource<Buffer>(lightingSystem->GetLightParticleBuffer());
+	auto lightParticleBufferResource = resourceManager->GetResource<RWBuffer>(lightingSystem->GetLightParticleBuffer());
 
 	auto fogMapResource = resourceManager->GetResource<Texture>(fogMapId);
 
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device, Graphics::DefaultFilterSetup::FILTER_BILINEAR_CLAMP);
+	auto samplerLinearWrapResource = resourceManager->GetDefaultSampler(device, Graphics::DefaultFilterSetup::FILTER_BILINEAR_WRAP);
 
 	auto motionBlurCS = resourceManager->GetResource<Shader>(motionBlurCSId);
 	auto volumetricFogCS = resourceManager->GetResource<Shader>(volumetricFogCSId);
@@ -647,7 +647,8 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 
 	ComputeObjectBuilder computeObjectBuilder{};
 	computeObjectBuilder.SetRootConstants(0u, 4u);
-	computeObjectBuilder.SetTexture(0u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
+	computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+	computeObjectBuilder.SetTexture(1u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
 	computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
 	computeObjectBuilder.SetShader(motionBlurCS->bytecode);
@@ -660,7 +661,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 	computeObjectBuilder.SetTexture(1u, sceneDepthTargetResource->srvDescriptor.gpuDescriptor);
 	computeObjectBuilder.SetBuffer(2u, lightParticleBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
-	computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+	computeObjectBuilder.SetSampler(0u, samplerLinearWrapResource->samplerDescriptor.gpuDescriptor);
 	computeObjectBuilder.SetShader(volumetricFogCS->bytecode);
 
 	volumetricFogComputeObject = computeObjectBuilder.Compose(device);

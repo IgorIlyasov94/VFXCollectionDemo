@@ -6,7 +6,7 @@ static const float EPSILON = 0.59604645E-7f;
 static const float MIE_G = -0.99f;
 static const float MIE_G2 = 0.9801f;
 
-static const float HG_G = -0.99f;
+static const float HG_G = 0.99f;
 static const float HG_FORWARD_G = HG_G;
 static const float HG_BACKWARD_G = -HG_G / 2.0f;
 static const float HG_LERP_FACTOR = 1.0f - HG_BACKWARD_G * HG_BACKWARD_G;

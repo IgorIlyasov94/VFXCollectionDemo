@@ -4,6 +4,9 @@ static const uint NUM_THREADS = 64;
 static const uint NUM_VIEW_STEPS = 4;
 static const uint NUM_LIGHT_STEPS = 2;
 
+static const float MAX_DISTANCE = 10.0f;
+static const float3 FOG_COLOR = float3(0.4f, 0.15f, 0.05f);
+
 cbuffer LightConstantBuffer : register(b0)
 {
 #ifdef AREA_LIGHT
@@ -29,7 +32,7 @@ cbuffer MutableConstants : register(b1)
 	float distanceFalloffStart;
 	float distanceFalloffLength;
 	float fogTiling;
-	float padding;
+	float fogOffset;
 };
 
 struct Input
@@ -39,7 +42,7 @@ struct Input
 	uint groupIndex : SV_GroupIndex;
 };
 
-Texture3D<float> fogMap : register(t0);
+Texture3D<float4> fogMap : register(t0);
 Texture2D<float> sceneDepth : register(t1);
 
 #if (PARTICLE_LIGHT_SOURCE_NUMBER > 0)
@@ -73,13 +76,18 @@ float3 ProcessLightSource(float3 sceneDiffuse, float3 lightColor, float3 sampleP
 	float3 resultColor = sceneDiffuse;
 	float3 vWayPoint = samplePoint;
 	
+	float3 offset = float3(frac(fogOffset), 0.0f, 0.0f);
+	
 	[unroll]
 	for (uint vStepIndex = 0u; vStepIndex < NUM_VIEW_STEPS; vStepIndex++)
 	{
 		vWayPoint -= viewStep;
 		
-		float fogAlpha = fogMap.SampleLevel(samplerLinear, vWayPoint * fogTiling, 0.0f).x;
-		float3 absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha);
+		float3 fogMapDistortion = fogMap.SampleLevel(samplerLinear, vWayPoint * 0.02f, 0.0f).xyz * 2.0f - 1.0f;
+		fogMapDistortion *= 0.03f;
+		float fogAlpha = fogMap.SampleLevel(samplerLinear, vWayPoint * fogTiling + offset + fogMapDistortion, 0.0f).x;
+		fogAlpha *= fogAlpha;
+		float3 absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha)*200.0f;
 		resultColor = BouguerLambertBeerLaw(resultColor, viewStepLength, absorptionCoeff);
 		
 		float3 lightDir = vWayPoint - lightPosition;
@@ -96,18 +104,21 @@ float3 ProcessLightSource(float3 sceneDiffuse, float3 lightColor, float3 sampleP
 		{
 			lWayPoint -= lightStep;
 			
-			fogAlpha = fogMap.SampleLevel(samplerLinear, lWayPoint * fogTiling, 0.0f).x;
-			absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha);
+			float3 fogMapDistortion = fogMap.SampleLevel(samplerLinear, lWayPoint * 0.02f, 0.0f).xyz * 2.0f - 1.0f;
+			fogMapDistortion *= 0.03f;
+			fogAlpha = fogMap.SampleLevel(samplerLinear, lWayPoint * fogTiling + offset + fogMapDistortion, 0.0f).x;
+			fogAlpha *= fogAlpha;
+			absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha)*200.0f;
 			scatteredLight = BouguerLambertBeerLaw(scatteredLight, lightStepLength, absorptionCoeff);
 		}
 		
 		float cosAngle = dot(viewDir, -lightDir);
 		float phaseValue = DoubleHenyeyGreensteinPhase(cosAngle);
 		
-		resultColor += scatteredLight * saturate(phaseValue);
+		resultColor = scatteredLight * saturate(phaseValue);
 	}
 	
-	return resultColor;
+	return resultColor / (NUM_LIGHT_STEPS * NUM_VIEW_STEPS);
 }
 
 [numthreads(NUM_THREADS, 1, 1)]
@@ -125,6 +136,9 @@ void main(Input input)
 	float depth = sceneDepth.SampleLevel(samplerLinear, texCoord, 0.0f).x;
 	float3 worldPosition = ReconstructWorldPosition(texCoord, depth, invViewProjection);
 	
+	float worldPositionLength = length(worldPosition);
+	worldPosition = worldPositionLength > MAX_DISTANCE ? worldPosition * (MAX_DISTANCE / worldPositionLength) : worldPosition;
+	
 	float3 viewStep = worldPosition - cameraPosition;
 	float sceneDistance = length(viewStep);
 	float3 viewDir = viewStep / sceneDistance;
@@ -136,6 +150,7 @@ void main(Input input)
 	float3 sceneDiffuse = sceneBuffer[bufferIndex].xyz;
 	
 	float3 resultColor = ProcessLightSource(sceneDiffuse, areaLight.color, worldPosition, areaLight.position, viewStep, viewDir, viewStepLength);
+	resultColor = lerp(sceneDiffuse, resultColor, falloff);
 	
 	sceneBuffer[bufferIndex] = float4(resultColor, 1.0f);
 }

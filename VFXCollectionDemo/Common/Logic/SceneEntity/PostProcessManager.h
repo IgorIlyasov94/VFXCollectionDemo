@@ -80,7 +80,7 @@ namespace Common::Logic::SceneEntity
 			float distanceFalloffStart;
 			float distanceFalloffLength;
 			float fogTiling;
-			float padding;
+			float fogOffset;
 		};
 
 		struct MotionBlurConstants
@@ -123,9 +123,10 @@ namespace Common::Logic::SceneEntity
 		static constexpr float BLOOM_INTENSITY = 1.0f;
 
 		static constexpr float FOG_DISTANCE_FALLOFF_START = 3.0f;
-		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 1.0f;
+		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 4.0f;
 		static constexpr float FOG_DISTANCE_FALLOFF_EXPONENT = 2.0f;
-		static constexpr float FOG_TILING = 5.0f;
+		static constexpr float FOG_TILING = 0.05f;
+		static constexpr float FOG_MOVING_SPEED = 0.0006f;
 
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
