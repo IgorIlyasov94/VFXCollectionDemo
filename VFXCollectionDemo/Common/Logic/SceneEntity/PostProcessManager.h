@@ -122,8 +122,8 @@ namespace Common::Logic::SceneEntity
 		static constexpr float BRIGHT_THRESHOLD = 5.0f;
 		static constexpr float BLOOM_INTENSITY = 1.0f;
 
-		static constexpr float FOG_DISTANCE_FALLOFF_START = 3.0f;
-		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 4.0f;
+		static constexpr float FOG_DISTANCE_FALLOFF_START = 4.0f;
+		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 5.0f;
 		static constexpr float FOG_DISTANCE_FALLOFF_EXPONENT = 2.0f;
 		static constexpr float FOG_TILING = 0.05f;
 		static constexpr float FOG_MOVING_SPEED = 0.0006f;
