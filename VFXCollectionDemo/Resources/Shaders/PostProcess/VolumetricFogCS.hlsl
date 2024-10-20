@@ -1,7 +1,7 @@
 #include "../Lighting/PBRLighting.hlsli"
 
 static const uint NUM_THREADS = 64;
-static const uint NUM_VIEW_STEPS = 8;
+static const uint NUM_VIEW_STEPS = 12;
 static const uint NUM_LIGHT_STEPS = 1;
 
 static const float MAX_DISTANCE = 10.0f;
@@ -83,10 +83,10 @@ float3 ProcessLightSource(float3 sceneDiffuse, float3 lightColor, float3 sampleP
 	{
 		vWayPoint += viewStep;
 		
-		float3 fogMapDistortion = fogMap.SampleLevel(samplerLinear, vWayPoint * 0.03f, 0.0f).xyz * 2.0f - 1.0f;
-		fogMapDistortion *= 0.1f;
-		float fogAlpha = fogMap.SampleLevel(samplerLinear, vWayPoint * fogTiling + offset + fogMapDistortion, 0.0f).w;
-		float3 absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha) * 200.0f;
+		float3 fogMapDistortion = fogMap.SampleLevel(samplerLinear, vWayPoint * 0.5f + offset, 0.0f).xyz * 2.0f - 1.0f;
+		fogMapDistortion *= 0.02f;
+		float fogAlpha = fogMap.SampleLevel(samplerLinear, vWayPoint * fogTiling + fogMapDistortion, 0.0f).w;
+		float3 absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha) * 2000.0f;
 		resultColor = BouguerLambertBeerLaw(resultColor, viewStepLength, absorptionCoeff);
 		
 		float3 lightDir = vWayPoint - lightPosition;
@@ -103,10 +103,10 @@ float3 ProcessLightSource(float3 sceneDiffuse, float3 lightColor, float3 sampleP
 		{
 			lWayPoint -= lightStep;
 			
-			fogMapDistortion = fogMap.SampleLevel(samplerLinear, lWayPoint * 0.03f, 0.0f).xyz * 2.0f - 1.0f;
-			fogMapDistortion *= 0.1f;
-			fogAlpha = fogMap.SampleLevel(samplerLinear, lWayPoint * fogTiling + offset + fogMapDistortion, 0.0f).w;
-			absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha) * 200.0f;
+			fogMapDistortion = fogMap.SampleLevel(samplerLinear, lWayPoint * 0.5f + offset, 0.0f).xyz * 2.0f - 1.0f;
+			fogMapDistortion *= 0.02f;
+			fogAlpha = fogMap.SampleLevel(samplerLinear, lWayPoint * fogTiling + fogMapDistortion, 0.0f).w;
+			absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha) * 2000.0f;
 			scatteredLight = BouguerLambertBeerLaw(scatteredLight, lightStepLength, absorptionCoeff);
 		}
 		
@@ -116,7 +116,7 @@ float3 ProcessLightSource(float3 sceneDiffuse, float3 lightColor, float3 sampleP
 		resultColor = scatteredLight * saturate(phaseValue);
 	}
 	
-	return resultColor / (NUM_LIGHT_STEPS * NUM_VIEW_STEPS);
+	return resultColor;// / (NUM_LIGHT_STEPS * NUM_VIEW_STEPS);
 }
 
 [numthreads(NUM_THREADS, 1, 1)]
@@ -142,7 +142,7 @@ void main(Input input)
 	float sceneDistance = length(viewStep);
 	float3 viewDir = viewStep / sceneDistance;
 	//viewStep /= NUM_VIEW_STEPS + 1;
-	viewStep = viewDir * 1.5f;
+	viewStep = viewDir * 0.4f;
 	float viewStepLength = length(viewStep);
 	
 	float falloff = CalculateVisibilityFalloff(sceneDistance);
