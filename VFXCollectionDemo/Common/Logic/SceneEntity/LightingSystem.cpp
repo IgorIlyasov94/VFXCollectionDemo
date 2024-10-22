@@ -265,12 +265,14 @@ void Common::Logic::SceneEntity::LightingSystem::SetLightBufferElement(LightDesc
 	{
 		auto light = reinterpret_cast<PointLight*>(desc.lightBufferStartAddress);
 		light->position = desc.position;
+		light->range = desc.range;
 		light->color = float3(desc.color.x * desc.intensity, desc.color.y * desc.intensity, desc.color.z * desc.intensity);
 	}
 	else if (desc.type == LightType::AREA_LIGHT)
 	{
 		auto light = reinterpret_cast<AreaLight*>(desc.lightBufferStartAddress);
 		light->position = desc.position;
+		light->range = desc.range;
 		light->radius = desc.radius;
 		light->color = float3(desc.color.x * desc.intensity, desc.color.y * desc.intensity, desc.color.z * desc.intensity);
 	}
@@ -280,7 +282,7 @@ void Common::Logic::SceneEntity::LightingSystem::SetLightBufferElement(LightDesc
 		light->position = desc.position;
 		light->direction = desc.direction;
 		light->color = float3(desc.color.x * desc.intensity, desc.color.y * desc.intensity, desc.color.z * desc.intensity);
-		light->falloff = desc.falloff;
+		light->range = desc.range;
 		light->cosPhi2 = desc.cosPhi2;
 		light->cosTheta2 = desc.cosTheta2;
 	}

@@ -19,8 +19,7 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	environmentWorld{}, timer{}, _deltaTime{}, fps(60.0f), cpuTimeCounter{}, prevTimePoint{}, frameCounter{},
 	vfxLux{}, vfxLuxSparkles{}, vfxLuxDistorters{}, areaLightId{}, ambientLightId{}, depthPrepassVSId{},
 	depthPassVSId{}, depthCubePassVSId{}, depthCubePassGSId{}, depthPassMaterial{}, depthCubePassMaterial{},
-	depthPrepassMaterial{}, areaLightIntensity(0.0f), ambientLightIntensity(0.0f), lightParticleBufferId{},
-	particleLightSimulationCSId{}
+	depthPrepassMaterial{}, lightParticleBufferId{}, particleLightSimulationCSId{}
 {
 	environmentPosition = float3(0.0f, 0.0f, 0.0f);
 	cameraPosition = float3(0.0f, 0.0f, 5.0f);
@@ -169,19 +168,14 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 	vegetationSystem->Update(timer, _deltaTime);
 
 	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
-	areaLightDesc.intensity = std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 60.0f) * 0.0f + areaLightIntensity;
+	areaLightDesc.intensity = AREA_LIGHT_INTENSITY + std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 60.0f) * 1.0f;
 
 	lightingSystem->UpdateSourceDesc(areaLightId);
 
 	auto& ambientLightDesc = lightingSystem->GetSourceDesc(ambientLightId);
-	ambientLightDesc.intensity = std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 120.0f) * 0.01f + ambientLightIntensity;
+	ambientLightDesc.intensity = AMBIENT_LIGHT_INTENSITY + std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 120.0f) * 0.05f;
 
 	lightingSystem->UpdateSourceDesc(ambientLightId);
-
-	if (areaLightIntensity < 5.0f)
-		areaLightIntensity = 9.0f;//_deltaTime * AREA_LIGHT_INTENSITY_INCREMENT_SPEED;
-
-	ambientLightIntensity = 0.15f;
 }
 
 void Common::Logic::Scene::Scene_0_Lux::RenderShadows(ID3D12GraphicsCommandList* commandList)
@@ -217,7 +211,7 @@ void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* comman
 	vfxLux->Draw(commandList);
 	vfxLuxSparkles->Draw(commandList);
 
-	postProcessManager->SetDistortBuffer(commandList);
+	postProcessManager->SetMotionBuffer(commandList);
 
 	vfxLuxDistorters->Draw(commandList);
 
@@ -319,15 +313,16 @@ void Common::Logic::Scene::Scene_0_Lux::CreateLights(ID3D12GraphicsCommandList* 
 	areaLight.position = float3(0.0f, 0.0f, 1.5f);
 	areaLight.radius = 0.05f;
 	areaLight.color = float3(0.6f, 0.5f, 0.3f);
-	areaLight.intensity = areaLightIntensity;
+	areaLight.intensity = 0.0f;
 	areaLight.type = LightType::AREA_LIGHT;
+	areaLight.range = 4.0f;
 	areaLight.castShadows = true;
 
 	areaLightId = lightingSystem->CreateLight(areaLight);
 
 	LightDesc ambientLight{};
 	ambientLight.color = float3(0.9f, 0.3f, 0.2f);
-	ambientLight.intensity = ambientLightIntensity;
+	ambientLight.intensity = 0.0f;
 	ambientLight.type = LightType::AMBIENT_LIGHT;
 
 	ambientLightId = lightingSystem->CreateLight(ambientLight);
@@ -461,8 +456,24 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 
 	vegetationSystem = new VegatationSystem(commandList, renderer, vegetationSystemDesc, camera);
 
+	SceneEntity::RenderingScheme renderingScheme{};
+	renderingScheme.enableDepthPrepass = true;
+	renderingScheme.enableMotionBlur = true;
+	renderingScheme.enableVolumetricFog = true;
+	renderingScheme.useParticleLight = true;
+	renderingScheme.whiteCutoff = WHITE_CUTOFF;
+	renderingScheme.brightThreshold = BRIGHT_THRESHOLD;
+	renderingScheme.bloomIntensity = BLOOM_INTENSITY;
+	renderingScheme.colorGrading = COLOR_GRADING;
+	renderingScheme.colorGradingFactor = COLOR_GRADING_FACTOR;
+	renderingScheme.fogDistanceFalloffStart = FOG_DISTANCE_FALLOFF_START;
+	renderingScheme.fogDistanceFalloffLength = FOG_DISTANCE_FALLOFF_LENGTH;
+	renderingScheme.fogTiling = FOG_TILING;
+	renderingScheme.windDirection = &windDirection;
+	renderingScheme.windStrength = &windStrength;
+
 	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer, camera,
-		lightingSystem, lightDefines);
+		lightingSystem, lightDefines, renderingScheme);
 
 	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, vfxAtlasId, camera,
 		float3(0.0f, 0.0f, 1.25f));

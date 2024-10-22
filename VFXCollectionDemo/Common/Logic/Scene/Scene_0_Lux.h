@@ -56,9 +56,22 @@ namespace Common::Logic::Scene
 		static constexpr float FOV_Y = DirectX::XM_PI / 4.0f;
 		static constexpr float Z_NEAR = 0.01f;
 		static constexpr float Z_FAR = 1000.0f;
-		static constexpr float AREA_LIGHT_INTENSITY_INCREMENT_SPEED = 1.5f;
-		static constexpr float AMBIENT_LIGHT_INTENSITY_INCREMENT_SPEED = 0.01f;
 
+		static constexpr float AREA_LIGHT_INTENSITY = 12.0f;
+		static constexpr float AMBIENT_LIGHT_INTENSITY = 0.15f;
+
+		static constexpr float WHITE_CUTOFF = 10.1f;
+		static constexpr float BRIGHT_THRESHOLD = 3.5f;
+		static constexpr float BLOOM_INTENSITY = 0.5f;
+
+		static constexpr float FOG_DISTANCE_FALLOFF_START = 0.5f;
+		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 5.0f;
+		static constexpr float FOG_TILING = 0.12f;
+
+		static constexpr float COLOR_GRADING_FACTOR = 0.25f;
+
+		static constexpr float3 COLOR_GRADING = float3(1.0f, 1.1f, 1.4f);
+		
 		static constexpr uint32_t SPARKLES_NUMBER = 20u;
 
 		struct MutableConstants
@@ -83,12 +96,9 @@ namespace Common::Logic::Scene
 		std::chrono::steady_clock::time_point prevTimePoint;
 
 		float3 environmentPosition;
-		float areaLightIntensity;
-
+		
 		float3 windDirection;
 		float windStrength;
-
-		float ambientLightIntensity;
 
 		float4x4 environmentWorld;
 

@@ -35,6 +35,7 @@ Output main(Input input)
 	Output output = (Output)0;
 	
 	float mask = colorTexture.SampleBias(samplerLinear, input.texCoord, -1.0f).x;
+	
 	float3 color = lerp(color0.xyz, color1.xyz, mask) * colorIntensity * mask;
 	
 	output.color = float4(color, mask);

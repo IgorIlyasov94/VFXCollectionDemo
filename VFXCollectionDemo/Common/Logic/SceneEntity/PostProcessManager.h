@@ -10,11 +10,34 @@
 
 namespace Common::Logic::SceneEntity
 {
+	struct RenderingScheme
+	{
+		float whiteCutoff;
+		float brightThreshold;
+		float bloomIntensity;
+		
+		float3 colorGrading;
+		float colorGradingFactor;
+
+		float fogDistanceFalloffStart;
+		float fogDistanceFalloffLength;
+		float fogTiling;
+
+		float3* windDirection;
+		float* windStrength;
+
+		bool enableDepthPrepass;
+		bool enableMotionBlur;
+		bool enableVolumetricFog;
+		bool useParticleLight;
+	};
+
 	class PostProcessManager
 	{
 	public:
 		PostProcessManager(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer,
-			Camera* camera, LightingSystem* lightingSystem, const std::vector<DxcDefine>& lightDefines);
+			Camera* camera, LightingSystem* lightingSystem, const std::vector<DxcDefine>& lightDefines,
+			const RenderingScheme& renderingScheme);
 		~PostProcessManager();
 
 		void Release(Graphics::Resources::ResourceManager* resourceManager);
@@ -24,7 +47,7 @@ namespace Common::Logic::SceneEntity
 		void SetDepthPrepass(ID3D12GraphicsCommandList* commandList);
 		void SetGBuffer(ID3D12GraphicsCommandList* commandList);
 
-		void SetDistortBuffer(ID3D12GraphicsCommandList* commandList);
+		void SetMotionBuffer(ID3D12GraphicsCommandList* commandList);
 
 		void Render(ID3D12GraphicsCommandList* commandList);
 		void RenderToBackBuffer(ID3D12GraphicsCommandList* commandList);
@@ -57,6 +80,10 @@ namespace Common::Logic::SceneEntity
 		void CreateComputeObjects(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			LightingSystem* lightingSystem);
 
+		void SetMotionBlur(ID3D12GraphicsCommandList* commandList);
+		void SetVolumetricFog(ID3D12GraphicsCommandList* commandList);
+		void SetHDR(ID3D12GraphicsCommandList* commandList);
+
 		struct QuadVertex
 		{
 		public:
@@ -74,13 +101,14 @@ namespace Common::Logic::SceneEntity
 			float width;
 			float height;
 
-			float3 cameraPosition;
-			float distanceFalloffExponent;
-
-			float distanceFalloffStart;
-			float distanceFalloffLength;
+			float3 cameraDirection;
 			float fogTiling;
-			float fogOffset;
+
+			float3 cameraPosition;
+			float distanceFalloffStart;
+
+			float3 fogOffset;
+			float distanceFalloffLength;
 		};
 
 		struct MotionBlurConstants
@@ -113,20 +141,13 @@ namespace Common::Logic::SceneEntity
 			float whiteCutoff;
 			float brightThreshold;
 			float bloomIntensity;
+			float3 colorGrading;
+			float colorGradingFactor;
 		};
 
 		static constexpr float CLEAR_COLOR[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-		static constexpr float MIDDLE_GRAY = 0.15f;
-		static constexpr float WHITE_CUTOFF = 1.75f;
-		static constexpr float BRIGHT_THRESHOLD = 5.0f;
-		static constexpr float BLOOM_INTENSITY = 1.0f;
-
-		static constexpr float FOG_DISTANCE_FALLOFF_START = 1.5f;
-		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 4.0f;
-		static constexpr float FOG_DISTANCE_FALLOFF_EXPONENT = 2.0f;
-		static constexpr float FOG_TILING = 0.05f;
-		static constexpr float FOG_MOVING_SPEED = 0.002f;
+		static constexpr float FOG_MOVING_COEFF = 0.002f;
 
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
@@ -154,6 +175,8 @@ namespace Common::Logic::SceneEntity
 
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneMotionTargetDescriptor;
 
+		RenderingScheme _renderingScheme;
+
 		std::vector<D3D12_RESOURCE_BARRIER> barriers;
 
 		Graphics::Resources::GPUResource* sceneColorTargetGPUResource;
@@ -173,6 +196,7 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID bloomBufferId;
 
 		Graphics::Resources::ResourceID fogMapId;
+		Graphics::Resources::ResourceID turbulenceMapId;
 
 		Graphics::Resources::ResourceID quadVSId;
 		Graphics::Resources::ResourceID motionBlurCSId;

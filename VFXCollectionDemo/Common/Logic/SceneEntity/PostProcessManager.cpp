@@ -5,6 +5,7 @@
 #include "../../Graphics/Assets/ComputeObjectBuilder.h"
 #include "../../Graphics/Assets/Loaders/DDSLoader.h"
 #include "../../Graphics/Assets/Generators/NoiseGenerator.h"
+#include "../../Graphics/Assets/Generators/TurbulenceMapGenerator.h"
 
 using namespace Graphics::Resources;
 using namespace Graphics::Assets;
@@ -14,8 +15,8 @@ using namespace DirectX::PackedVector;
 
 Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer, Camera* camera, LightingSystem* lightingSystem,
-	const std::vector<DxcDefine>& lightDefines)
-	: _camera(camera)
+	const std::vector<DxcDefine>& lightDefines, const RenderingScheme& renderingScheme)
+	: _camera(camera), _renderingScheme(renderingScheme)
 {
 	auto width = renderer->GetWidth();
 	auto height = renderer->GetHeight();
@@ -34,9 +35,9 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 
 	hdrConstants.width = width;
 	hdrConstants.area = width * height;
-	hdrConstants.middleGray = MIDDLE_GRAY;
-	hdrConstants.whiteCutoff = WHITE_CUTOFF;
-	hdrConstants.brightThreshold = BRIGHT_THRESHOLD;
+	hdrConstants.middleGray = 0.0f;
+	hdrConstants.whiteCutoff = _renderingScheme.whiteCutoff;
+	hdrConstants.brightThreshold = _renderingScheme.brightThreshold;
 
 	motionBlurConstants.widthU = width;
 	motionBlurConstants.area = hdrConstants.area;
@@ -47,10 +48,10 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 	toneMappingConstants.area = hdrConstants.area;
 	toneMappingConstants.halfWidth = width / 2u;
 	toneMappingConstants.quartArea = hdrConstants.area / 4u;
-	toneMappingConstants.middleGray = MIDDLE_GRAY;
-	toneMappingConstants.whiteCutoff = WHITE_CUTOFF;
-	toneMappingConstants.brightThreshold = BRIGHT_THRESHOLD;
-	toneMappingConstants.bloomIntensity = BLOOM_INTENSITY;
+	toneMappingConstants.middleGray = 0.0f;
+	toneMappingConstants.whiteCutoff = _renderingScheme.whiteCutoff;
+	toneMappingConstants.brightThreshold = _renderingScheme.brightThreshold;
+	toneMappingConstants.bloomIntensity = _renderingScheme.bloomIntensity;
 
 	_width = width;
 	_height = height;
@@ -58,7 +59,8 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 	auto device = renderer->GetDevice();
 	auto resourceManager = renderer->GetResourceManager();
 
-	CreateConstantBuffers(device, resourceManager, width, height);
+	if (_renderingScheme.enableVolumetricFog)
+		CreateConstantBuffers(device, resourceManager, width, height);
 
 	CreateQuad(device, commandList, resourceManager);
 	CreateTargets(device, commandList, resourceManager, width, height);
@@ -66,7 +68,8 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 
 	LoadShaders(device, resourceManager, lightDefines);
 
-	CreateTextures(device, commandList, resourceManager);
+	if (_renderingScheme.enableVolumetricFog)
+		CreateTextures(device, commandList, resourceManager);
 
 	CreateMaterials(device, resourceManager, renderer);
 	CreateComputeObjects(device, resourceManager, lightingSystem);
@@ -83,8 +86,6 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 {
 	delete toneMappingMaterial;
 
-	delete volumetricFogComputeObject;
-	delete motionBlurComputeObject;
 	delete luminanceComputeObject;
 	delete luminanceIterationComputeObject;
 	delete bloomHorizontalObject;
@@ -93,22 +94,32 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 	quadMesh->Release(resourceManager);
 	delete quadMesh;
 
-	resourceManager->DeleteResource<ConstantBuffer>(volumetricFogConstantBufferId);
-
 	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
 	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
 
-	resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
+	if (_renderingScheme.enableMotionBlur)
+	{
+		delete motionBlurComputeObject;
+
+		resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
+		resourceManager->DeleteResource<Shader>(motionBlurCSId);
+	}
 
 	resourceManager->DeleteResource<RWBuffer>(sceneBufferId);
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
 
-	resourceManager->DeleteResource<Texture>(fogMapId);
+	if (_renderingScheme.enableVolumetricFog)
+	{
+		delete volumetricFogComputeObject;
+
+		resourceManager->DeleteResource<Texture>(fogMapId);
+		resourceManager->DeleteResource<Texture>(turbulenceMapId);
+		resourceManager->DeleteResource<ConstantBuffer>(volumetricFogConstantBufferId);
+		resourceManager->DeleteResource<Shader>(volumetricFogCSId);
+	}
 
 	resourceManager->DeleteResource<Shader>(quadVSId);
-	resourceManager->DeleteResource<Shader>(volumetricFogCSId);
-	resourceManager->DeleteResource<Shader>(motionBlurCSId);
 	resourceManager->DeleteResource<Shader>(luminanceCSId);
 	resourceManager->DeleteResource<Shader>(luminanceIterationCSId);
 	resourceManager->DeleteResource<Shader>(bloomHorizontalCSId);
@@ -130,15 +141,21 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	scissorRectangle.right = width;
 	scissorRectangle.bottom = height;
 
-	volumetricFogConstants->widthU = width;
-	volumetricFogConstants->area = width * height;
-	volumetricFogConstants->width = static_cast<float>(width);
-	volumetricFogConstants->height = static_cast<float>(height);
-
 	auto resourceManager = renderer->GetResourceManager();
+
+	if (_renderingScheme.enableVolumetricFog)
+	{
+		volumetricFogConstants->widthU = width;
+		volumetricFogConstants->area = width * height;
+		volumetricFogConstants->width = static_cast<float>(width);
+		volumetricFogConstants->height = static_cast<float>(height);
+	}
+
+	if (_renderingScheme.enableMotionBlur)
+		resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
+
 	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
 	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
-	resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
 	resourceManager->DeleteResource<RWBuffer>(sceneBufferId);
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
@@ -152,7 +169,8 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 
-	motionBlurComputeObject->UpdateRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
+	if (_renderingScheme.enableMotionBlur)
+		motionBlurComputeObject->UpdateRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
 
 	luminanceComputeObject->UpdateBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	luminanceComputeObject->UpdateRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
@@ -172,7 +190,11 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 
 void Common::Logic::SceneEntity::PostProcessManager::SetDepthPrepass(ID3D12GraphicsCommandList* commandList)
 {
-	sceneDepthTargetGPUResource->EndBarrier(commandList);
+	if (!_renderingScheme.enableDepthPrepass)
+		return;
+
+	if (_renderingScheme.enableVolumetricFog)
+		sceneDepthTargetGPUResource->EndBarrier(commandList);
 
 	commandList->RSSetViewports(1u, &viewport);
 	commandList->RSSetScissorRects(1u, &scissorRectangle);
@@ -183,11 +205,20 @@ void Common::Logic::SceneEntity::PostProcessManager::SetDepthPrepass(ID3D12Graph
 
 void Common::Logic::SceneEntity::PostProcessManager::SetGBuffer(ID3D12GraphicsCommandList* commandList)
 {
+	if (!_renderingScheme.enableDepthPrepass)
+	{
+		commandList->RSSetViewports(1u, &viewport);
+		commandList->RSSetScissorRects(1u, &scissorRectangle);
+	}
+
 	D3D12_RESOURCE_BARRIER barrier{};
 	barriers.clear();
 
 	if (sceneColorTargetGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
+
+	if (_renderingScheme.enableVolumetricFog && !_renderingScheme.enableDepthPrepass)
+		sceneDepthTargetGPUResource->EndBarrier(commandList);
 
 	if (!barriers.empty())
 		commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
@@ -196,8 +227,11 @@ void Common::Logic::SceneEntity::PostProcessManager::SetGBuffer(ID3D12GraphicsCo
 	commandList->OMSetRenderTargets(1u, &sceneColorTargetDescriptor, true, &sceneDepthTargetDescriptor);
 }
 
-void Common::Logic::SceneEntity::PostProcessManager::SetDistortBuffer(ID3D12GraphicsCommandList* commandList)
+void Common::Logic::SceneEntity::PostProcessManager::SetMotionBuffer(ID3D12GraphicsCommandList* commandList)
 {
+	if (!_renderingScheme.enableMotionBlur)
+		return;
+
 	D3D12_RESOURCE_BARRIER barrier{};
 	barriers.clear();
 
@@ -218,133 +252,53 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 	D3D12_RESOURCE_BARRIER barrier{};
 	barriers.clear();
 
-	if (sceneColorTargetGPUResource->GetEndBarrier(barrier))
+	if (_renderingScheme.enableMotionBlur &&
+		sceneMotionTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);
-	if (sceneMotionTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
-		barriers.push_back(barrier);
+
+	if (_renderingScheme.enableMotionBlur)
+	{
+		if (sceneColorTargetGPUResource->GetEndBarrier(barrier))
+			barriers.push_back(barrier);
+	}
+	else
+	{
+		if (sceneColorTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+			barriers.push_back(barrier);
+	}
+
 	if (sceneBufferGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
-	if (sceneDepthTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_DEPTH_READ |
+	if (_renderingScheme.enableVolumetricFog && sceneDepthTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_DEPTH_READ |
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);
 
 	if (!barriers.empty())
 		commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
-	motionBlurConstants.widthU = _width;
-	motionBlurConstants.area = _width * _height;
-	motionBlurConstants.width = static_cast<float>(_width);
-	motionBlurConstants.height = static_cast<float>(_height);
+	if (_renderingScheme.enableMotionBlur)
+		SetMotionBlur(commandList);
 
-	uint32_t numGroupsX = std::max(motionBlurConstants.area / THREADS_PER_GROUP, 1u);
-
-	motionBlurComputeObject->Set(commandList);
-	motionBlurComputeObject->SetRootConstants(commandList, 0u, 4u, &motionBlurConstants);
-	motionBlurComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
-
-	barriers.clear();
-
-	volumetricFogConstants->invViewProjection = _camera->GetInvViewProjection();
-	volumetricFogConstants->cameraPosition = _camera->GetPosition();
-	volumetricFogConstants->fogOffset += FOG_MOVING_SPEED;
-
-	sceneBufferGPUResource->GetUAVBarrier(barrier);
-	barriers.push_back(barrier);
-
-	if (sceneDepthTargetGPUResource->GetEndBarrier(barrier))
-		barriers.push_back(barrier);
-
-	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
-
-	volumetricFogComputeObject->Set(commandList);
-	volumetricFogComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
-
-	barriers.clear();
-
-	sceneBufferGPUResource->GetUAVBarrier(barrier);
-	barriers.push_back(barrier);
-
-	if (sceneBufferGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
-		barriers.push_back(barrier);
-	if (luminanceBufferGPUResource->GetEndBarrier(barrier))
-		barriers.push_back(barrier);
-	if (sceneDepthTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_DEPTH_WRITE, barrier))
-		barriers.push_back(barrier);
-
-	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
-
-	hdrConstants.width = _width;
-	hdrConstants.area = motionBlurConstants.area;
-	uint32_t remain = hdrConstants.area % THREADS_PER_GROUP;
-	
-	luminanceComputeObject->Set(commandList);
-	luminanceComputeObject->SetRootConstants(commandList, 0u, 2u, &hdrConstants);
-	luminanceComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
-
-	if (numGroupsX > 1u)
-		luminanceIterationComputeObject->Set(commandList);
-
-	while (numGroupsX > 1u)
+	if (_renderingScheme.enableVolumetricFog)
 	{
-		hdrConstants.area = std::max(numGroupsX + remain, 1u);
-		remain = numGroupsX % THREADS_PER_GROUP;
-		numGroupsX = std::max(numGroupsX / THREADS_PER_GROUP, 1u);
-		
-		luminanceBufferGPUResource->UAVBarrier(commandList);
+		barriers.clear();
 
-		luminanceIterationComputeObject->SetRootConstant(commandList, 0u, &hdrConstants.area);
-		luminanceIterationComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+		if (_renderingScheme.enableMotionBlur)
+		{
+			sceneBufferGPUResource->GetUAVBarrier(barrier);
+			barriers.push_back(barrier);
+		}
+
+		if (_renderingScheme.enableVolumetricFog && sceneDepthTargetGPUResource->GetEndBarrier(barrier))
+			barriers.push_back(barrier);
+
+		if (!barriers.empty())
+			commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
+
+		SetVolumetricFog(commandList);
 	}
 
-	barriers.clear();
-
-	luminanceBufferGPUResource->GetUAVBarrier(barrier);
-	barriers.push_back(barrier);
-
-	if (luminanceBufferGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
-		barriers.push_back(barrier);
-	if (bloomBufferGPUResource->GetEndBarrier(barrier))
-		barriers.push_back(barrier);
-
-	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
-
-	toneMappingConstants.width = _width;
-	toneMappingConstants.area = _width * _height;
-	toneMappingConstants.halfWidth = _width / 2u;
-	toneMappingConstants.quartArea = _width * _height / 4u;
-
-	numGroupsX = std::max(toneMappingConstants.quartArea / (THREADS_PER_GROUP - HALF_BLUR_SAMPLES_NUMBER * 2u), 1u);
-
-	bloomHorizontalObject->Set(commandList);
-	bloomHorizontalObject->SetRootConstants(commandList, 0u, 7u, &toneMappingConstants);
-	bloomHorizontalObject->Dispatch(commandList, numGroupsX, 1u, 1u);
-
-	barriers.clear();
-
-	if (sceneBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
-		barriers.push_back(barrier);
-	if (luminanceBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
-		barriers.push_back(barrier);
-
-	bloomBufferGPUResource->GetUAVBarrier(barrier);
-	barriers.push_back(barrier);
-
-	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
-
-	uint32_t verticalBlurConstants[3]
-	{
-		toneMappingConstants.halfWidth,
-		_height / 2u,
-		toneMappingConstants.quartArea
-	};
-
-	bloomVerticalObject->Set(commandList);
-	bloomVerticalObject->SetRootConstants(commandList, 0u, 3u, &verticalBlurConstants);
-	bloomVerticalObject->Dispatch(commandList, numGroupsX, 1u, 1u);
-
-	quadMesh->SetInputAssemblerOnly(commandList);
-
-	bloomBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	SetHDR(commandList);
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12GraphicsCommandList* commandList)
@@ -374,8 +328,11 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 
 	if (sceneColorTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, barrier))
 		barriers.push_back(barrier);
-	if (sceneMotionTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, barrier))
+
+	if (_renderingScheme.enableMotionBlur &&
+		sceneMotionTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, barrier))
 		barriers.push_back(barrier);
+
 	if (sceneBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
 		barriers.push_back(barrier);
 	if (luminanceBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
@@ -407,12 +364,12 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateConstantBuffers(ID3D1
 	volumetricFogConstants->area = width * height;
 	volumetricFogConstants->width = static_cast<float>(width);
 	volumetricFogConstants->height = static_cast<float>(height);
+	volumetricFogConstants->cameraDirection = _camera->GetDirection();
 	volumetricFogConstants->cameraPosition = _camera->GetPosition();
-	volumetricFogConstants->distanceFalloffExponent = FOG_DISTANCE_FALLOFF_EXPONENT;
-	volumetricFogConstants->distanceFalloffStart = FOG_DISTANCE_FALLOFF_START;
-	volumetricFogConstants->distanceFalloffLength = FOG_DISTANCE_FALLOFF_LENGTH;
-	volumetricFogConstants->fogTiling = FOG_TILING;
-	volumetricFogConstants->fogOffset = 0.0f;
+	volumetricFogConstants->distanceFalloffStart = _renderingScheme.fogDistanceFalloffStart;
+	volumetricFogConstants->distanceFalloffLength = _renderingScheme.fogDistanceFalloffLength;
+	volumetricFogConstants->fogTiling = _renderingScheme.fogTiling;
+	volumetricFogConstants->fogOffset = {};
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateQuad(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -469,24 +426,26 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 	sceneDepthTargetId = resourceManager->CreateTextureResource(device, commandList,
 		TextureResourceType::DEPTH_STENCIL_TARGET, sceneTargetDesc);
 
-	sceneTargetDesc.format = DXGI_FORMAT_R16G16_FLOAT;
-
-	sceneMotionTargetId = resourceManager->CreateTextureResource(device, commandList,
-		TextureResourceType::RENDER_TARGET, sceneTargetDesc);
-
 	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
 	auto sceneDepthTargetResource = resourceManager->GetResource<DepthStencilTarget>(sceneDepthTargetId);
 
-	auto sceneDistortionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
-
 	sceneColorTargetGPUResource = sceneColorTargetResource->resource;
 	sceneDepthTargetGPUResource = sceneDepthTargetResource->resource;
-	sceneMotionTargetGPUResource = sceneDistortionTargetResource->resource;
 
 	sceneColorTargetDescriptor = sceneColorTargetResource->rtvDescriptor.cpuDescriptor;
 	sceneDepthTargetDescriptor = sceneDepthTargetResource->dsvDescriptor.cpuDescriptor;
 
-	sceneMotionTargetDescriptor = sceneDistortionTargetResource->rtvDescriptor.cpuDescriptor;
+	if (_renderingScheme.enableMotionBlur)
+	{
+		sceneTargetDesc.format = DXGI_FORMAT_R16G16_FLOAT;
+
+		sceneMotionTargetId = resourceManager->CreateTextureResource(device, commandList,
+			TextureResourceType::RENDER_TARGET, sceneTargetDesc);
+
+		auto sceneDistortionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
+		sceneMotionTargetGPUResource = sceneDistortionTargetResource->resource;
+		sceneMotionTargetDescriptor = sceneDistortionTargetResource->rtvDescriptor.cpuDescriptor;
+	}
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -534,17 +493,24 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 	quadVSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\QuadVS.hlsl", ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
-	motionBlurCSId = resourceManager->CreateShaderResource(device,
-		"Resources\\Shaders\\PostProcess\\MotionBlurCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
+	std::vector<DxcDefine> defines;
 
-	volumetricFogCSId = resourceManager->CreateShaderResource(device,
-		"Resources\\Shaders\\PostProcess\\VolumetricFogCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5, lightDefines);
+	if (_renderingScheme.enableMotionBlur)
+		defines.push_back({ L"MOTION_BLUR", nullptr });
+
+	if (_renderingScheme.enableVolumetricFog)
+		defines.push_back({ L"VOLUMETRIC_FOG", nullptr });
+
+	if (_renderingScheme.enableMotionBlur)
+	{
+		motionBlurCSId = resourceManager->CreateShaderResource(device,
+			"Resources\\Shaders\\PostProcess\\MotionBlurCS.hlsl",
+			ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
+	}
 
 	luminanceCSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\LuminanceCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
+		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5, defines);
 
 	luminanceIterationCSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\LuminanceIterationCS.hlsl",
@@ -552,7 +518,7 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 
 	bloomHorizontalCSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\BloomHorizontalCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
+		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5, defines);
 
 	bloomVerticalCSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\BloomVerticalCS.hlsl",
@@ -560,7 +526,17 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 
 	toneMappingPSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\ToneMappingPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, defines);
+
+	if (_renderingScheme.enableVolumetricFog)
+	{
+		for (auto& define : lightDefines)
+			defines.push_back(define);
+
+		volumetricFogCSId = resourceManager->CreateShaderResource(device,
+			"Resources\\Shaders\\PostProcess\\VolumetricFogCS.hlsl",
+			ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5, defines);
+	}
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -569,7 +545,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTextures(ID3D12Device
 	TextureDesc textureDesc{};
 
 	std::filesystem::path fileName("Resources\\Textures\\FogMap.dds");
-
+	
 	if (std::filesystem::exists(fileName))
 		DDSLoader::Load(fileName, textureDesc);
 	else
@@ -591,12 +567,35 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTextures(ID3D12Device
 	}
 
 	fogMapId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
+
+	fileName = "Resources\\Textures\\TurbulenceMap.dds";
+
+	if (std::filesystem::exists(fileName))
+		DDSLoader::Load(fileName, textureDesc);
+	else
+	{
+		TurbulenceMapGenerator turbulenceMapGenerator{};
+
+		std::vector<float4> turbulenceData;
+		turbulenceMapGenerator.Generate(NOISE_SIZE_X, NOISE_SIZE_Y, NOISE_SIZE_Z, float3(4.0f, 4.0f, 4.0f), turbulenceData);
+
+		DDSSaveDesc ddsSaveDesc{};
+		ddsSaveDesc.width = NOISE_SIZE_X;
+		ddsSaveDesc.height = NOISE_SIZE_Y;
+		ddsSaveDesc.depth = NOISE_SIZE_Z;
+		ddsSaveDesc.targetFormat = DDSFormat::R8G8B8A8_UNORM;
+		ddsSaveDesc.dimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+
+		DDSLoader::Save(fileName, ddsSaveDesc, turbulenceData);
+		DDSLoader::Load(fileName, textureDesc);
+	}
+
+	turbulenceMapId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Device* device, ResourceManager* resourceManager,
 	Graphics::DirectX12Renderer* renderer)
 {
-	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 	
@@ -605,7 +604,18 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetRootConstants(0u, 8u);
-	materialBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	if (_renderingScheme.enableMotionBlur || _renderingScheme.enableVolumetricFog)
+	{
+		auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
+		materialBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
+	}
+	else
+	{
+		auto sceneColorResource = resourceManager->GetResource<Texture>(sceneColorTargetId);
+		materialBuilder.SetTexture(0u, sceneColorResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	}
+
 	materialBuilder.SetBuffer(1u, luminanceBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetBuffer(2u, bloomBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
@@ -622,52 +632,80 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12Device* device,
 	ResourceManager* resourceManager, LightingSystem* lightingSystem)
 {
-	auto lightConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightingSystem->GetLightConstantBufferId());
-	auto volumetricFogConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(volumetricFogConstantBufferId);
-	
 	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
-	auto sceneDepthTargetResource = resourceManager->GetResource<DepthStencilTarget>(sceneDepthTargetId);
 	auto sceneMotionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
 	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
-	auto lightParticleBufferResource = resourceManager->GetResource<RWBuffer>(lightingSystem->GetLightParticleBuffer());
-
-	auto fogMapResource = resourceManager->GetResource<Texture>(fogMapId);
-
+	
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device, Graphics::DefaultFilterSetup::FILTER_BILINEAR_CLAMP);
-	auto samplerLinearWrapResource = resourceManager->GetDefaultSampler(device, Graphics::DefaultFilterSetup::FILTER_BILINEAR_WRAP);
-
-	auto motionBlurCS = resourceManager->GetResource<Shader>(motionBlurCSId);
-	auto volumetricFogCS = resourceManager->GetResource<Shader>(volumetricFogCSId);
+	
 	auto luminanceCS = resourceManager->GetResource<Shader>(luminanceCSId);
 	auto luminanceIterationCS = resourceManager->GetResource<Shader>(luminanceIterationCSId);
 	auto bloomHorizontalCS = resourceManager->GetResource<Shader>(bloomHorizontalCSId);
 	auto bloomVerticalCS = resourceManager->GetResource<Shader>(bloomVerticalCSId);
 
 	ComputeObjectBuilder computeObjectBuilder{};
-	computeObjectBuilder.SetRootConstants(0u, 4u);
-	computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
-	computeObjectBuilder.SetTexture(1u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
-	computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
-	computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
-	computeObjectBuilder.SetShader(motionBlurCS->bytecode);
 
-	motionBlurComputeObject = computeObjectBuilder.Compose(device);
+	if (_renderingScheme.enableMotionBlur)
+	{
+		auto motionBlurCS = resourceManager->GetResource<Shader>(motionBlurCSId);
+		
+		computeObjectBuilder.SetRootConstants(0u, 4u);
+		computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+		computeObjectBuilder.SetTexture(1u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
+		computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
+		computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+		computeObjectBuilder.SetShader(motionBlurCS->bytecode);
 
-	computeObjectBuilder.SetConstantBuffer(0u, lightConstantBufferResource->resourceGPUAddress);
-	computeObjectBuilder.SetConstantBuffer(1u, volumetricFogConstantBufferResource->resourceGPUAddress);
-	computeObjectBuilder.SetTexture(0u, fogMapResource->srvDescriptor.gpuDescriptor);
-	computeObjectBuilder.SetTexture(1u, sceneDepthTargetResource->srvDescriptor.gpuDescriptor);
-	computeObjectBuilder.SetBuffer(2u, lightParticleBufferResource->resourceGPUAddress);
-	computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
-	computeObjectBuilder.SetSampler(0u, samplerLinearWrapResource->samplerDescriptor.gpuDescriptor);
-	computeObjectBuilder.SetShader(volumetricFogCS->bytecode);
+		motionBlurComputeObject = computeObjectBuilder.Compose(device);
+	}
 
-	volumetricFogComputeObject = computeObjectBuilder.Compose(device);
+	if (_renderingScheme.enableVolumetricFog)
+	{
+		auto lightConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightingSystem->GetLightConstantBufferId());
+		auto volumetricFogConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(volumetricFogConstantBufferId);
+		auto sceneDepthTargetResource = resourceManager->GetResource<DepthStencilTarget>(sceneDepthTargetId);
+
+		auto fogMapResource = resourceManager->GetResource<Texture>(fogMapId);
+		auto turbulenceMapResource = resourceManager->GetResource<Texture>(turbulenceMapId);
+
+		auto samplerLinearWrapResource = resourceManager->GetDefaultSampler(device, Graphics::DefaultFilterSetup::FILTER_BILINEAR_WRAP);
+
+		auto volumetricFogCS = resourceManager->GetResource<Shader>(volumetricFogCSId);
+
+		computeObjectBuilder.SetConstantBuffer(0u, lightConstantBufferResource->resourceGPUAddress);
+		computeObjectBuilder.SetConstantBuffer(1u, volumetricFogConstantBufferResource->resourceGPUAddress);
+		computeObjectBuilder.SetTexture(0u, fogMapResource->srvDescriptor.gpuDescriptor);
+		computeObjectBuilder.SetTexture(1u, turbulenceMapResource->srvDescriptor.gpuDescriptor);
+		computeObjectBuilder.SetTexture(2u, sceneDepthTargetResource->srvDescriptor.gpuDescriptor);
+
+		if (_renderingScheme.useParticleLight)
+		{
+			auto lightParticleBufferResource = resourceManager->GetResource<RWBuffer>(lightingSystem->GetLightParticleBuffer());
+
+			computeObjectBuilder.SetBuffer(3u, lightParticleBufferResource->resourceGPUAddress);
+
+			if (!_renderingScheme.enableMotionBlur)
+				computeObjectBuilder.SetTexture(4u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+		}
+		else if (!_renderingScheme.enableMotionBlur)
+			computeObjectBuilder.SetTexture(3u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+
+		computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
+		computeObjectBuilder.SetSampler(0u, samplerLinearWrapResource->samplerDescriptor.gpuDescriptor);
+		computeObjectBuilder.SetShader(volumetricFogCS->bytecode);
+
+		volumetricFogComputeObject = computeObjectBuilder.Compose(device);
+	}
 
 	computeObjectBuilder.SetRootConstants(0u, 2u);
-	computeObjectBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress);
+
+	if (_renderingScheme.enableMotionBlur || _renderingScheme.enableVolumetricFog)
+		computeObjectBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress);
+	else
+		computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+
 	computeObjectBuilder.SetRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetShader(luminanceCS->bytecode);
 
@@ -680,7 +718,12 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 	luminanceIterationComputeObject = computeObjectBuilder.Compose(device);
 
 	computeObjectBuilder.SetRootConstants(0u, 7u);
-	computeObjectBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress);
+
+	if (_renderingScheme.enableMotionBlur || _renderingScheme.enableVolumetricFog)
+		computeObjectBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress);
+	else
+		computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+
 	computeObjectBuilder.SetBuffer(1u, luminanceBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
 	computeObjectBuilder.SetShader(bloomHorizontalCS->bytecode);
@@ -692,4 +735,138 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 	computeObjectBuilder.SetShader(bloomVerticalCS->bytecode);
 
 	bloomVerticalObject = computeObjectBuilder.Compose(device);
+}
+
+void Common::Logic::SceneEntity::PostProcessManager::SetMotionBlur(ID3D12GraphicsCommandList* commandList)
+{
+	motionBlurConstants.widthU = _width;
+	motionBlurConstants.area = _width * _height;
+	motionBlurConstants.width = static_cast<float>(_width);
+	motionBlurConstants.height = static_cast<float>(_height);
+
+	uint32_t numGroupsX = std::max(motionBlurConstants.area / THREADS_PER_GROUP, 1u);
+
+	motionBlurComputeObject->Set(commandList);
+	motionBlurComputeObject->SetRootConstants(commandList, 0u, 4u, &motionBlurConstants);
+	motionBlurComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+}
+
+void Common::Logic::SceneEntity::PostProcessManager::SetVolumetricFog(ID3D12GraphicsCommandList* commandList)
+{
+	volumetricFogConstants->invViewProjection = _camera->GetInvViewProjection();
+	volumetricFogConstants->cameraPosition = _camera->GetPosition();
+	volumetricFogConstants->cameraDirection = _camera->GetDirection();
+
+	if ((_renderingScheme.windStrength != nullptr) && (_renderingScheme.windDirection != nullptr))
+	{
+		float windStrength = (*_renderingScheme.windStrength) * FOG_MOVING_COEFF;
+
+		volumetricFogConstants->fogOffset.x += _renderingScheme.windDirection->x * windStrength;
+		volumetricFogConstants->fogOffset.y += _renderingScheme.windDirection->y * windStrength;
+		volumetricFogConstants->fogOffset.z += _renderingScheme.windDirection->z * windStrength;
+		volumetricFogConstants->fogOffset.x -= std::floor(volumetricFogConstants->fogOffset.x);
+		volumetricFogConstants->fogOffset.y -= std::floor(volumetricFogConstants->fogOffset.y);
+		volumetricFogConstants->fogOffset.z -= std::floor(volumetricFogConstants->fogOffset.z);
+	}
+
+	uint32_t numGroupsX = std::max(_width * _height / THREADS_PER_GROUP, 1u);
+
+	volumetricFogComputeObject->Set(commandList);
+	volumetricFogComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+}
+
+void Common::Logic::SceneEntity::PostProcessManager::SetHDR(ID3D12GraphicsCommandList* commandList)
+{
+	D3D12_RESOURCE_BARRIER barrier{};
+	barriers.clear();
+
+	if (_renderingScheme.enableMotionBlur || _renderingScheme.enableVolumetricFog)
+	{
+		sceneBufferGPUResource->GetUAVBarrier(barrier);
+		barriers.push_back(barrier);
+	}
+
+	if (sceneBufferGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	if (luminanceBufferGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+	if (_renderingScheme.enableVolumetricFog &&
+		sceneDepthTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_DEPTH_WRITE, barrier))
+		barriers.push_back(barrier);
+
+	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
+
+	hdrConstants.width = _width;
+	hdrConstants.area = motionBlurConstants.area;
+	uint32_t remain = hdrConstants.area % THREADS_PER_GROUP;
+	uint32_t numGroupsX = std::max(_width * _height / THREADS_PER_GROUP, 1u);
+
+	luminanceComputeObject->Set(commandList);
+	luminanceComputeObject->SetRootConstants(commandList, 0u, 2u, &hdrConstants);
+	luminanceComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+
+	if (numGroupsX > 1u)
+		luminanceIterationComputeObject->Set(commandList);
+
+	while (numGroupsX > 1u)
+	{
+		hdrConstants.area = std::max(numGroupsX + remain, 1u);
+		remain = numGroupsX % THREADS_PER_GROUP;
+		numGroupsX = std::max(numGroupsX / THREADS_PER_GROUP, 1u);
+
+		luminanceBufferGPUResource->UAVBarrier(commandList);
+
+		luminanceIterationComputeObject->SetRootConstant(commandList, 0u, &hdrConstants.area);
+		luminanceIterationComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+	}
+
+	barriers.clear();
+
+	luminanceBufferGPUResource->GetUAVBarrier(barrier);
+	barriers.push_back(barrier);
+
+	if (luminanceBufferGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	if (bloomBufferGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
+
+	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
+
+	toneMappingConstants.width = _width;
+	toneMappingConstants.area = _width * _height;
+	toneMappingConstants.halfWidth = _width / 2u;
+	toneMappingConstants.quartArea = _width * _height / 4u;
+
+	numGroupsX = std::max(toneMappingConstants.quartArea / (THREADS_PER_GROUP - HALF_BLUR_SAMPLES_NUMBER * 2u), 1u);
+
+	bloomHorizontalObject->Set(commandList);
+	bloomHorizontalObject->SetRootConstants(commandList, 0u, 7u, &toneMappingConstants);
+	bloomHorizontalObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+
+	barriers.clear();
+
+	if (sceneBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	if (luminanceBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+
+	bloomBufferGPUResource->GetUAVBarrier(barrier);
+	barriers.push_back(barrier);
+
+	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
+
+	uint32_t verticalBlurConstants[3]
+	{
+		toneMappingConstants.halfWidth,
+		_height / 2u,
+		toneMappingConstants.quartArea
+	};
+
+	bloomVerticalObject->Set(commandList);
+	bloomVerticalObject->SetRootConstants(commandList, 0u, 3u, &verticalBlurConstants);
+	bloomVerticalObject->Dispatch(commandList, numGroupsX, 1u, 1u);
+
+	quadMesh->SetInputAssemblerOnly(commandList);
+
+	bloomBufferGPUResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }

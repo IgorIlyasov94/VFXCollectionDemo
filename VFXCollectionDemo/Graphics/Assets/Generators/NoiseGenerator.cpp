@@ -1,6 +1,7 @@
 #include "NoiseGenerator.h"
 #include "../../Common/Utilities.h"
 #include "../../DirectX12Includes.h"
+#include "GeneratorUtilities.h"
 
 using namespace Common;
 using namespace DirectX;
@@ -22,7 +23,7 @@ void Graphics::Assets::Generators::NoiseGenerator::Generate(uint32_t width, uint
 	std::vector<floatN> tempData;
 	GenerateWhiteNoiseMap(width, height, depth, tempData);
 	GaussianBlur(static_cast<int32_t>(width), static_cast<int32_t>(height), static_cast<int32_t>(depth), scale, tempData);
-	Normalize(tempData, textureData);
+	GeneratorUtilities::Normalize(tempData, textureData);
 }
 
 void Graphics::Assets::Generators::NoiseGenerator::GenerateWhiteNoiseMap(uint32_t width, uint32_t height, uint32_t depth,
@@ -94,7 +95,7 @@ void Graphics::Assets::Generators::NoiseGenerator::GaussianBlur(int32_t width, i
 		{
 			for (int32_t xIndex = 0u; xIndex < width; xIndex++)
 			{
-				auto pixelIndex = GetIndexFromXYZ(xIndex, yIndex, zIndex, width, height);
+				auto pixelIndex = GeneratorUtilities::GetIndexFromXYZ(xIndex, yIndex, zIndex, width, height);
 				
 				floatN sampleSum{};
 
@@ -103,7 +104,8 @@ void Graphics::Assets::Generators::NoiseGenerator::GaussianBlur(int32_t width, i
 					auto offsettedXIndex = (width + xIndex + sampleOffset * directionMaskX) % width;
 					auto offsettedYIndex = (height + yIndex + sampleOffset * directionMaskY) % height;
 					auto offsettedZIndex = (depth + zIndex + sampleOffset * directionMaskZ) % depth;
-					auto offsettedPixelIndex = GetIndexFromXYZ(offsettedXIndex, offsettedYIndex, offsettedZIndex, width, height);
+					auto offsettedPixelIndex = GeneratorUtilities::GetIndexFromXYZ(offsettedXIndex, offsettedYIndex,
+						offsettedZIndex, width, height);
 
 					auto weightIndex = static_cast<uint32_t>(sampleOffset + halfSamplesNumber);
 					const auto& weight = weights[weightIndex];
@@ -114,39 +116,6 @@ void Graphics::Assets::Generators::NoiseGenerator::GaussianBlur(int32_t width, i
 				result[pixelIndex] = sampleSum;
 			}
 		}
-	}
-}
-
-void Graphics::Assets::Generators::NoiseGenerator::Normalize(const std::vector<floatN>& noiseMap, std::vector<float4>& result)
-{
-	floatN minValue{};
-	floatN maxValue{};
-	FindMinMax(noiseMap, minValue, maxValue);
-
-	auto diffValue = XMVectorSubtract(maxValue, minValue);
-
-	result.resize(noiseMap.size(), {});
-
-	for (auto pixelIndex = 0u; pixelIndex < noiseMap.size(); pixelIndex++)
-		Normalize(noiseMap[pixelIndex], minValue, diffValue, result[pixelIndex]);
-}
-
-void Graphics::Assets::Generators::NoiseGenerator::Normalize(const floatN& value, const floatN& minValue,
-	const floatN& diffValue, float4& result)
-{
-	XMStoreFloat4(&result, XMVectorDivide(XMVectorSubtract(value, minValue), diffValue));
-}
-
-void Graphics::Assets::Generators::NoiseGenerator::FindMinMax(const std::vector<floatN>& noiseMap,
-	floatN& minValue, floatN& maxValue)
-{
-	minValue = noiseMap[0];
-	maxValue = noiseMap[0];
-
-	for (auto& element : noiseMap)
-	{
-		minValue = XMVectorMin(minValue, element);
-		maxValue = XMVectorMax(maxValue, element);
 	}
 }
 
@@ -167,18 +136,4 @@ float Graphics::Assets::Generators::NoiseGenerator::Weight(float x, float sigma)
 	weight /= static_cast<float>(sigma * std::sqrt(2.0 * std::numbers::pi));
 
 	return weight;
-}
-
-uint32_t Graphics::Assets::Generators::NoiseGenerator::GetIndexFromXYZ(uint32_t x, uint32_t y, uint32_t z,
-	uint32_t width, uint32_t height)
-{
-	return static_cast<uint32_t>(width * (static_cast<uint64_t>(z) * height + y) + x);
-}
-
-void Graphics::Assets::Generators::NoiseGenerator::GetXYZFromIndex(uint32_t index, uint32_t width, uint32_t height,
-	uint32_t& x, uint32_t& y, uint32_t& z)
-{
-	x = index % width;
-	y = (index / width) % height;
-	z = (index / width) / height;
 }

@@ -220,7 +220,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Render(ID3D12GraphicsCommandList* 
 
 	resultTargetResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-	postProcessManager->SetDistortBuffer(commandList);
+	postProcessManager->SetMotionBuffer(commandList);
 
 	postProcessManager->Render(commandList);
 
@@ -477,7 +477,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateObjects(ID3D12Device* device
 	device5->Release();
 	commandList5->Release();
 
-	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer, camera, lightingSystem, {});
+	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer, camera, lightingSystem, {}, {});
 }
 
 void Common::Logic::Scene::Scene_1_WhiteRoom::LoadMesh(std::filesystem::path filePath,

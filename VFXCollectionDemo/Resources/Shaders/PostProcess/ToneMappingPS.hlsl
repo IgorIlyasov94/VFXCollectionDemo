@@ -10,6 +10,8 @@ cbuffer RootConstants : register(b0)
 	float whiteCutoff;
 	float brightThreshold;
 	float bloomIntensity;
+	float3 colorGrading;
+	float colorGradingFactor;
 };
 
 struct Input
@@ -23,7 +25,12 @@ struct Output
 	float4 color : SV_TARGET0;
 };
 
+#if defined(MOTION_BLUR) || defined(VOLUMETRIC_FOG)
 StructuredBuffer<float4> sceneBuffer : register(t0);
+#else
+Texture2D sceneColor : register(t0);
+#endif
+
 StructuredBuffer<float> luminanceBuffer : register(t1);
 StructuredBuffer<float4> bloomBuffer : register(t2);
 
@@ -44,18 +51,20 @@ Output main(Input input)
 	uint2 bufferCoord = (uint2)input.position.xy;
 	uint bufferIndex = min(bufferCoord.x + bufferCoord.y * width, maxCoordValue);
 	
+#if defined(MOTION_BLUR) || defined(VOLUMETRIC_FOG)
 	float3 color = sceneBuffer[bufferIndex].xyz;
+#else
+	float3 color = sceneColor.Load(int3(bufferCoord.x, bufferCoord.y, 0)).xyz;
+#endif
 	
 	float luminance = luminanceBuffer[0u] / (float)area;
 	
 	float gray = dot(color, LUMINANCE_VECTOR);
-	float3 сolorGrade = float3(1.0f, 1.1f, 1.4f);
-	float colorShiftFactor = 0.75f;
 	
-	float3 gradedColor = gray * сolorGrade;
+	float3 gradedColor = gray * colorGrading;
 	
-	color = lerp(gradedColor, color, colorShiftFactor);
-	luminance = lerp(dot(gradedColor, LUMINANCE_VECTOR), luminance, colorShiftFactor);
+	color = lerp(color, gradedColor, colorGradingFactor);
+	luminance = lerp(dot(gradedColor, LUMINANCE_VECTOR), luminance, colorGradingFactor);
 	
 	color = ToneMapping(color, luminance);
 	
@@ -66,7 +75,7 @@ Output main(Input input)
 	
 	float3 bloom = bloomBuffer[bufferIndex].xyz;
 	
-	output.color = float4(saturate(bloom * bloomIntensity*0 + color), 1.0f);
+	output.color = float4(saturate(bloom * bloomIntensity + color), 1.0f);
 	
 	return output;
 }

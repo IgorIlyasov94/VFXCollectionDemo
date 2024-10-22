@@ -3,13 +3,15 @@ static const uint AREA_LIGHT_SAMPLES_NUMBER = 8;
 static const float PI = 3.14159265f;
 static const float EPSILON = 0.59604645E-7f;
 
-static const float MIE_G = 0.99f;
+static const float MIE_G = -0.99f;
 static const float MIE_G2 = 0.9801f;
 
-static const float HG_G = 0.99f;
+static const float HG_G = -0.99f;
 static const float HG_FORWARD_G = HG_G;
 static const float HG_BACKWARD_G = -HG_G / 2.0f;
 static const float HG_LERP_FACTOR = 1.0f - HG_BACKWARD_G * HG_BACKWARD_G;
+
+static const float SCATTERING_CONST = 0.001f;
 
 static const float AIR_PARTICLE_SIZE = 0.1578E-9;
 static const float FOG_WATER_PARTICLE_SIZE = 10E-6;
@@ -19,11 +21,11 @@ static const float CLOUD_UPPER_WATER_PARTICLE_SIZE = 30E-6;
 static const float3 AIR_IOR = float3(1.00027657f, 1.00027784f, 1.00028004f);
 static const float3 WATER_IOR = float3(1.3318f, 1.3330f, 1.3364f);
 
-static const float3 AIR_ABSORPTION_COEFF = float3(2E-3, 2E-3, 2E-3);
-static const float3 AIR_WET_ABSORPTION_COEFF = float3(4E-3, 4E-3, 4E-3);
-static const float3 WATER_ABSORPTION_COEFF = float3(2.8723E-5, 4.4782E-6, 2.6335E-6);
+static const float3 AIR_ABSORPTION_COEFF = float3(0.002f, 0.002f, 0.002f);
+static const float3 AIR_WET_ABSORPTION_COEFF = float3(0.004f, 0.004f, 0.004f);
+static const float3 WATER_ABSORPTION_COEFF = float3(2.8723f, 0.44782f, 0.26335f) * 1E-5;
 
-static const float3 INV_WAVELENGTH_4 = 1.0f.xxx / pow(float3(630E-9, 550E-9, 464E-9), 4.0f);
+static const float3 INV_WAVELENGTH_4 = 1.0f.xxx / pow(float3(630E-3, 550E-3, 464E-3), 4.0f);
 
 static const float AREA_LIGHT_SAMPLE_WEIGHT = 1.0f / AREA_LIGHT_SAMPLES_NUMBER;
 
@@ -53,7 +55,7 @@ struct DirectionalLight
 struct PointLight
 {
 	float3 position;
-	float padding0;
+	float range;
 	float3 color;
 	float padding1;
 };
@@ -63,13 +65,13 @@ struct AreaLight
 	float3 position;
 	float radius;
 	float3 color;
-	float padding;
+	float range;
 };
 
 struct SpotLight
 {
 	float3 position;
-	float falloff;
+	float range;
 	float3 color;
 	float cosPhi2;
 	float3 direction;
@@ -108,7 +110,7 @@ struct ShadowCubeData
 
 struct LightData
 {
-	float3 vector;
+	float3 direction;
 	float3 color;
 	float attenuationCoeff;
 };
@@ -199,11 +201,10 @@ void CalculatePBRLighting(LightingDesc lightingDesc, float3 viewDir, out float3 
 {
 	float3 position = lightingDesc.surface.position;
 	float3 normal = lightingDesc.surface.normal;
-	float3 lightVec = lightingDesc.lightData.vector;
-	float3 lightDir = normalize(lightVec);
+	float3 lightDir = lightingDesc.lightData.direction;
 	float3 albedo = lightingDesc.material.albedo;
 	
-	float attenuation = lightingDesc.lightData.attenuationCoeff / max(dot(lightVec, lightVec), 0.01f);
+	float attenuation = lightingDesc.lightData.attenuationCoeff;
 	
 	float3 F;
 	float3 F0 = lerp(lightingDesc.material.f0, albedo, lightingDesc.material.metalness);
@@ -300,7 +301,7 @@ float3 BouguerLambertBeerLaw(float thickness, float3 absorptionCoeff)
 void CalculateDirectionalLight(DirectionalLight directionalLight, Surface surface, Material material, float3 viewDir, out float3 light)
 {
 	LightData lightData;
-	lightData.vector = directionalLight.direction;
+	lightData.direction = directionalLight.direction;
 	lightData.color = directionalLight.color;
 	lightData.attenuationCoeff = 1.0f;
 	
@@ -314,10 +315,14 @@ void CalculateDirectionalLight(DirectionalLight directionalLight, Surface surfac
 
 void CalculatePointLight(PointLight pointLight, Surface surface, Material material, float3 viewDir, out float3 light)
 {
+	float3 lightToSurface = surface.position - pointLight.position;
+	float lightDistance = length(lightToSurface);
+	
 	LightData lightData;
-	lightData.vector = surface.position - pointLight.position;
+	lightData.direction = lightDistance > 0.0f ? lightToSurface / lightDistance : float3(0.0f, 1.0f, 0.0f);
 	lightData.color = pointLight.color;
-	lightData.attenuationCoeff = 1.0f;
+	lightData.attenuationCoeff = saturate(1.0f - lightDistance / pointLight.range);
+	lightData.attenuationCoeff *= lightData.attenuationCoeff * (3.0f - 2.0f * lightData.attenuationCoeff);
 	
 	LightingDesc lightingDesc;
 	lightingDesc.surface = surface;
@@ -336,10 +341,14 @@ void CalculateAreaLight(AreaLight areaLight, Surface surface, Material material,
 	{
 		float3 lightPoint = areaLight.position + AREA_LIGHT_SAMPLES[pointIndex] * areaLight.radius;
 		
+		float3 lightToSurface = surface.position - areaLight.position;
+		float lightDistance = length(lightToSurface);
+		
 		LightData lightData;
-		lightData.vector = surface.position - lightPoint;
+		lightData.direction = lightDistance > 0.0f ? lightToSurface / lightDistance : float3(0.0f, 1.0f, 0.0f);
 		lightData.color = areaLight.color * AREA_LIGHT_SAMPLE_WEIGHT;
-		lightData.attenuationCoeff = 1.0f;
+		lightData.attenuationCoeff = saturate(1.0f - lightDistance / areaLight.range);
+		lightData.attenuationCoeff *= lightData.attenuationCoeff * (3.0f - 2.0f * lightData.attenuationCoeff);
 		
 		LightingDesc lightingDesc;
 		lightingDesc.surface = surface;
@@ -356,17 +365,21 @@ void CalculateAreaLight(AreaLight areaLight, Surface surface, Material material,
 void CalculateSpotLight(SpotLight spotLight, Surface surface, Material material, float3 viewDir, out float3 light)
 {
 	float3 lightToSurface = surface.position - spotLight.position;
-	
-	float cosAlpha = dot(normalize(lightToSurface), spotLight.direction);
-	float cosPhi2 = spotLight.cosPhi2;
-	float cosTheta2 = spotLight.cosTheta2;
-	float spotAttenuation = saturate((cosAlpha - cosPhi2) / (cosTheta2 - cosPhi2 + 0.00001f));
-	spotAttenuation = pow(spotAttenuation, spotLight.falloff);
+	float lightDistance = length(lightToSurface);
 	
 	LightData lightData;
-	lightData.vector = lightToSurface;
+	lightData.direction = lightDistance > 0.0f ? lightToSurface / lightDistance : float3(0.0f, 1.0f, 0.0f);
 	lightData.color = spotLight.color;
-	lightData.attenuationCoeff = spotAttenuation;
+	
+	float cosAlpha = dot(lightData.direction, spotLight.direction);
+	float cosPhi2 = spotLight.cosPhi2;
+	float cosTheta2 = spotLight.cosTheta2;
+	float spotAttenuation = saturate((cosAlpha - cosPhi2) / (cosTheta2 - cosPhi2));
+	spotAttenuation *= spotAttenuation;
+	
+	lightData.attenuationCoeff = saturate(1.0f - lightDistance / spotLight.range);
+	lightData.attenuationCoeff *= lightData.attenuationCoeff * (3.0f - 2.0f * lightData.attenuationCoeff);
+	lightData.attenuationCoeff *= spotAttenuation;
 	
 	LightingDesc lightingDesc;
 	lightingDesc.surface = surface;
@@ -399,10 +412,14 @@ void CalculateAreaLight(ShadowCubeData shadowData, AreaLight areaLight, Surface 
 		float3 offset = AREA_LIGHT_SAMPLES[pointIndex] * areaLight.radius;
 		float3 lightPoint = areaLight.position + offset;
 		
+		float3 lightToSurface = surface.position - lightPoint;
+		float lightDistance = length(lightToSurface);
+		
 		LightData lightData;
-		lightData.vector = surface.position - lightPoint;
+		lightData.direction = lightDistance > 0.0f ? lightToSurface / lightDistance : float3(0.0f, 1.0f, 0.0f);
 		lightData.color = areaLight.color * AREA_LIGHT_SAMPLE_WEIGHT;
-		lightData.attenuationCoeff = 1.0f;
+		lightData.attenuationCoeff = saturate(1.0f - lightDistance / areaLight.range);
+		lightData.attenuationCoeff *= lightData.attenuationCoeff * (3.0f - 2.0f * lightData.attenuationCoeff);
 		
 		LightingDesc lightingDesc;
 		lightingDesc.surface = surface;

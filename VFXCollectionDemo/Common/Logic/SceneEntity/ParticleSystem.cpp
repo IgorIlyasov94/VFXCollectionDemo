@@ -117,6 +117,7 @@ void Common::Logic::SceneEntity::ParticleSystem::CreateConstantBuffers(ID3D12Dev
 	auto mutableConstantsResource = resourceManager->GetResource<ConstantBuffer>(mutableConstantsId);
 	mutableConstantsBuffer = reinterpret_cast<MutableConstants*>(mutableConstantsResource->resourceCPUAddress);
 	mutableConstantsBuffer->emitterOrigin = *_desc.emitterOrigin;
+	mutableConstantsBuffer->emitterRadiusOffset = _desc.emitterRadiusOffset;
 	mutableConstantsBuffer->emitterRadius = _desc.emitterRadius;
 	mutableConstantsBuffer->minParticleVelocity = _desc.minParticleVelocity;
 	mutableConstantsBuffer->particleDamping = _desc.particleDamping;
@@ -136,6 +137,7 @@ void Common::Logic::SceneEntity::ParticleSystem::CreateConstantBuffers(ID3D12Dev
 	mutableConstantsBuffer->maxParticlesNumber = _desc.maxParticlesNumber;
 	mutableConstantsBuffer->perlinNoiseSize = _desc.perlinNoiseSize;
 	mutableConstantsBuffer->maxLightIntensity = _desc.maxLightIntensity;
+	mutableConstantsBuffer->lightRange = _desc.lightRange;
 
 	mutableConstantsBuffer->random0 = Utilities::Random4(randomEngine);
 	mutableConstantsBuffer->random1 = Utilities::Random4(randomEngine);

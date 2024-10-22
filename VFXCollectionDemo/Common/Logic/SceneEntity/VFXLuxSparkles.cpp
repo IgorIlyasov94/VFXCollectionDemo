@@ -41,7 +41,7 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::Update(float time, float deltaT
 	sparklesConstants->time = time;
 
 	//particleSystemDesc.forces[0u].axis = _camera->GetDirection();
-	particleSystemDesc.forces[0u].strength = -std::pow(std::max(std::sin(time * 2.8f), 0.0f), 60.0f) * 65.0f - 0.2f;
+	//particleSystemDesc.forces[0u].strength = -std::pow(std::max(std::sin(time * 2.8f), 0.0f), 60.0f) * 350.0f - 0.2f;
 	
 	particleSystem->Update(time, deltaTime);
 }
@@ -104,7 +104,7 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateConstantBuffers(ID3D12Dev
 	sparklesConstants->viewProjection = _camera->GetViewProjection();
 	sparklesConstants->atlasElementOffset = float2(0.25f, 0.125f);
 	sparklesConstants->atlasElementSize = float2(1.0f / 8.0f, 1.0f / 8.0f);
-	sparklesConstants->colorIntensity = 3.0f;
+	sparklesConstants->colorIntensity = 7.0f;
 	sparklesConstants->perlinNoiseTiling =  float3(0.3f, 0.3f, 0.3f);
 	sparklesConstants->perlinNoiseScrolling = float3(0.011f, 0.019f, -0.017f);
 	sparklesConstants->particleTurbulence = 0.25f;
@@ -171,8 +171,9 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateParticleSystems(ID3D12Gra
 	Graphics::DirectX12Renderer* renderer, ResourceID perlinNoiseId, ResourceID particleSimulationCSId,
 	Graphics::Resources::ResourceID lightParticleBufferId, uint32_t maxParticleNumber)
 {
-	particleSystemDesc.emitterOrigin = new float3(0.0f, 0.0f, 1.25f);
-	particleSystemDesc.emitterRadius = 0.1f;
+	particleSystemDesc.emitterOrigin = new float3(0.0f, 0.0f, 1.75f);
+	particleSystemDesc.emitterRadius = float3(5.0f, 5.0f, 0.5f);
+	particleSystemDesc.emitterRadiusOffset = 0.6f;
 	particleSystemDesc.minParticleVelocity = float3(-0.5f, -0.5f, -0.3f);
 	particleSystemDesc.particleDamping = 0.995f;
 	particleSystemDesc.maxParticleVelocity = float3(0.5f, 0.5f, 0.3f);
@@ -181,10 +182,10 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateParticleSystems(ID3D12Gra
 	particleSystemDesc.maxRotation = 0.0f;
 	particleSystemDesc.minRotationSpeed = 0.0f;
 	particleSystemDesc.maxRotationSpeed = 0.0f;
-	particleSystemDesc.minSize = float2(0.1f, 0.1f);
-	particleSystemDesc.maxSize = float2(0.3f, 0.3f);
-	particleSystemDesc.minLifeSec = 1.4f;
-	particleSystemDesc.maxLifeSec = 3.0f;
+	particleSystemDesc.minSize = float2(0.3f, 0.3f);
+	particleSystemDesc.maxSize = float2(0.7f, 0.7f);
+	particleSystemDesc.minLifeSec = 2.4f;
+	particleSystemDesc.maxLifeSec = 9.0f;
 	particleSystemDesc.averageParticleEmitPerSecond = 25u;
 	particleSystemDesc.maxParticlesNumber = maxParticleNumber;
 	particleSystemDesc.perlinNoiseId = perlinNoiseId;
@@ -193,27 +194,9 @@ void Common::Logic::SceneEntity::VFXLuxSparkles::CreateParticleSystems(ID3D12Gra
 	particleSystemDesc.particleLightBufferId = lightParticleBufferId;
 	particleSystemDesc.animationTextureId = sparklesAnimationId;
 	particleSystemDesc.maxLightIntensity = MAX_LIGHT_INTENSITY;
-
-	particleSystemDesc.forcesNumber = 1u;
-	particleSystemDesc.forces = new ParticleSystemForce[particleSystemDesc.forcesNumber]{};
-	auto& force0 = particleSystemDesc.forces[0u];
-	force0.position = float3(0.0f, 0.0f, 1.25f);
-	force0.strength = 0.0f;
-	force0.axis = float3(0.0f, 0.0f, 1.0f);
-	force0.type = static_cast<uint32_t>(ParticleSystemForceType::CIRCULAR);
-	force0.nAccelerationCoeff = 1.0f;
-	force0.tAccelerationCoeff = 2.5f;
-	force0.padding = float2(0.0f, 0.0f);
+	particleSystemDesc.lightRange = LIGHT_RANGE;
+	particleSystemDesc.forcesNumber = 0u;
 	
-	//auto& force1 = particleSystemDesc.forces[1u];
-	//force1.position = float3(0.0f, 0.0f, 1.25f);
-	//force1.strength = 20.0f;
-	//force1.axis = float3(0.0f, 0.0f, 1.0f);
-	//force1.type = static_cast<uint32_t>(ParticleSystemForceType::ATTRACTOR);
-	//force1.nAccelerationCoeff = 1.0f;
-	//force1.tAccelerationCoeff = 2.5f;
-	//force1.padding = float2(0.0f, 0.0f);
-
 	particleSystemDesc.perlinNoiseSize = float2(1024.0f, 1024.0f);
 
 	particleSystem = new SceneEntity::ParticleSystem(commandList, renderer, sparklesMaterial, particleSystemDesc);

@@ -29,7 +29,7 @@ namespace Common::Logic::SceneEntity
 	{
 	public:
 		float3 position;
-		float padding0;
+		float range;
 		float3 color;
 		float padding1;
 	};
@@ -40,14 +40,14 @@ namespace Common::Logic::SceneEntity
 		float3 position;
 		float radius;
 		float3 color;
-		float padding;
+		float range;
 	};
 
 	struct SpotLight
 	{
 	public:
 		float3 position;
-		float falloff;
+		float range;
 		float3 color;
 		float cosPhi2;
 		float3 direction;
@@ -81,7 +81,7 @@ namespace Common::Logic::SceneEntity
 		float3 direction;
 		float cosPhi2;
 		float cosTheta2;
-		float falloff;
+		float range;
 		bool castShadows;
 		LightType type;
 

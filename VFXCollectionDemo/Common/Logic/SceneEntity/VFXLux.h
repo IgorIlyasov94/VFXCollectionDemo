@@ -138,30 +138,33 @@ namespace Common::Logic::SceneEntity
 		static constexpr uint32_t HALO_INDICES_PER_RIBBON = (TOTAL_SEGMENT_NUMBER - 4) * INDICES_PER_SEGMENT;
 		static constexpr uint32_t HALO_INDICES_NUMBER = TOTAL_RIBBON_NUMBER * HALO_INDICES_PER_RIBBON;
 
-		static constexpr uint32_t ATLAS_ELEMENT_INDEX = 10u;
+		static constexpr uint32_t ATLAS_ELEMENT_INDEX = 0u;
 		static constexpr uint32_t ATLAS_SIZE_X = 8u;
 		static constexpr uint32_t ATLAS_SIZE_Y = 8u;
 
-		static constexpr float COLOR_INTENSITY_INCREMENT_SPEED = 1.5f;
-		static constexpr float HALO_INTENSITY_INCREMENT_SPEED = 1.5f;
+		static constexpr float CIRCLE_INTENSITY = 14.0f;
+		static constexpr float CIRCLE_SHARPNESS = 3.5f;
+		
+		static constexpr float HALO_INTENSITY = 3.0f;
+		static constexpr float HALO_SHARPNESS = 3.5f;
 
-		static constexpr float RING_START_OFFSET = 0.0f;
-		static constexpr float RING_WIDTH = 0.45f;
-		static constexpr float RING_FADING_WIDTH = 0.35f;
+		static constexpr float RING_START_OFFSET = 0.1f;
+		static constexpr float RING_WIDTH = 0.2f;
+		static constexpr float RING_FADING_WIDTH = 0.3f;
 		static constexpr float CIRCLE_WIDTH = RING_WIDTH + RING_FADING_WIDTH * 2.0f;
 
 		static constexpr float HALO_RING_START_OFFSET = 0.9f;
-		static constexpr float HALO_RING_WIDTH = 0.4f;
+		static constexpr float HALO_RING_WIDTH = 0.7f;
 		static constexpr float HALO_RING_FADING_WIDTH = 0.7f;
 		static constexpr float HALO_WIDTH = HALO_RING_WIDTH + HALO_RING_FADING_WIDTH * 2.0f;
 
 		static constexpr float4 FLARE_COLOR0 = float4(1.0f, 0.8f, 0.1f, 1.0f);
 		static constexpr float4 FLARE_COLOR1 = float4(2.0f, 1.7f, 0.6f, 1.0f);
-		static constexpr float2 FLARE_MIN_SIZE = float2(1.0f, 1.0f);
-		static constexpr float2 FLARE_MAX_SIZE = float2(2.0f, 1.5f);
+		static constexpr float2 FLARE_MIN_SIZE = float2(3.0f, 0.3f);
+		static constexpr float2 FLARE_MAX_SIZE = float2(3.25f, 0.4f);
 		static constexpr float FLARE_ANIMATION_SPEED = 0.75f;
-		static constexpr float FLARE_COLOR_INTENSITY_MIN = 1.0f;
-		static constexpr float FLARE_COLOR_INTENSITY_MAX = 1.0f;
+		static constexpr float FLARE_COLOR_INTENSITY_MIN = 0.1f;
+		static constexpr float FLARE_COLOR_INTENSITY_MAX = 0.4f;
 
 		static constexpr uint32_t INDEX_OFFSETS[INDICES_PER_SEGMENT] =
 		{
@@ -200,10 +203,7 @@ namespace Common::Logic::SceneEntity
 		};
 
 		float4x4 circleWorld;
-		float colorIntensity;
-		float haloColorIntensity;
-		float flareColorIntensity;
-
+		
 		VFXPillarConstants* circleConstants;
 		VFXHaloConstants* haloConstants;
 		VFXFlareConstants* flareConstants;

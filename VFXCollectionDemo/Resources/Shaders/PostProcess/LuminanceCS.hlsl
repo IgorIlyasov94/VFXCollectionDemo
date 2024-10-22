@@ -14,7 +14,12 @@ struct Input
 	uint groupIndex : SV_GroupIndex;
 };
 
+#if defined(MOTION_BLUR) || defined(VOLUMETRIC_FOG)
 StructuredBuffer<float4> sceneBuffer : register(t0);
+#else
+Texture2D sceneColor : register(t0);
+#endif
+
 RWStructuredBuffer<float> luminanceBuffer : register(u0);
 
 groupshared float groupBuffer[NUM_THREADS];
@@ -25,7 +30,14 @@ void main(Input input)
 	if (input.dispatchThreadId.x < area)
 	{
 		uint bufferIndex = min(input.dispatchThreadId.x, area - 1);
+		
+#if defined(MOTION_BLUR) || defined(VOLUMETRIC_FOG)
 		groupBuffer[input.groupIndex] = dot(sceneBuffer[bufferIndex].xyz, LUMINANCE_VECTOR);
+#else
+		int3 texCoord = int3(bufferIndex % width, bufferIndex / width, 0);
+		
+		groupBuffer[input.groupIndex] = dot(sceneColor.Load(texCoord).xyz, LUMINANCE_VECTOR);
+#endif
 	}
 	else
 		groupBuffer[input.groupIndex] = 0.0f;

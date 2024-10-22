@@ -33,7 +33,7 @@ struct Particle
 cbuffer MutableConstants : register(b0)
 {
 	float3 emitterOrigin;
-	float emitterRadius;
+	float emitterRadiusOffset;
 	
 	float3 minParticleVelocity;
 	float particleDamping;
@@ -62,6 +62,9 @@ cbuffer MutableConstants : register(b0)
 	float4 random1;
 	
 	float maxLightIntensity;
+	float3 emitterRadius;
+	
+	float lightRange;
 	float3 padding;
 	
 	ParticleSystemForce forces[MAX_FORCES_NUMBER];
@@ -105,15 +108,22 @@ float3 SumAccelerations(float3 particlePosition)
 	return result;
 }
 
-float3 RandomSpherePoint(float3 random)
+float3 RandomPosition(float3 random, float offset, float3 radius)
 {
-	return random * 2.0f - 1.0f.xxx;
+	float invHalfOffset = 1.0f - offset * 0.5f;
+	
+	float3 result = step(0.5f.xxx, random);
+	result = lerp(random * offset, (random - 0.5f.xxx) * offset + invHalfOffset.xxx, result);
+	result = result * 2.0f - 1.0f.xxx;
+	result *= radius;
+	
+	return result;
 }
 
 Particle EmitParticle(float4 random0_0, float4 random1_0)
 {
 	Particle newParticle = (Particle)0;
-	newParticle.position = emitterOrigin + RandomSpherePoint(random0_0.xyz) * emitterRadius;
+	newParticle.position = emitterOrigin + RandomPosition(random0_0.xyz, emitterRadiusOffset, emitterRadius);
 	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, float3(random0_0.w, random1_0.wx));
 	
 	newParticle.rotation = lerp(minRotation, maxRotation, random1_0.x);
