@@ -71,6 +71,14 @@ namespace Common::Logic::Scene
 		static constexpr float Z_NEAR = 0.01f;
 		static constexpr float Z_FAR = 1000.0f;
 
+		static constexpr float WHITE_CUTOFF = 0.7f;
+		static constexpr float BRIGHT_THRESHOLD = 3.5f;
+		static constexpr float BLOOM_INTENSITY = 1.0f;
+
+		static constexpr float COLOR_GRADING_FACTOR = 0.25f;
+
+		static constexpr float3 COLOR_GRADING = float3(1.0f, 1.1f, 1.4f);
+
 		static constexpr uint32_t MAX_SIMULTANEOUS_BARRIER_NUMBER = 2u;
 
 		struct MutableConstants

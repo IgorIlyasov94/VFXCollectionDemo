@@ -298,6 +298,11 @@ float3 BouguerLambertBeerLaw(float thickness, float3 absorptionCoeff)
 	return exp(-absorptionCoeff * thickness);
 }
 
+float Attenuation(float x, float range)
+{
+	return exp(-x * 5.0f / range);
+}
+
 void CalculateDirectionalLight(DirectionalLight directionalLight, Surface surface, Material material, float3 viewDir, out float3 light)
 {
 	LightData lightData;
@@ -321,8 +326,7 @@ void CalculatePointLight(PointLight pointLight, Surface surface, Material materi
 	LightData lightData;
 	lightData.direction = lightDistance > 0.0f ? lightToSurface / lightDistance : float3(0.0f, 1.0f, 0.0f);
 	lightData.color = pointLight.color;
-	lightData.attenuationCoeff = saturate(1.0f - lightDistance / pointLight.range);
-	lightData.attenuationCoeff *= lightData.attenuationCoeff * (3.0f - 2.0f * lightData.attenuationCoeff);
+	lightData.attenuationCoeff = Attenuation(lightDistance, pointLight.range);
 	
 	LightingDesc lightingDesc;
 	lightingDesc.surface = surface;
@@ -347,8 +351,7 @@ void CalculateAreaLight(AreaLight areaLight, Surface surface, Material material,
 		LightData lightData;
 		lightData.direction = lightDistance > 0.0f ? lightToSurface / lightDistance : float3(0.0f, 1.0f, 0.0f);
 		lightData.color = areaLight.color * AREA_LIGHT_SAMPLE_WEIGHT;
-		lightData.attenuationCoeff = saturate(1.0f - lightDistance / areaLight.range);
-		lightData.attenuationCoeff *= lightData.attenuationCoeff * (3.0f - 2.0f * lightData.attenuationCoeff);
+		lightData.attenuationCoeff = Attenuation(lightDistance, areaLight.range);
 		
 		LightingDesc lightingDesc;
 		lightingDesc.surface = surface;
@@ -377,8 +380,7 @@ void CalculateSpotLight(SpotLight spotLight, Surface surface, Material material,
 	float spotAttenuation = saturate((cosAlpha - cosPhi2) / (cosTheta2 - cosPhi2));
 	spotAttenuation *= spotAttenuation;
 	
-	lightData.attenuationCoeff = saturate(1.0f - lightDistance / spotLight.range);
-	lightData.attenuationCoeff *= lightData.attenuationCoeff * (3.0f - 2.0f * lightData.attenuationCoeff);
+	lightData.attenuationCoeff = Attenuation(lightDistance, spotLight.range);
 	lightData.attenuationCoeff *= spotAttenuation;
 	
 	LightingDesc lightingDesc;
@@ -418,8 +420,7 @@ void CalculateAreaLight(ShadowCubeData shadowData, AreaLight areaLight, Surface 
 		LightData lightData;
 		lightData.direction = lightDistance > 0.0f ? lightToSurface / lightDistance : float3(0.0f, 1.0f, 0.0f);
 		lightData.color = areaLight.color * AREA_LIGHT_SAMPLE_WEIGHT;
-		lightData.attenuationCoeff = saturate(1.0f - lightDistance / areaLight.range);
-		lightData.attenuationCoeff *= lightData.attenuationCoeff * (3.0f - 2.0f * lightData.attenuationCoeff);
+		lightData.attenuationCoeff = Attenuation(lightDistance, areaLight.range);
 		
 		LightingDesc lightingDesc;
 		lightingDesc.surface = surface;

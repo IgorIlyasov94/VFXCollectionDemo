@@ -52,6 +52,8 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 	toneMappingConstants.whiteCutoff = _renderingScheme.whiteCutoff;
 	toneMappingConstants.brightThreshold = _renderingScheme.brightThreshold;
 	toneMappingConstants.bloomIntensity = _renderingScheme.bloomIntensity;
+	toneMappingConstants.colorGrading = _renderingScheme.colorGrading;
+	toneMappingConstants.colorGradingFactor = _renderingScheme.colorGradingFactor;
 
 	_width = width;
 	_height = height;
@@ -321,7 +323,7 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	toneMappingMaterial->Set(commandList);
-	toneMappingMaterial->SetRootConstants(commandList, 0u, 8u, &toneMappingConstants);
+	toneMappingMaterial->SetRootConstants(commandList, 0u, 12u, &toneMappingConstants);
 	quadMesh->DrawOnly(commandList);
 
 	barriers.clear();
@@ -606,7 +608,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 	auto toneMappingPS = resourceManager->GetResource<Shader>(toneMappingPSId);
 
 	MaterialBuilder materialBuilder{};
-	materialBuilder.SetRootConstants(0u, 8u);
+	materialBuilder.SetRootConstants(0u, 12u);
 
 	if (_renderingScheme.enableMotionBlur || _renderingScheme.enableVolumetricFog)
 	{

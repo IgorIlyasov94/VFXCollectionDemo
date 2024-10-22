@@ -353,7 +353,7 @@ void ClosestHit(inout Payload payload, in BuiltInTriangleIntersectionAttributes 
 	for (uint lightSourceIndex = 0u; lightSourceIndex < LIGHT_SOURCE_NUMBER; lightSourceIndex++)
 		resultColor += ProcessLightSource(lightSources[lightSourceIndex], surface, material, rayDirection, payload.recursionDepth, random);
 	
-    payload.color += resultColor;
+    payload.color += resultColor / MAX_RECURSION_DEPTH;
 	payload.hitT = hitT;
 }
 

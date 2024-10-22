@@ -362,7 +362,7 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterials(ID3D12Device*
 
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
 	materialBuilder.SetSampler(1u, samplerShadowResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetDepthBias(-1.0f);
+	materialBuilder.SetDepthBias(-3.0f);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_BACK);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
 	materialBuilder.SetDepthStencilFormat(32u, true, true);

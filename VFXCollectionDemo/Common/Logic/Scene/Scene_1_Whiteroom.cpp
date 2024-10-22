@@ -153,11 +153,11 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Update()
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 
 	auto& light0Desc = lightingSystem->GetSourceDesc(pointLight0Id);
-	light0Desc.intensity = std::sin(timer * 1.8f) * 0.5f + 4.0f;
+	light0Desc.intensity = std::sin(timer * 1.8f) * 0.5f + 8.0f;
 	lightingSystem->UpdateSourceDesc(pointLight0Id);
 	
 	auto& light1Desc = lightingSystem->GetSourceDesc(pointLight1Id);
-	light1Desc.intensity = std::cos(timer * 1.8f) * 0.5f + 4.0f;
+	light1Desc.intensity = std::cos(timer * 1.8f) * 0.5f + 8.0f;
 	light1Desc.position.x = -3.0f;
 	light1Desc.position.y = 2.5f + std::sin(timer * 0.9f) * 1.5f;
 	light1Desc.position.z = 2.5f + std::cos(timer * 0.9f) * 1.5f;
@@ -349,16 +349,18 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateLights(Graphics::DirectX12Re
 
 	LightDesc pointLight0{};
 	pointLight0.position = float3(-3.75f, 2.5f, 2.5f);
-	pointLight0.color = float3(1.0f, 0.8f, 0.8f);
+	pointLight0.color = float3(1.0f, 0.8f, 0.5f);
 	pointLight0.intensity = lightIntensity0;
+	pointLight0.range = 7.0f;
 	pointLight0.type = LightType::POINT_LIGHT;
 
 	pointLight0Id = lightingSystem->CreateLight(pointLight0);
 
 	LightDesc pointLight1{};
 	pointLight1.position = float3(-4.0f, 1.5f, 2.5f);
-	pointLight1.color = float3(0.8f, 0.8f, 1.0f);
+	pointLight1.color = float3(0.5f, 0.8f, 1.0f);
 	pointLight1.intensity = lightIntensity1;
+	pointLight1.range = 7.0f;
 	pointLight1.type = LightType::POINT_LIGHT;
 
 	pointLight1Id = lightingSystem->CreateLight(pointLight1);
@@ -477,7 +479,18 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateObjects(ID3D12Device* device
 	device5->Release();
 	commandList5->Release();
 
-	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer, camera, lightingSystem, {}, {});
+	SceneEntity::RenderingScheme renderingScheme{};
+	renderingScheme.enableDepthPrepass = false;
+	renderingScheme.enableMotionBlur = false;
+	renderingScheme.enableVolumetricFog = false;
+	renderingScheme.useParticleLight = false;
+	renderingScheme.whiteCutoff = WHITE_CUTOFF;
+	renderingScheme.brightThreshold = BRIGHT_THRESHOLD;
+	renderingScheme.bloomIntensity = BLOOM_INTENSITY;
+	renderingScheme.colorGrading = COLOR_GRADING;
+	renderingScheme.colorGradingFactor = COLOR_GRADING_FACTOR;
+
+	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer, camera, lightingSystem, {}, renderingScheme);
 }
 
 void Common::Logic::Scene::Scene_1_WhiteRoom::LoadMesh(std::filesystem::path filePath,

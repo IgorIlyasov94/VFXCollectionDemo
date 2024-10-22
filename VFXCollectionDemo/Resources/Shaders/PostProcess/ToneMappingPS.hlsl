@@ -64,7 +64,6 @@ Output main(Input input)
 	float3 gradedColor = gray * colorGrading;
 	
 	color = lerp(color, gradedColor, colorGradingFactor);
-	luminance = lerp(dot(gradedColor, LUMINANCE_VECTOR), luminance, colorGradingFactor);
 	
 	color = ToneMapping(color, luminance);
 	

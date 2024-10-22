@@ -27,7 +27,7 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	windStrength = 2.5f;
 
 	XMStoreFloat3(&cameraLookAt, DirectX::XMLoadFloat3(&environmentPosition));
-	cameraLookAt.z = 1.0f;
+	cameraLookAt.z = 0.0f;
 
 	cameraUpVector = float3(0.0f, 0.0f, 1.0f);
 	auto cameraUpVectorN = DirectX::XMLoadFloat3(&cameraUpVector);
@@ -136,7 +136,7 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 {
 	cameraPosition.x = std::cos(timer * 0.2f) * 5.0f;
 	cameraPosition.y = std::sin(timer * 0.2f) * 5.0f;
-	cameraPosition.z = 3.0f;
+	cameraPosition.z = 1.0f;
 
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 

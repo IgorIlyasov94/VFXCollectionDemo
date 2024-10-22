@@ -11,7 +11,7 @@ Common::Logic::MainLogic::MainLogic(const RECT& windowPlacement, HWND windowHand
 	luxSceneId = sceneManager->AddScene(new Scene::Scene_0_Lux());
 	whiteroomSceneId = sceneManager->AddScene(new Scene::Scene_1_WhiteRoom());
 
-	sceneManager->LoadScene(luxSceneId, renderer);
+	sceneManager->LoadScene(whiteroomSceneId, renderer);
 }
 
 Common::Logic::MainLogic::~MainLogic()

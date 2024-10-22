@@ -60,7 +60,7 @@ namespace Common::Logic::Scene
 		static constexpr float AREA_LIGHT_INTENSITY = 12.0f;
 		static constexpr float AMBIENT_LIGHT_INTENSITY = 0.15f;
 
-		static constexpr float WHITE_CUTOFF = 10.1f;
+		static constexpr float WHITE_CUTOFF = 1.7f;
 		static constexpr float BRIGHT_THRESHOLD = 3.5f;
 		static constexpr float BLOOM_INTENSITY = 0.5f;
 
