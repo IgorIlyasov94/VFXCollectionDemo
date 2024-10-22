@@ -109,6 +109,10 @@ namespace Common::Logic::SceneEntity
 
 			float3 fogOffset;
 			float distanceFalloffLength;
+
+			float zNear;
+			float zFar;
+			float2 padding;
 		};
 
 		struct MotionBlurConstants

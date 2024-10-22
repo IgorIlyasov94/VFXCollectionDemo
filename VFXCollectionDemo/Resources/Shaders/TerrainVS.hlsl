@@ -18,9 +18,9 @@ cbuffer MutableConstants : register(b1)
 struct Input
 {
 	float3 position : POSITION;
-	float4 normal : NORMAL;
-	float4 tangent : TANGENT;
-	float2 texCoord : TEXCOORD0;
+	half4 normal : NORMAL;
+	half4 tangent : TANGENT;
+	half2 texCoord : TEXCOORD0;
 };
 
 struct Output

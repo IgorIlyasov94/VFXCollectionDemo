@@ -187,12 +187,12 @@ D3D12_DEPTH_STENCIL_DESC Graphics::DirectX12Utilities::CreateDepthStencilDesc(bo
 {
 	D3D12_DEPTH_STENCIL_DESC desc{};
 	desc.DepthEnable = enableZTest;
-	desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 	desc.DepthWriteMask = readOnly ? D3D12_DEPTH_WRITE_MASK_ZERO : D3D12_DEPTH_WRITE_MASK_ALL;
 	desc.StencilEnable = false;
 	desc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
 	desc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-
+	
 	const D3D12_DEPTH_STENCILOP_DESC depthStencilOpDesc =
 	{
 		D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS
@@ -208,7 +208,7 @@ D3D12_DEPTH_STENCIL_DESC1 Graphics::DirectX12Utilities::CreateDepthStencilDesc1(
 {
 	D3D12_DEPTH_STENCIL_DESC1 desc{};
 	desc.DepthEnable = enableZTest;
-	desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 	desc.DepthWriteMask = readOnly ? D3D12_DEPTH_WRITE_MASK_ZERO : D3D12_DEPTH_WRITE_MASK_ALL;
 	desc.StencilEnable = false;
 	desc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;

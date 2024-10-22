@@ -370,6 +370,9 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateConstantBuffers(ID3D1
 	volumetricFogConstants->distanceFalloffLength = _renderingScheme.fogDistanceFalloffLength;
 	volumetricFogConstants->fogTiling = _renderingScheme.fogTiling;
 	volumetricFogConstants->fogOffset = {};
+	volumetricFogConstants->zNear = LightingSystem::SHADOW_MAP_Z_NEAR;
+	volumetricFogConstants->zFar = LightingSystem::SHADOW_MAP_Z_FAR;
+	volumetricFogConstants->padding = {};
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateQuad(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -671,7 +674,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 		auto turbulenceMapResource = resourceManager->GetResource<Texture>(turbulenceMapId);
 
 		auto samplerLinearWrapResource = resourceManager->GetDefaultSampler(device, Graphics::DefaultFilterSetup::FILTER_BILINEAR_WRAP);
-
+		
 		auto volumetricFogCS = resourceManager->GetResource<Shader>(volumetricFogCSId);
 
 		computeObjectBuilder.SetConstantBuffer(0u, lightConstantBufferResource->resourceGPUAddress);
@@ -679,7 +682,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 		computeObjectBuilder.SetTexture(0u, fogMapResource->srvDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetTexture(1u, turbulenceMapResource->srvDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetTexture(2u, sceneDepthTargetResource->srvDescriptor.gpuDescriptor);
-
+		
 		if (_renderingScheme.useParticleLight)
 		{
 			auto lightParticleBufferResource = resourceManager->GetResource<RWBuffer>(lightingSystem->GetLightParticleBuffer());

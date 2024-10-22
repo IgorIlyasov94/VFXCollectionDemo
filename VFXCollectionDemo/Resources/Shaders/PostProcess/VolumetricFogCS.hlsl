@@ -1,10 +1,10 @@
 #include "../Lighting/PBRLighting.hlsli"
 
 static const uint NUM_THREADS = 64;
-static const uint NUM_VIEW_STEPS = 12;
+static const uint NUM_VIEW_STEPS = 24;
 static const uint NUM_LIGHT_STEPS = 1;
 
-static const float VIEW_STEP_SIZE = 0.8f;
+static const float VIEW_STEP_SIZE = 0.4f;
 static const float3 FOG_COLOR = float3(0.4f, 0.15f, 0.05f);
 
 cbuffer LightConstantBuffer : register(b0)
@@ -34,6 +34,10 @@ cbuffer MutableConstants : register(b1)
 
 	float3 fogOffset;
 	float distanceFalloffLength;
+	
+	float zNear;
+	float zFar;
+	float2 padding;
 };
 
 struct Input
@@ -144,7 +148,10 @@ float3 ProcessLightSources(float3 sceneDiffuse, float3 lightColor, float3 screen
 		float cosAngle = dot(viewDirection, -lightDir);
 		float phaseValue = DoubleHenyeyGreensteinPhase(cosAngle);
 		
-		resultColor += scatteredLight * saturate(phaseValue) * occlusion * SCATTERING_CONST * INV_WAVELENGTH_4 * 4.0f * PI / NUM_VIEW_STEPS;
+		scatteredLight *= 4.0f * PI * SCATTERING_CONST * saturate(phaseValue) * occlusion / NUM_VIEW_STEPS;
+		scatteredLight *= INV_WAVELENGTH_4;
+		
+		resultColor += scatteredLight;
 		
 #if (PARTICLE_LIGHT_SOURCE_NUMBER > 0)
 		[unroll]

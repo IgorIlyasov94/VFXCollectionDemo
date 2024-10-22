@@ -449,7 +449,7 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(1u, samplerShadowResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 
-	materialBuilder.SetDepthBias(-8.5f);
+	materialBuilder.SetDepthBias(-1.0f);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
 	materialBuilder.SetDepthStencilFormat(32u, true, true);
