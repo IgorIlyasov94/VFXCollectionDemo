@@ -35,14 +35,10 @@ Common::Logic::SceneEntity::VFXLuxSparkles::~VFXLuxSparkles()
 
 void Common::Logic::SceneEntity::VFXLuxSparkles::Update(float time, float deltaTime)
 {
-	
 	sparklesConstants->invView = _camera->GetInvView();
 	sparklesConstants->viewProjection = _camera->GetViewProjection();
 	sparklesConstants->time = time;
 
-	//particleSystemDesc.forces[0u].axis = _camera->GetDirection();
-	//particleSystemDesc.forces[0u].strength = -std::pow(std::max(std::sin(time * 2.8f), 0.0f), 60.0f) * 350.0f - 0.2f;
-	
 	particleSystem->Update(time, deltaTime);
 }
 

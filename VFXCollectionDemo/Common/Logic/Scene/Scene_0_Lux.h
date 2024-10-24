@@ -57,7 +57,9 @@ namespace Common::Logic::Scene
 		static constexpr float Z_NEAR = 0.01f;
 		static constexpr float Z_FAR = 1000.0f;
 
-		static constexpr float AREA_LIGHT_INTENSITY = 12.0f;
+		static constexpr float AREA_LIGHT_INTENSITY = 15.0f;
+		static constexpr float AREA_LIGHT_RANGE = 8.0f;
+
 		static constexpr float AMBIENT_LIGHT_INTENSITY = 0.15f;
 
 		static constexpr float WHITE_CUTOFF = 1.7f;

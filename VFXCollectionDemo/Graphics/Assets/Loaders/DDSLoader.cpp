@@ -86,7 +86,7 @@ void Graphics::Assets::Loaders::DDSLoader::Load(std::filesystem::path filePath, 
 }
 
 void Graphics::Assets::Loaders::DDSLoader::Save(std::filesystem::path filePath, const DDSSaveDesc& saveDesc,
-    const std::vector<float4>& data)
+    const std::vector<floatN>& data)
 {
     std::ofstream ddsFile(filePath, std::ios::binary);
     
@@ -339,7 +339,7 @@ uint32_t Graphics::Assets::Loaders::DDSLoader::CalculatePitch(uint32_t width, DD
     return pitch;
 }
 
-void Graphics::Assets::Loaders::DDSLoader::Convert(const DDSSaveDesc& desc, const std::vector<float4>& data,
+void Graphics::Assets::Loaders::DDSLoader::Convert(const DDSSaveDesc& desc, const std::vector<floatN>& data,
     std::vector<uint8_t>& convertedData)
 {
     auto bytePerPixel = desc.targetFormat == DDSFormat::R8G8B8A8_UNORM ? 4u : 1u;
@@ -352,6 +352,8 @@ void Graphics::Assets::Loaders::DDSLoader::Convert(const DDSSaveDesc& desc, cons
     convertedData.resize(resultSize, 0u);
     auto destAddress = convertedData.data();
 
+    auto vectorScale = DirectX::XMVectorReplicate(255.0f);
+
     for (uint32_t z = 0u; z < desc.depth; z++)
         for (uint32_t y = 0u; y < desc.height; y++)
         {
@@ -361,15 +363,12 @@ void Graphics::Assets::Loaders::DDSLoader::Convert(const DDSSaveDesc& desc, cons
                 const auto& pixelData = data[pixelIndex];
 
                 if (desc.targetFormat == DDSFormat::R8_UNORM)
-                    *destAddress = Float32ToUNorm8(pixelData.x);
+                    *destAddress = Float32ToUNorm8(pixelData.m128_f32[0]);
                 else
                 {
-                    auto destAddress4 = reinterpret_cast<DirectX::PackedVector::XMUBYTE4*>(destAddress);
-
-                    destAddress4->x = Float32ToUNorm8(pixelData.x);
-                    destAddress4->y = Float32ToUNorm8(pixelData.y);
-                    destAddress4->z = Float32ToUNorm8(pixelData.z);
-                    destAddress4->w = Float32ToUNorm8(pixelData.w);
+                    auto destAddress4 = reinterpret_cast<ubyte4*>(destAddress);
+                    auto remappedVector = DirectX::XMVectorMultiply(pixelData, vectorScale);
+                    DirectX::PackedVector::XMStoreUByte4(destAddress4, remappedVector);
                 }
 
                 destAddress += bytePerPixel;

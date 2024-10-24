@@ -174,6 +174,9 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	if (_renderingScheme.enableMotionBlur)
 		motionBlurComputeObject->UpdateRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
 
+	if (_renderingScheme.enableVolumetricFog)
+		volumetricFogComputeObject->UpdateRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
+
 	luminanceComputeObject->UpdateBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	luminanceComputeObject->UpdateRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
 
@@ -557,7 +560,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTextures(ID3D12Device
 	{
 		NoiseGenerator noiseGenerator{};
 
-		std::vector<float4> noiseData;
+		std::vector<floatN> noiseData;
 		noiseGenerator.Generate(NOISE_SIZE_X, NOISE_SIZE_Y, NOISE_SIZE_Z, float3(4.0f, 4.0f, 4.0f), noiseData);
 
 		DDSSaveDesc ddsSaveDesc{};
@@ -581,7 +584,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTextures(ID3D12Device
 	{
 		TurbulenceMapGenerator turbulenceMapGenerator{};
 
-		std::vector<float4> turbulenceData;
+		std::vector<floatN> turbulenceData;
 		turbulenceMapGenerator.Generate(NOISE_SIZE_X, NOISE_SIZE_Y, NOISE_SIZE_Z, float3(4.0f, 4.0f, 4.0f), turbulenceData);
 
 		DDSSaveDesc ddsSaveDesc{};

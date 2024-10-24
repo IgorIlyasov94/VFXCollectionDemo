@@ -27,7 +27,7 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	windStrength = 2.5f;
 
 	XMStoreFloat3(&cameraLookAt, DirectX::XMLoadFloat3(&environmentPosition));
-	cameraLookAt.z = 0.0f;
+	cameraLookAt.z = 1.0f;
 
 	cameraUpVector = float3(0.0f, 0.0f, 1.0f);
 	auto cameraUpVectorN = DirectX::XMLoadFloat3(&cameraUpVector);
@@ -136,7 +136,7 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 {
 	cameraPosition.x = std::cos(timer * 0.2f) * 5.0f;
 	cameraPosition.y = std::sin(timer * 0.2f) * 5.0f;
-	cameraPosition.z = 1.0f;
+	cameraPosition.z = 3.0f;
 
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 
@@ -315,7 +315,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateLights(ID3D12GraphicsCommandList* 
 	areaLight.color = float3(0.6f, 0.5f, 0.3f);
 	areaLight.intensity = 0.0f;
 	areaLight.type = LightType::AREA_LIGHT;
-	areaLight.range = 4.0f;
+	areaLight.range = AREA_LIGHT_RANGE;
 	areaLight.castShadows = true;
 
 	areaLightId = lightingSystem->CreateLight(areaLight);

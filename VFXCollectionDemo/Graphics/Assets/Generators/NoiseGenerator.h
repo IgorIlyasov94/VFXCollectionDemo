@@ -11,20 +11,12 @@ namespace Graphics::Assets::Generators
 		NoiseGenerator();
 		~NoiseGenerator();
 
-		void Generate(uint32_t width, uint32_t height, uint32_t depth, const float3& scale, std::vector<float4>& textureData);
+		void Generate(uint32_t width, uint32_t height, uint32_t depth, const float3& scale, std::vector<floatN>& textureData);
 
 	private:
 		void GenerateWhiteNoiseMap(uint32_t width, uint32_t height, uint32_t depth, std::vector<floatN>& noiseMap);
-		void GenerateWeights(int32_t halfSamplesNumber, std::vector<floatN>& weights);
 		void GaussianBlur(int32_t width, int32_t height, int32_t depth, const float3& scale, std::vector<floatN>& noiseMap);
 
-		void GaussianBlur(int32_t width, int32_t height, int32_t depth, int32_t halfSamplesNumber,
-			int32_t directionMaskX, int32_t directionMaskY, int32_t directionMaskZ,
-			const std::vector<floatN>& noiseMap, std::vector<floatN>& result);
-		
-		float Sigma(float blurSize);
-		float Weight(float x, float sigma);
-		
 		static constexpr uint32_t BASE_MAP_SIZE = 128u;
 		static constexpr uint32_t BASE_GAUSSIAN_BLUR_SIZE = 2u;
 

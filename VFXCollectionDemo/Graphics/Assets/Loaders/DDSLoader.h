@@ -24,7 +24,7 @@ namespace Graphics::Assets::Loaders
 	{
 	public:
 		static void Load(std::filesystem::path filePath, Resources::TextureDesc& textureDesc);
-		static void Save(std::filesystem::path filePath, const DDSSaveDesc& saveDesc, const std::vector<float4>& data);
+		static void Save(std::filesystem::path filePath, const DDSSaveDesc& saveDesc, const std::vector<floatN>& data);
 
 	private:
 		DDSLoader() = delete;
@@ -80,10 +80,10 @@ namespace Graphics::Assets::Loaders
 		static DXGI_FORMAT GetFormat(DDSFormat format) noexcept;
 		static DDSPixelFormat GetPixelFormat(DDSFormat format) noexcept;
 		static uint32_t CalculatePitch(uint32_t width, DDSFormat format) noexcept;
-		static void Convert(const DDSSaveDesc& desc, const std::vector<float4>& data, std::vector<uint8_t>& convertedData);
+		static void Convert(const DDSSaveDesc& desc, const std::vector<floatN>& data, std::vector<uint8_t>& convertedData);
 		
 		static inline uint8_t Float32ToUNorm8(float value);
-
+		
 		static constexpr uint32_t DDSD_CAPS = 0x1u;
 		static constexpr uint32_t DDSD_HEIGHT = 0x2u;
 		static constexpr uint32_t DDSD_WIDTH = 0x4u;

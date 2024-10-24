@@ -11,12 +11,16 @@ namespace Graphics::Assets::Generators
 		TurbulenceMapGenerator();
 		~TurbulenceMapGenerator();
 
-		void Generate(uint32_t width, uint32_t height, uint32_t depth, const float3& scale, std::vector<float4>& textureData);
+		void Generate(uint32_t width, uint32_t height, uint32_t depth, const float3& scale,
+			std::vector<floatN>& textureData);
 
 	private:
 		void Rotor(uint32_t width, uint32_t height, uint32_t depth,
-			const std::vector<float4>& textureData, std::vector<floatN>& result);
-		
-		floatN Rotor(const float4& w_0, const float4& w_x1, const float4& w_y1, const float4& w_z1);
+			const std::vector<floatN>& textureData, std::vector<floatN>& result);
+
+		floatN Rotor(const floatN& w_0, const floatN& w_x1, const floatN& w_y1, const floatN& w_z1);
+
+		static constexpr float ROTOR_SCALE = 10.0f;
+		static constexpr int32_t BLUR_MAX_SIZE = 15;
 	};
 }

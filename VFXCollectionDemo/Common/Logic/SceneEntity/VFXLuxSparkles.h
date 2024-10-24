@@ -48,8 +48,8 @@ namespace Common::Logic::SceneEntity
 			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID particleSimulationCSId,
 			Graphics::Resources::ResourceID lightParticleBufferId, uint32_t maxParticleNumber);
 
-		static constexpr float MAX_LIGHT_INTENSITY = 12.0f;
-		static constexpr float LIGHT_RANGE = 1.5f;
+		static constexpr float MAX_LIGHT_INTENSITY = 20.0f;
+		static constexpr float LIGHT_RANGE = 3.5f;
 
 		struct VFXSparklesConstants
 		{

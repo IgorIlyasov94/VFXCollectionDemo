@@ -17,6 +17,9 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dxcompiler.lib")
 
+using ubyte4 = DirectX::PackedVector::XMUBYTE4;
+using ubyte2 = DirectX::PackedVector::XMUBYTE2;
+
 using floatN = DirectX::XMVECTOR;
 using float4 = DirectX::XMFLOAT4;
 using float3 = DirectX::XMFLOAT3;

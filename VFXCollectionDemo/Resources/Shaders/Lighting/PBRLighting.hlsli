@@ -300,7 +300,7 @@ float3 BouguerLambertBeerLaw(float thickness, float3 absorptionCoeff)
 
 float Attenuation(float x, float range)
 {
-	return exp(-x * 5.0f / range);
+	return exp(-x * 5.5f / range);
 }
 
 void CalculateDirectionalLight(DirectionalLight directionalLight, Surface surface, Material material, float3 viewDir, out float3 light)
