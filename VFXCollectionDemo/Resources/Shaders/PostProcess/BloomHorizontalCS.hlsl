@@ -59,6 +59,9 @@ void main(Input input)
 	uint2 texCoord;
 	texCoord.x = bufferIndex % halfWidth;
 	texCoord.y = bufferIndex / halfWidth;
+	
+	bool outOfBounds = texCoord.x < HALF_SAMPLES_NUMBER || texCoord.x > (halfWidth - HALF_SAMPLES_NUMBER);
+	
 	texCoord *= 2u;
 	
 	uint4 texIndex = (texCoord.x + texCoord.y * width).xxxx;
@@ -85,7 +88,7 @@ void main(Input input)
 	color = max(color * 0.25f - brightThreshold, 0.0f.xxx);
 	color = ToneMapping(color, luminance);
 	
-	groupBuffer[input.groupIndex] = color;
+	groupBuffer[input.groupIndex] = outOfBounds ? 0.0f.xxx : color;
 	
 	GroupMemoryBarrierWithGroupSync();
 	

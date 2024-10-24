@@ -39,10 +39,12 @@ void main(Input input)
 	texCoord.x = bufferIndex / height;
 	texCoord.y = bufferIndex % height;
 	
+	bool outOfBounds = texCoord.y < HALF_SAMPLES_NUMBER || texCoord.y > (height - HALF_SAMPLES_NUMBER);
+	
 	bufferIndex = texCoord.x + texCoord.y * width;
 	
 	float3 color = bloomBuffer[clamp(bufferIndex, 0, area - 1)].xyz;
-	groupBuffer[input.groupIndex] = color;
+	groupBuffer[input.groupIndex] = outOfBounds ? 0.0f.xxx : color;
 	
 	GroupMemoryBarrierWithGroupSync();
 	

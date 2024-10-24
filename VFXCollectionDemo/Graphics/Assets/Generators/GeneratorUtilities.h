@@ -15,6 +15,7 @@ namespace Graphics::Assets::Generators
 			const std::vector<floatN>& forceMap, const std::vector<floatN>& map, std::vector<floatN>& result);
 
 		static void Normalize(const std::vector<floatN>& map, std::vector<floatN>& result);
+		static void Normalize(std::vector<floatN>& map);
 
 		static uint32_t GetIndexFromXYZ(uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height);
 		static void GetXYZFromIndex(uint32_t index, uint32_t width, uint32_t height, uint32_t& x, uint32_t& y, uint32_t& z);

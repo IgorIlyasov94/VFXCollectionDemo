@@ -64,7 +64,7 @@ namespace Common::Logic::Scene
 
 		static constexpr float WHITE_CUTOFF = 1.7f;
 		static constexpr float BRIGHT_THRESHOLD = 3.5f;
-		static constexpr float BLOOM_INTENSITY = 0.5f;
+		static constexpr float BLOOM_INTENSITY = 1.0f;
 
 		static constexpr float FOG_DISTANCE_FALLOFF_START = 0.5f;
 		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 5.0f;

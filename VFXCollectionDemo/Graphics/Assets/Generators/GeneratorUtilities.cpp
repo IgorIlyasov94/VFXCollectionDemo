@@ -97,6 +97,18 @@ void Graphics::Assets::Generators::GeneratorUtilities::Normalize(const std::vect
 		result[pixelIndex] = XMVectorDivide(XMVectorSubtract(map[pixelIndex], minValue), diffValue);
 }
 
+void Graphics::Assets::Generators::GeneratorUtilities::Normalize(std::vector<floatN>& map)
+{
+	floatN minValue{};
+	floatN maxValue{};
+	FindMinMax(map, minValue, maxValue);
+
+	auto diffValue = XMVectorSubtract(maxValue, minValue);
+
+	for (auto pixelIndex = 0u; pixelIndex < map.size(); pixelIndex++)
+		map[pixelIndex] = XMVectorDivide(XMVectorSubtract(map[pixelIndex], minValue), diffValue);
+}
+
 uint32_t Graphics::Assets::Generators::GeneratorUtilities::GetIndexFromXYZ(uint32_t x, uint32_t y, uint32_t z,
 	uint32_t width, uint32_t height)
 {
