@@ -164,6 +164,7 @@ void Common::Logic::SceneEntity::Terrain::Release(Graphics::Resources::ResourceM
 	delete mesh;
 
 	delete material;
+	delete materialDepthPrepass;
 
 	resourceManager->DeleteResource<ConstantBuffer>(mutableConstantsId);
 	resourceManager->DeleteResource<Texture>(albedo0Id);

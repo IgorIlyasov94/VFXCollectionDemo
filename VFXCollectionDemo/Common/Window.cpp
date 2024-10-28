@@ -19,21 +19,18 @@ Common::Window::Window(HINSTANCE instance, int cmdShow, const RECT& initialPlace
 
 	RegisterClassEx(&windowClass);
 
-	DWORD styles = WS_OVERLAPPEDWINDOW;
-	DWORD exStyles = WS_EX_APPWINDOW | WS_EX_NOREDIRECTIONBITMAP;
-
 	RECT adjustedPlacement = initialPlacement;
-	AdjustWindowRectEx(&adjustedPlacement, styles, false, exStyles);
+	AdjustWindowRectEx(&adjustedPlacement, WINDOW_STYLES, false, WINDOW_EX_STYLES);
 
 	int initialX = adjustedPlacement.left;
 	int initialY = adjustedPlacement.top;
 	int initialWidth = adjustedPlacement.right - adjustedPlacement.left;
 	int initialHeight = adjustedPlacement.bottom - adjustedPlacement.top;
 
-	windowHandler = CreateWindowEx(exStyles, windowClassName, windowTitleName, styles,
+	windowHandler = CreateWindowEx(WINDOW_EX_STYLES, windowClassName, windowTitleName, WINDOW_STYLES,
 		initialX, initialY, initialWidth, initialHeight, nullptr, nullptr, instance, nullptr);
 
-	ShowWindow(windowHandler, SW_SHOWDEFAULT);
+	ShowWindow(windowHandler, cmdShow);
 	UpdateWindow(windowHandler);
 
 	SetForegroundWindow(windowHandler);

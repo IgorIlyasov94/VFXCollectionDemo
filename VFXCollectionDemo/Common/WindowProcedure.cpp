@@ -37,6 +37,16 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 		//
 		//	return 0;
 		//}
+		case WM_SYSKEYDOWN:
+		{
+			if ((wParam == VK_RETURN) && (lParam & (1ull << 29ull)))
+			{
+				if (mainLogic != nullptr)
+					mainLogic->ToggleFullscreen(windowHandler);
+			}
+
+			break;
+		}
 		case WM_KEYDOWN:
 		{
 			auto keyData = static_cast<uint8_t>(wParam);
@@ -52,37 +62,6 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 
 			return 0;
 		}
-		//case WM_EXITSIZEMOVE:
-		//{
-		//	//if (mainLogic != nullptr)
-		//	//{
-		//	//	DWORD styles = WS_OVERLAPPEDWINDOW | WS_SYSMENU;
-		//	//	DWORD exStyles = WS_EX_APPWINDOW;
-		//	//
-		//	//	RECT adjustedPlacement{};
-		//	//	GetClientRect(windowHandler, &adjustedPlacement);
-		//	//	AdjustWindowRectEx(&adjustedPlacement, styles, true, exStyles);
-		//	//
-		//	//	uint32_t newWidth = adjustedPlacement.right - adjustedPlacement.left;
-		//	//	uint32_t newHeight = adjustedPlacement.bottom - adjustedPlacement.top;
-		//	//
-		//	//	mainLogic->OnResize(newWidth, newHeight, windowHandler);
-		//	//}
-		//
-		//	DWORD styles = WS_OVERLAPPEDWINDOW | WS_SYSMENU;
-		//	DWORD exStyles = WS_EX_APPWINDOW;
-		//
-		//	RECT adjustedPlacement{};
-		//	GetClientRect(windowHandler, &adjustedPlacement);
-		//	AdjustWindowRectEx(&adjustedPlacement, styles, true, exStyles);
-		//
-		//	//InvalidateRect(windowHandler, &adjustedPlacement, true);
-		//	//UpdateWindow(windowHandler);
-		//
-		//	RedrawWindow(windowHandler, nullptr, nullptr, RDW_ERASE | RDW_INVALIDATE);
-		//
-		//	return 0;
-		//}
 		case WM_SIZE:
 		{
 			if (mainLogic != nullptr)
@@ -115,28 +94,20 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 
 			return 0;
 		}
-		/*case WM_SETFOCUS:
+		case WM_SETFOCUS:
 		{
-			if (data != nullptr)
-			{
-				auto renderer = data->renderer;
-
-				renderer->OnSetFocus(windowHandler);
-			}
+			if (mainLogic != nullptr)
+				mainLogic->OnSetFocus(windowHandler);
 
 			return 0;
 		}
 		case WM_KILLFOCUS:
 		{
-			if (data != nullptr)
-			{
-				auto renderer = data->renderer;
-
-				renderer->OnLostFocus(windowHandler);
-			}
+			if (mainLogic != nullptr)
+				mainLogic->OnLostFocus(windowHandler);
 
 			return 0;
-		}*/
+		}
 		case WM_CLOSE:
 		{
 			PostQuitMessage(0);

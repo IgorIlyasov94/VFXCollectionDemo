@@ -3,7 +3,7 @@
 #include "Scene/Scene_1_Whiteroom.h"
 
 Common::Logic::MainLogic::MainLogic(const RECT& windowPlacement, HWND windowHandler, bool isFullscreen)
-	: _isFullscreen(isFullscreen), needBackgroundUpdate(true)
+	: needBackgroundUpdate(true)
 {
 	renderer = new Graphics::DirectX12Renderer(windowPlacement, windowHandler, isFullscreen);
 	sceneManager = new SceneManager();
@@ -20,6 +20,16 @@ Common::Logic::MainLogic::~MainLogic()
 
 	delete sceneManager;
 	delete renderer;
+}
+
+void Common::Logic::MainLogic::ToggleFullscreen(HWND windowHandler)
+{
+	renderer->ToggleFullscreen(windowHandler);
+}
+
+void Common::Logic::MainLogic::SetFullscreen(bool isFullscreen, HWND windowHandler)
+{
+	renderer->SetFullscreen(isFullscreen, windowHandler);
 }
 
 void Common::Logic::MainLogic::OnResize(uint32_t newWidth, uint32_t newHeight, HWND windowHandler)

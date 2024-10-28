@@ -1,8 +1,10 @@
 #include "DirectX12Renderer.h"
 #include "DirectX12Utilities.h"
+#include "../Common/Window.h"
 
 Graphics::DirectX12Renderer::DirectX12Renderer(const RECT& windowPlacement, HWND windowHandler, bool _isFullscreen)
-    : commandManager(nullptr), descriptorManager(nullptr), commandQueueId{}, isFullscreen(_isFullscreen)
+    : commandManager(nullptr), descriptorManager(nullptr), commandQueueId{},
+    isFullscreen(_isFullscreen), lastWindowRect{}
 {
     currentWidth = windowPlacement.right - windowPlacement.left;
     currentHeight = windowPlacement.bottom - windowPlacement.top;
@@ -50,6 +52,59 @@ Graphics::DirectX12Renderer::~DirectX12Renderer()
     CloseHandle(fenceEvent);
 
     device->Release();
+}
+
+void Graphics::DirectX12Renderer::ToggleFullscreen(HWND windowHandler)
+{
+    if (isFullscreen)
+    {
+        SetWindowLong(windowHandler, GWL_STYLE, Common::Window::WINDOW_STYLES);
+
+        SetWindowPos(windowHandler,
+            HWND_NOTOPMOST,
+            lastWindowRect.left,
+            lastWindowRect.top,
+            lastWindowRect.right - lastWindowRect.left,
+            lastWindowRect.bottom - lastWindowRect.top,
+            SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+        ShowWindow(windowHandler, SW_NORMAL);
+    }
+    else
+    {
+        GetWindowRect(windowHandler, &lastWindowRect);
+
+        DWORD borderlessStyles = ~(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU | WS_THICKFRAME);
+
+        SetWindowLong(windowHandler, GWL_STYLE, Common::Window::WINDOW_STYLES & borderlessStyles);
+
+        IDXGIOutput* output;
+        swapChain->GetContainingOutput(&output);
+
+        DXGI_OUTPUT_DESC outputDesc{};
+        output->GetDesc(&outputDesc);
+        output->Release();
+
+        auto fullscreenWindowRect = outputDesc.DesktopCoordinates;
+        
+        SetWindowPos(windowHandler,
+            HWND_TOPMOST,
+            fullscreenWindowRect.left,
+            fullscreenWindowRect.top,
+            fullscreenWindowRect.right,
+            fullscreenWindowRect.bottom,
+            SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+        ShowWindow(windowHandler, SW_MAXIMIZE);
+    }
+
+    isFullscreen = !isFullscreen;
+}
+
+void Graphics::DirectX12Renderer::SetFullscreen(bool _isFullscreen, HWND windowHandler)
+{
+    if (isFullscreen != _isFullscreen)
+        ToggleFullscreen(windowHandler);
 }
 
 void Graphics::DirectX12Renderer::OnResize(uint32_t newWidth, uint32_t newHeight, HWND windowHandler)
@@ -128,6 +183,7 @@ void Graphics::DirectX12Renderer::EndFrame(ID3D12GraphicsCommandList* commandLis
     commandManager->SubmitCommandList(commandListId);
     commandManager->ExecuteCommands(commandQueueId);
 
+    //swapChain->Present(0u, DXGI_PRESENT_ALLOW_TEARING);
     swapChain->Present(1u, 0u);
 
     PrepareToNextFrame();
@@ -385,11 +441,16 @@ IDXGISwapChain3* Graphics::DirectX12Renderer::CreateSwapChain(uint32_t width, ui
     desc.Height = height;
     desc.Format = BACK_BUFFER_FORMAT;
     desc.SampleDesc.Count = 1;
+    //desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     desc.BufferCount = BACK_BUFFER_NUMBER;
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
-    factory->CreateSwapChainForHwnd(commandQueue, windowHandler, &desc, nullptr, nullptr, &newSwapChain1);
+    DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullScreenDesc{};
+    fullScreenDesc.Windowed = !isFullscreen;
+
+    factory->CreateSwapChainForHwnd(commandQueue, windowHandler, &desc, &fullScreenDesc, nullptr, &newSwapChain1);
+    factory->MakeWindowAssociation(windowHandler, DXGI_MWA_NO_ALT_ENTER);
 
     IDXGISwapChain3* newSwapChain = nullptr;
     newSwapChain1->QueryInterface(IID_PPV_ARGS(&newSwapChain));

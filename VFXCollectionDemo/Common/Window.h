@@ -12,6 +12,9 @@ namespace Common
 
 		HWND GetHandler();
 
+		static constexpr DWORD WINDOW_STYLES = WS_OVERLAPPEDWINDOW;
+		static constexpr DWORD WINDOW_EX_STYLES = WS_EX_APPWINDOW | WS_EX_NOREDIRECTIONBITMAP;
+
 	private:
 		Window() = delete;
 		Window(const Window&) = delete;

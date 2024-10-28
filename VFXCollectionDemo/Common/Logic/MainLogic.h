@@ -12,6 +12,9 @@ namespace Common::Logic
 		MainLogic(const RECT& windowPlacement, HWND windowHandler, bool isFullscreen);
 		~MainLogic();
 
+		void ToggleFullscreen(HWND windowHandler);
+		void SetFullscreen(bool isFullscreen, HWND windowHandler);
+
 		void OnResize(uint32_t newWidth, uint32_t newHeight, HWND windowHandler);
 		void OnSetFocus(HWND windowHandler);
 		void OnLostFocus(HWND windowHandler);
@@ -33,7 +36,6 @@ namespace Common::Logic
 
 		SceneManager* sceneManager;
 		Graphics::DirectX12Renderer* renderer;
-		bool _isFullscreen;
 		bool needBackgroundUpdate;
 	};
 }
