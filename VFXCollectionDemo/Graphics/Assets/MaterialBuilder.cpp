@@ -198,12 +198,14 @@ void Graphics::Assets::MaterialBuilder::SetRenderTargetFormat(uint32_t renderTar
 	renderTargetNumber++;
 }
 
-void Graphics::Assets::MaterialBuilder::SetDepthStencilFormat(uint32_t depthBit, bool enableZTest, bool readOnly)
+void Graphics::Assets::MaterialBuilder::SetDepthStencilFormat(uint32_t depthBit, bool enableZTest,
+	bool readOnly, bool isPrepass)
 {
 	depthStencilFormat = (depthBit == 32) ? DXGI_FORMAT_D32_FLOAT : (depthBit == 16) ? DXGI_FORMAT_D24_UNORM_S8_UINT :
 		DXGI_FORMAT_UNKNOWN;
 	zTest = enableZTest;
 	depthBufferReadOnly = readOnly;
+	isZPrepass = isPrepass;
 }
 
 Graphics::Assets::Material* Graphics::Assets::MaterialBuilder::ComposeStandard(ID3D12Device* device)
@@ -415,7 +417,7 @@ ID3D12PipelineState* Graphics::Assets::MaterialBuilder::CreateGraphicsPipelineSt
 	pipelineStateDesc.DS = domainShader;
 	pipelineStateDesc.GS = geometryShader;
 	pipelineStateDesc.PS = pixelShader;
-	pipelineStateDesc.DepthStencilState = DirectX12Utilities::CreateDepthStencilDesc(zTest, depthBufferReadOnly);
+	pipelineStateDesc.DepthStencilState = DirectX12Utilities::CreateDepthStencilDesc(zTest, depthBufferReadOnly, isZPrepass);
 	pipelineStateDesc.DSVFormat = depthStencilFormat;
 	pipelineStateDesc.SampleMask = UINT_MAX;
 	pipelineStateDesc.PrimitiveTopologyType = topologyType;
@@ -446,7 +448,7 @@ ID3D12PipelineState* Graphics::Assets::MaterialBuilder::CreatePipelineState(ID3D
 	pipelineStateDesc.meshShader = meshShader;
 	pipelineStateDesc.amplificationShader = amplificationShader;
 	pipelineStateDesc.pixelShader = pixelShader;
-	pipelineStateDesc.depthStencilDesc = DirectX12Utilities::CreateDepthStencilDesc1(zTest, depthBufferReadOnly);
+	pipelineStateDesc.depthStencilDesc = DirectX12Utilities::CreateDepthStencilDesc1(zTest, depthBufferReadOnly, isZPrepass);
 	pipelineStateDesc.dsvFormat = depthStencilFormat;
 	pipelineStateDesc.sampleMask = UINT_MAX;
 	pipelineStateDesc.sampleDesc = { 1, 0 };

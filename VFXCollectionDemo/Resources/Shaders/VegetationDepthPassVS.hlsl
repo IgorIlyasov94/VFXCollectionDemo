@@ -6,16 +6,12 @@ struct Vegetation
 	float height;
 };
 
-#ifndef DEPTH_PREPASS
 cbuffer RootConstants : register(b0)
 {
 	uint lightMatrixStartIndex;
 };
 
 cbuffer MutableConstants : register(b1)
-#else
-cbuffer MutableConstants : register(b0)
-#endif
 {
 	float4x4 viewProjection;
 	
@@ -29,12 +25,10 @@ cbuffer MutableConstants : register(b0)
 	float windStrength;
 };
 
-#ifndef DEPTH_PREPASS
 cbuffer LightConstants : register(b2)
 {
 	float4x4 lightViewProjection[LIGHT_MATRICES_NUMBER];
 };
-#endif
 
 struct Input
 {
@@ -49,7 +43,6 @@ struct Output
 {
 	float4 position : SV_Position;
 	float2 texCoord : TEXCOORD0;
-	float2 depth : TEXCOORD1;
 };
 
 StructuredBuffer<Vegetation> vegetationBuffer : register(t0);
@@ -85,14 +78,8 @@ Output main(Input input)
 	
 	worldPosition.xyz += shift * shiftCoeff;
 	
-#ifndef DEPTH_PREPASS
 	output.position = mul(lightViewProjection[lightMatrixStartIndex], worldPosition);
-#else
-	output.position = mul(viewProjection, worldPosition);
-#endif
-	
 	output.texCoord = input.texCoord * atlasElementSize + vegetation.atlasElementOffset;
-	output.depth = output.position.zw;
 	
 	return output;
 }

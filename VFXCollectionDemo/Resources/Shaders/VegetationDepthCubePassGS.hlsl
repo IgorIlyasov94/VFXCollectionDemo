@@ -41,7 +41,6 @@ struct Output
 	float4 position : SV_Position;
 	uint targetIndex : SV_RenderTargetArrayIndex;
 	float2 texCoord : TEXCOORD0;
-	float2 depth : TEXCOORD1;
 };
 
 [maxvertexcount(18)]
@@ -60,7 +59,6 @@ void main(triangle Input input[3], inout TriangleStream<Output> outputStream)
 		{
 			output.position = mul(lightViewProjection[lightViewProjectionIndex], input[vertexIndex].position);
 			output.texCoord = input[vertexIndex].texCoord;
-			output.depth = output.position.zw;
 			outputStream.Append(output);
 		}
 		

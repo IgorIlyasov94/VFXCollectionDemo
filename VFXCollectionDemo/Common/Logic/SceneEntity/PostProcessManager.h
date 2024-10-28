@@ -149,7 +149,7 @@ namespace Common::Logic::SceneEntity
 			float colorGradingFactor;
 		};
 
-		static constexpr float CLEAR_COLOR[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+		static constexpr float CLEAR_COLOR[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
 		static constexpr float FOG_MOVING_COEFF = 0.002f;
 

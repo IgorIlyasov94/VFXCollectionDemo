@@ -62,8 +62,8 @@ namespace Graphics
 		static D3D12_DEPTH_STENCIL_VIEW_DESC CreateDSVDesc(const Resources::TextureDesc& desc);
 
 		static D3D12_RASTERIZER_DESC CreateRasterizeDesc(D3D12_CULL_MODE mode, float depthBias = 0.0f, bool conservative = false);
-		static D3D12_DEPTH_STENCIL_DESC CreateDepthStencilDesc(bool enableZTest, bool readOnly = false);
-		static D3D12_DEPTH_STENCIL_DESC1 CreateDepthStencilDesc1(bool enableZTest, bool readOnly = false);
+		static D3D12_DEPTH_STENCIL_DESC CreateDepthStencilDesc(bool enableZTest, bool readOnly = false, bool isPrepass = false);
+		static D3D12_DEPTH_STENCIL_DESC1 CreateDepthStencilDesc1(bool enableZTest, bool readOnly = false, bool isPrepass = false);
 
 		static D3D12_BLEND_DESC CreateBlendDesc(DefaultBlendSetup setup);
 		static D3D12_SAMPLER_DESC CreateSamplerDesc(DefaultFilterSetup setup,

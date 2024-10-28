@@ -120,7 +120,7 @@ Output main(Input input)
 	}
 #endif
 	
-	output.color = float4(lightSum, 1.0f);
+	output.color = float4(lightSum, 0.0f);
 	
 	return output;
 }

@@ -44,7 +44,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 	float2 motionG = motion * STRENGTH_COEFF.y;
 	float2 motionB = motion * STRENGTH_COEFF.z;
 	
-	float3 color = 0.0f.xxx;
+	float4 color = 0.0f.xxxx;
 	
 	[unroll]
 	for (int sampleIndex = 0; sampleIndex < SAMPLES_NUMBER; sampleIndex++)
@@ -55,12 +55,12 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float2 offsetG = saturate(texCoord + motionG * t);
 		float2 offsetB = saturate(texCoord + motionB * t);
 		
-		float colorR = sceneColor.SampleLevel(samplerLinear, offsetR, 0.0f).x;
+		float2 colorRA = sceneColor.SampleLevel(samplerLinear, offsetR, 0.0f).xw;
 		float colorG = sceneColor.SampleLevel(samplerLinear, offsetG, 0.0f).y;
 		float colorB = sceneColor.SampleLevel(samplerLinear, offsetB, 0.0f).z;
 		
-		color += float3(colorR, colorG, colorB) * Weight(sampleIndex, NORMAL_DISTRIBUTION_SIGMA);
+		color += float4(colorRA.x, colorG, colorB, colorRA.y) * Weight(sampleIndex, NORMAL_DISTRIBUTION_SIGMA);
 	}
 	
-	sceneBuffer[bufferIndex] = float4(color, 1.0f);
+	sceneBuffer[bufferIndex] = color;
 }

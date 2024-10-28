@@ -28,7 +28,6 @@ namespace Common::Logic::SceneEntity
 		std::vector<Graphics::Resources::ResourceID> shadowMapIds;
 		const std::vector<DxcDefine>* lightDefines;
 		
-		Graphics::Assets::Material* materialDepthPrepass;
 		Graphics::Assets::Material* materialDepthPass;
 		Graphics::Assets::Material* materialDepthCubePass;
 
@@ -59,7 +58,8 @@ namespace Common::Logic::SceneEntity
 		const float3& GetSize() const noexcept;
 		const float3& GetMinCorner() const noexcept;
 
-		void DrawDepthPrepass(ID3D12GraphicsCommandList* commandList, const Camera* camera, float time);
+		void Update(const Camera* camera, float time);
+		void DrawDepthPrepass(ID3D12GraphicsCommandList* commandList);
 		void DrawShadows(ID3D12GraphicsCommandList* commandList, uint32_t lightMatrixStartIndex);
 		void DrawShadowsCube(ID3D12GraphicsCommandList* commandList, uint32_t lightMatrixStartIndex);
 		void Draw(ID3D12GraphicsCommandList* commandList);

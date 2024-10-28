@@ -153,11 +153,12 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 		volumetricFogConstants->height = static_cast<float>(height);
 	}
 
+	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
+	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
+
 	if (_renderingScheme.enableMotionBlur)
 		resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
 
-	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
-	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
 	resourceManager->DeleteResource<RWBuffer>(sceneBufferId);
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
@@ -450,9 +451,9 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 		sceneMotionTargetId = resourceManager->CreateTextureResource(device, commandList,
 			TextureResourceType::RENDER_TARGET, sceneTargetDesc);
 
-		auto sceneDistortionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
-		sceneMotionTargetGPUResource = sceneDistortionTargetResource->resource;
-		sceneMotionTargetDescriptor = sceneDistortionTargetResource->rtvDescriptor.cpuDescriptor;
+		auto sceneMotionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
+		sceneMotionTargetGPUResource = sceneMotionTargetResource->resource;
+		sceneMotionTargetDescriptor = sceneMotionTargetResource->rtvDescriptor.cpuDescriptor;
 	}
 }
 
@@ -752,7 +753,8 @@ void Common::Logic::SceneEntity::PostProcessManager::SetMotionBlur(ID3D12Graphic
 	motionBlurConstants.width = static_cast<float>(_width);
 	motionBlurConstants.height = static_cast<float>(_height);
 
-	uint32_t numGroupsX = std::max(motionBlurConstants.area / THREADS_PER_GROUP, 1u);
+	float numGroupsF = std::ceil(motionBlurConstants.area / static_cast<float>(THREADS_PER_GROUP));
+	uint32_t numGroupsX = std::max(static_cast<uint32_t>(numGroupsF), 1u);
 
 	motionBlurComputeObject->Set(commandList);
 	motionBlurComputeObject->SetRootConstants(commandList, 0u, 4u, &motionBlurConstants);
@@ -777,7 +779,8 @@ void Common::Logic::SceneEntity::PostProcessManager::SetVolumetricFog(ID3D12Grap
 		volumetricFogConstants->fogOffset.z -= std::floor(volumetricFogConstants->fogOffset.z);
 	}
 
-	uint32_t numGroupsX = std::max(_width * _height / THREADS_PER_GROUP, 1u);
+	float numGroupsF = std::ceil(_width * _height / static_cast<float>(THREADS_PER_GROUP));
+	uint32_t numGroupsX = std::max(static_cast<uint32_t>(numGroupsF), 1u);
 
 	volumetricFogComputeObject->Set(commandList);
 	volumetricFogComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
@@ -807,7 +810,9 @@ void Common::Logic::SceneEntity::PostProcessManager::SetHDR(ID3D12GraphicsComman
 	hdrConstants.width = _width;
 	hdrConstants.area = motionBlurConstants.area;
 	uint32_t remain = hdrConstants.area % THREADS_PER_GROUP;
-	uint32_t numGroupsX = std::max(_width * _height / THREADS_PER_GROUP, 1u);
+
+	float numGroupsF = std::ceil(_width * _height / static_cast<float>(THREADS_PER_GROUP));
+	uint32_t numGroupsX = std::max(static_cast<uint32_t>(numGroupsF), 1u);
 
 	luminanceComputeObject->Set(commandList);
 	luminanceComputeObject->SetRootConstants(commandList, 0u, 2u, &hdrConstants);
@@ -845,7 +850,8 @@ void Common::Logic::SceneEntity::PostProcessManager::SetHDR(ID3D12GraphicsComman
 	toneMappingConstants.halfWidth = _width / 2u;
 	toneMappingConstants.quartArea = _width * _height / 4u;
 
-	numGroupsX = std::max(toneMappingConstants.quartArea / (THREADS_PER_GROUP - HALF_BLUR_SAMPLES_NUMBER * 2u), 1u);
+	numGroupsF = std::ceil(toneMappingConstants.quartArea / static_cast<float>(THREADS_PER_GROUP - HALF_BLUR_SAMPLES_NUMBER * 2u));
+	numGroupsX = std::max(static_cast<uint32_t>(numGroupsF), 1u);
 
 	bloomHorizontalObject->Set(commandList);
 	bloomHorizontalObject->SetRootConstants(commandList, 0u, 7u, &toneMappingConstants);

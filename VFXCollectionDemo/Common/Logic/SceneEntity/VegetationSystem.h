@@ -181,7 +181,6 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID vegetationVSId;
 		Graphics::Resources::ResourceID vegetationPSId;
 
-		Graphics::Resources::ResourceID vegetationDepthPrepassVSId;
 		Graphics::Resources::ResourceID vegetationDepthPassVSId;
 		Graphics::Resources::ResourceID vegetationDepthPassPSId;
 		Graphics::Resources::ResourceID vegetationDepthCubePassVSId;

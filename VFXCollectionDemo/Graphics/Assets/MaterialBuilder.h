@@ -44,7 +44,7 @@ namespace Graphics::Assets
 		void SetCullMode(D3D12_CULL_MODE mode);
 		void SetBlendMode(D3D12_BLEND_DESC desc);
 		void SetRenderTargetFormat(uint32_t renderTargetIndex, DXGI_FORMAT format);
-		void SetDepthStencilFormat(uint32_t depthBit, bool enableZTest, bool readOnly = false);
+		void SetDepthStencilFormat(uint32_t depthBit, bool enableZTest, bool readOnly = false, bool isPrepass = false);
 		
 		Material* ComposeStandard(ID3D12Device* device);
 		Material* ComposeMeshletized(ID3D12Device2* device);
@@ -154,6 +154,7 @@ namespace Graphics::Assets
 		float _conservativeRender;
 		bool zTest;
 		bool depthBufferReadOnly;
+		bool isZPrepass;
 		uint32_t renderTargetNumber;
 
 		std::array<DXGI_FORMAT, 8> renderTargetsFormat;

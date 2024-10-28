@@ -26,7 +26,6 @@ Common::Logic::SceneEntity::Terrain::Terrain(ID3D12GraphicsCommandList* commandL
 
 	mapSize = desc.size;
 
-	materialDepthPrepass = desc.materialDepthPrepass;
 	materialDepthPass = desc.materialDepthPass;
 	materialDepthCubePass = desc.materialDepthCubePass;
 
@@ -120,17 +119,16 @@ const float3& Common::Logic::SceneEntity::Terrain::GetMinCorner() const noexcept
 	return minCorner;
 }
 
-void Common::Logic::SceneEntity::Terrain::DrawDepthPrepass(ID3D12GraphicsCommandList* commandList,
-	const Camera* camera, float time)
+void Common::Logic::SceneEntity::Terrain::Update(const Camera* camera, float time)
 {
-	auto worldViewProjection = depthPassConstants.world * camera->GetViewProjection();
-
 	mutableConstantsBuffer->viewProjection = camera->GetViewProjection();
 	mutableConstantsBuffer->cameraPosition = camera->GetPosition();
 	mutableConstantsBuffer->time = time;
+}
 
+void Common::Logic::SceneEntity::Terrain::DrawDepthPrepass(ID3D12GraphicsCommandList* commandList)
+{
 	materialDepthPrepass->Set(commandList);
-	materialDepthPrepass->SetRootConstants(commandList, 0u, 16u, &worldViewProjection);
 	mesh->Draw(commandList);
 }
 
@@ -449,7 +447,6 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(1u, samplerShadowResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 
-	materialBuilder.SetDepthBias(-18.0f);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
 	materialBuilder.SetDepthStencilFormat(32u, true, true);
@@ -459,6 +456,16 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 	materialBuilder.SetPixelShader(terrainPS->bytecode);
 
 	material = materialBuilder.ComposeStandard(device);
+
+	materialBuilder.SetConstantBuffer(1u, constantsResource->resourceGPUAddress);
+	
+	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
+	materialBuilder.SetDepthStencilFormat(32u, true, false, true);
+	materialBuilder.SetGeometryFormat(mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	materialBuilder.SetVertexShader(terrainVS->bytecode);
+	
+	materialDepthPrepass = materialBuilder.ComposeStandard(device);
 }
 
 void Common::Logic::SceneEntity::Terrain::LoadCache(const std::filesystem::path& fileName, ID3D12Device* device,

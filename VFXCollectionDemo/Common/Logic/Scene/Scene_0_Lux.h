@@ -114,7 +114,6 @@ namespace Common::Logic::Scene
 		Graphics::Resources::ResourceID pbrStandardVSId;
 		Graphics::Resources::ResourceID pbrStandardPSId;
 
-		Graphics::Resources::ResourceID depthPrepassVSId;
 		Graphics::Resources::ResourceID depthPassVSId;
 
 		Graphics::Resources::ResourceID depthCubePassVSId;
@@ -125,7 +124,6 @@ namespace Common::Logic::Scene
 
 		SceneEntity::Camera* camera;
 
-		Graphics::Assets::Material* depthPrepassMaterial;
 		Graphics::Assets::Material* depthPassMaterial;
 		Graphics::Assets::Material* depthCubePassMaterial;
 

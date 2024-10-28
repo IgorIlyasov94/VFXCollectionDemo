@@ -17,9 +17,9 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	camera(nullptr), postProcessManager(nullptr), mutableConstantsBuffer{}, mutableConstantsId{},
 	vfxAtlasId{}, perlinNoiseId{}, pbrStandardVSId{}, pbrStandardPSId{}, particleSimulationCSId{},
 	environmentWorld{}, timer{}, _deltaTime{}, fps(60.0f), cpuTimeCounter{}, prevTimePoint{}, frameCounter{},
-	vfxLux{}, vfxLuxSparkles{}, vfxLuxDistorters{}, areaLightId{}, ambientLightId{}, depthPrepassVSId{},
-	depthPassVSId{}, depthCubePassVSId{}, depthCubePassGSId{}, depthPassMaterial{}, depthCubePassMaterial{},
-	depthPrepassMaterial{}, lightParticleBufferId{}, particleLightSimulationCSId{}
+	vfxLux{}, vfxLuxSparkles{}, vfxLuxDistorters{}, areaLightId{}, ambientLightId{}, depthPassVSId{},
+	depthCubePassVSId{}, depthCubePassGSId{}, depthPassMaterial{}, depthCubePassMaterial{},
+	lightParticleBufferId{}, particleLightSimulationCSId{}
 {
 	environmentPosition = float3(0.0f, 0.0f, 0.0f);
 	cameraPosition = float3(0.0f, 0.0f, 5.0f);
@@ -72,8 +72,6 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 {
 	auto resourceManager = renderer->GetResourceManager();
 
-	delete depthPrepassMaterial;
-
 	if (depthPassMaterial != nullptr)
 		delete depthPassMaterial;
 
@@ -94,7 +92,6 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 
 	resourceManager->DeleteResource<Shader>(pbrStandardVSId);
 	resourceManager->DeleteResource<Shader>(pbrStandardPSId);
-	resourceManager->DeleteResource<Shader>(depthPrepassVSId);
 	resourceManager->DeleteResource<Shader>(depthCubePassVSId);
 	resourceManager->DeleteResource<Shader>(depthCubePassGSId);
 
@@ -176,6 +173,8 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 	ambientLightDesc.intensity = AMBIENT_LIGHT_INTENSITY + std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 120.0f) * 0.05f;
 
 	lightingSystem->UpdateSourceDesc(ambientLightId);
+
+	terrain->Update(camera, timer);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::RenderShadows(ID3D12GraphicsCommandList* commandList)
@@ -198,7 +197,7 @@ void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* comman
 
 	postProcessManager->SetDepthPrepass(commandList);
 
-	terrain->DrawDepthPrepass(commandList, camera, timer);
+	terrain->DrawDepthPrepass(commandList);
 	vegetationSystem->DrawDepthPrepass(commandList);
 
 	postProcessManager->SetGBuffer(commandList);
@@ -266,9 +265,6 @@ void Common::Logic::Scene::Scene_0_Lux::LoadShaders(ID3D12Device* device, Graphi
 	std::vector<DxcDefine> defines;
 	defines.push_back({ L"LIGHT_MATRICES_NUMBER", lightMatricesNumberString.c_str() });
 
-	std::vector<DxcDefine> definesDepthPrepass;
-	definesDepthPrepass.push_back({ L"DEPTH_PREPASS", nullptr });
-
 	pbrStandardVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\PBRStandardVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
@@ -280,9 +276,6 @@ void Common::Logic::Scene::Scene_0_Lux::LoadShaders(ID3D12Device* device, Graphi
 
 	particleLightSimulationCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\ParticleLightSimulationCS.hlsl",
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
-
-	depthPrepassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\DepthPassVS.hlsl",
-		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, definesDepthPrepass);
 
 	depthPassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\DepthPassVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, defines);
@@ -340,7 +333,6 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 
 	auto pbrStandardVS = resourceManager->GetResource<Shader>(pbrStandardVSId);
 	auto pbrStandardPS = resourceManager->GetResource<Shader>(pbrStandardPSId);
-	auto depthPrepassVS = resourceManager->GetResource<Shader>(depthPrepassVSId);
 	auto depthCubePassVS = resourceManager->GetResource<Shader>(depthCubePassVSId);
 	auto depthCubePassGS = resourceManager->GetResource<Shader>(depthCubePassGSId);
 
@@ -350,15 +342,6 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 		Graphics::VertexFormat::TEXCOORD0;
 
 	MaterialBuilder materialBuilder{};
-	materialBuilder.SetRootConstants(0u, 16u);
-	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
-	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
-	materialBuilder.SetDepthStencilFormat(32u, true);
-	materialBuilder.SetGeometryFormat(terrainVertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	materialBuilder.SetVertexShader(depthPrepassVS->bytecode);
-
-	depthPrepassMaterial = materialBuilder.ComposeStandard(device);
-
 	materialBuilder.SetRootConstants(0u, 17u);
 	materialBuilder.SetConstantBuffer(1u, lightMatricesConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_GEOMETRY);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
@@ -400,7 +383,6 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrainDesc.lightParticleBufferId = lightParticleBufferId;
 	terrainDesc.lightDefines = &lightDefines;
 	terrainDesc.shadowMapIds.push_back(areaLightDesc.GetShadowMapId());
-	terrainDesc.materialDepthPrepass = depthPrepassMaterial;
 	terrainDesc.materialDepthPass = depthPassMaterial;
 	terrainDesc.materialDepthCubePass = depthCubePassMaterial;
 	terrainDesc.terrainFileName = "Resources\\Meshes\\Lux_Terrain.bin";

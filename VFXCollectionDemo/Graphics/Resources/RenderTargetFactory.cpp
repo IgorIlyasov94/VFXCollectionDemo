@@ -18,8 +18,7 @@ Graphics::Resources::IResource* Graphics::Resources::RenderTargetFactory::Create
 	auto& textureDesc = static_cast<const TextureDesc*>(desc)[0];
 	D3D12_CLEAR_VALUE clearValue{};
 	clearValue.Format = textureDesc.format;
-	clearValue.Color[3] = 1.0f;
-
+	
 	auto textureAllocation = _textureManager->Allocate(device, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, clearValue, textureDesc);
 
 	auto renderTarget = new RenderTarget;

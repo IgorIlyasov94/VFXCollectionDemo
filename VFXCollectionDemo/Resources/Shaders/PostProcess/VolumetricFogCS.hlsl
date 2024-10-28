@@ -1,10 +1,10 @@
 #include "../Lighting/PBRLighting.hlsli"
 
 static const uint NUM_THREADS = 64;
-static const uint NUM_VIEW_STEPS = 24;
+static const uint NUM_VIEW_STEPS = 8;
 static const uint NUM_LIGHT_STEPS = 1;
 
-static const float VIEW_STEP_SIZE = 0.4f;
+static const float VIEW_STEP_SIZE = 1.2f;
 static const float3 FOG_COLOR = float3(0.4f, 0.15f, 0.05f);
 
 cbuffer LightConstantBuffer : register(b0)
@@ -198,9 +198,9 @@ void main(Input input)
 	texCoord.y = (bufferIndex / widthU) / height;
 	
 #if defined(MOTION_BLUR)
-	float3 sceneDiffuse = sceneBuffer[bufferIndex].xyz;
+	float4 sceneDiffuse = sceneBuffer[bufferIndex];
 #else
-	float3 sceneDiffuse = sceneColor.SampleLevel(samplerLinear, texCoord, 0.0f).xyz;
+	float4 sceneDiffuse = sceneColor.SampleLevel(samplerLinear, texCoord, 0.0f);
 #endif
 	
 	float depth = sceneDepth.SampleLevel(samplerLinear, texCoord, 0.0f).x;
@@ -210,8 +210,10 @@ void main(Input input)
 	float3 viewDirection = normalize(worldPosition - cameraPosition + 0.00001f.xxx);
 	float3 viewStep = viewDirection * VIEW_STEP_SIZE;
 	
-	float3 resultColor = ProcessLightSources(sceneDiffuse, areaLight.color, screenWorldPosition,
+	float3 resultColor = ProcessLightSources(sceneDiffuse.xyz, areaLight.color, screenWorldPosition,
 		worldPosition, areaLight.position, viewStep, viewDirection);
 	
-	sceneBuffer[bufferIndex] = float4(resultColor, 1.0f);
+	resultColor = lerp(resultColor, sceneDiffuse.xyz, sceneDiffuse.w);
+	
+	sceneBuffer[bufferIndex] = float4(resultColor, sceneDiffuse.w);
 }

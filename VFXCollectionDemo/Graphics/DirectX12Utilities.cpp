@@ -183,11 +183,11 @@ D3D12_RASTERIZER_DESC Graphics::DirectX12Utilities::CreateRasterizeDesc(D3D12_CU
 	return desc;
 }
 
-D3D12_DEPTH_STENCIL_DESC Graphics::DirectX12Utilities::CreateDepthStencilDesc(bool enableZTest, bool readOnly)
+D3D12_DEPTH_STENCIL_DESC Graphics::DirectX12Utilities::CreateDepthStencilDesc(bool enableZTest, bool readOnly, bool isPrepass)
 {
 	D3D12_DEPTH_STENCIL_DESC desc{};
 	desc.DepthEnable = enableZTest;
-	desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	desc.DepthFunc = isPrepass ? D3D12_COMPARISON_FUNC_LESS : D3D12_COMPARISON_FUNC_LESS_EQUAL;
 	desc.DepthWriteMask = readOnly ? D3D12_DEPTH_WRITE_MASK_ZERO : D3D12_DEPTH_WRITE_MASK_ALL;
 	desc.StencilEnable = false;
 	desc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
@@ -204,11 +204,11 @@ D3D12_DEPTH_STENCIL_DESC Graphics::DirectX12Utilities::CreateDepthStencilDesc(bo
 	return desc;
 }
 
-D3D12_DEPTH_STENCIL_DESC1 Graphics::DirectX12Utilities::CreateDepthStencilDesc1(bool enableZTest, bool readOnly)
+D3D12_DEPTH_STENCIL_DESC1 Graphics::DirectX12Utilities::CreateDepthStencilDesc1(bool enableZTest, bool readOnly, bool isPrepass)
 {
 	D3D12_DEPTH_STENCIL_DESC1 desc{};
 	desc.DepthEnable = enableZTest;
-	desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	desc.DepthFunc = isPrepass ? D3D12_COMPARISON_FUNC_LESS : D3D12_COMPARISON_FUNC_LESS_EQUAL;
 	desc.DepthWriteMask = readOnly ? D3D12_DEPTH_WRITE_MASK_ZERO : D3D12_DEPTH_WRITE_MASK_ALL;
 	desc.StencilEnable = false;
 	desc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
@@ -232,7 +232,7 @@ D3D12_BLEND_DESC Graphics::DirectX12Utilities::CreateBlendDesc(DefaultBlendSetup
 
 	desc.RenderTarget[0].BlendEnable = true;
 	desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_MAX;
 	desc.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
 	desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 
@@ -272,7 +272,7 @@ D3D12_BLEND_DESC Graphics::DirectX12Utilities::CreateBlendDesc(DefaultBlendSetup
 	}
 
 	desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-	desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
 
 	return desc;
 }
