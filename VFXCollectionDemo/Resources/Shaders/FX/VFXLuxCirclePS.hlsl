@@ -45,12 +45,12 @@ Output main(Input input)
 	float noiseG = perlinNoise.Sample(samplerLinear, input.texCoord.zw + distortion * STRENGTH_COEFF.y).x;
 	float noiseB = perlinNoise.Sample(samplerLinear, input.texCoord.zw + distortion * STRENGTH_COEFF.z).x;
 	
-	float fading = input.color.r * input.color.w;
+	float fading = input.color.r * input.color.g * input.color.w * 3.0f;
 	
 	float alpha =  pow(fading * max(noiseR, max(noiseG, noiseB)), alphaSharpness);
 	
-	float3 color = lerp(color0.xyz, color1.xyz, fading);
-	color = lerp(float3(noiseR, noiseG, noiseB), color, pow(input.color.g, spectralTransitionSharpness));
+	float3 color = lerp(color0.xyz, color1.xyz, saturate(fading));
+	color = lerp(float3(noiseR, noiseG, noiseB), color, pow(1.0f - input.color.g, spectralTransitionSharpness));
 	
 	output.color = float4(color * colorIntensity, saturate(alpha));
 	

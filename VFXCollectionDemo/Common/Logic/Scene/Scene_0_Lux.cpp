@@ -190,7 +190,8 @@ void Common::Logic::Scene::Scene_0_Lux::RenderShadows(ID3D12GraphicsCommandList*
 	lightingSystem->EndRenderShadowMaps(commandList);
 }
 
-void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* commandList)
+void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* commandList,
+	Graphics::DirectX12Renderer* renderer)
 {
 	vfxLuxSparkles->OnCompute(commandList);
 	vfxLuxDistorters->OnCompute(commandList);
@@ -210,11 +211,11 @@ void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* comman
 	vfxLux->Draw(commandList);
 	vfxLuxSparkles->Draw(commandList);
 
-	postProcessManager->SetMotionBuffer(commandList);
+	//postProcessManager->SetMotionBuffer(commandList);
 
-	vfxLuxDistorters->Draw(commandList);
+	//vfxLuxDistorters->Draw(commandList);
 
-	postProcessManager->Render(commandList);
+	postProcessManager->Render(commandList, renderer, _deltaTime);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::RenderToBackBuffer(ID3D12GraphicsCommandList* commandList)
@@ -369,6 +370,23 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	
 	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
 
+	SceneEntity::RenderingScheme renderingScheme{};
+	renderingScheme.enableFSR = true;
+	renderingScheme.enableDepthPrepass = true;
+	renderingScheme.enableMotionBlur = false;
+	renderingScheme.enableVolumetricFog = false;
+	renderingScheme.useParticleLight = false;
+	renderingScheme.whiteCutoff = WHITE_CUTOFF;
+	renderingScheme.brightThreshold = BRIGHT_THRESHOLD;
+	renderingScheme.bloomIntensity = BLOOM_INTENSITY;
+	renderingScheme.colorGrading = COLOR_GRADING;
+	renderingScheme.colorGradingFactor = COLOR_GRADING_FACTOR;
+	renderingScheme.fogDistanceFalloffStart = FOG_DISTANCE_FALLOFF_START;
+	renderingScheme.fogDistanceFalloffLength = FOG_DISTANCE_FALLOFF_LENGTH;
+	renderingScheme.fogTiling = FOG_TILING;
+	renderingScheme.windDirection = &windDirection;
+	renderingScheme.windStrength = &windStrength;
+
 	TerrainDesc terrainDesc{};
 	terrainDesc.origin = {};
 	terrainDesc.verticesPerWidth = 256u;
@@ -380,6 +398,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrainDesc.map3Tiling = float2(4.0f, 4.0f);
 	terrainDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
 	terrainDesc.hasParticleLighting = true;
+	terrainDesc.outputVelocity = renderingScheme.enableFSR;
 	terrainDesc.lightParticleBufferId = lightParticleBufferId;
 	terrainDesc.lightDefines = &lightDefines;
 	terrainDesc.shadowMapIds.push_back(areaLightDesc.GetShadowMapId());
@@ -407,6 +426,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	vegetationSystemDesc.hasDepthPass = false;
 	vegetationSystemDesc.hasDepthCubePass = true;
 	vegetationSystemDesc.hasParticleLighting = true;
+	vegetationSystemDesc.outputVelocity = renderingScheme.enableFSR;
 	vegetationSystemDesc.lightParticleBufferId = lightParticleBufferId;
 	vegetationSystemDesc.lightMatricesNumber = lightingSystem->GetLightMatricesNumber();
 	vegetationSystemDesc.terrain = terrain;
@@ -437,22 +457,6 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	vegetationSystemDesc.grassTable[14u] = grassTableElement;
 
 	vegetationSystem = new VegatationSystem(commandList, renderer, vegetationSystemDesc, camera);
-
-	SceneEntity::RenderingScheme renderingScheme{};
-	renderingScheme.enableDepthPrepass = true;
-	renderingScheme.enableMotionBlur = true;
-	renderingScheme.enableVolumetricFog = true;
-	renderingScheme.useParticleLight = true;
-	renderingScheme.whiteCutoff = WHITE_CUTOFF;
-	renderingScheme.brightThreshold = BRIGHT_THRESHOLD;
-	renderingScheme.bloomIntensity = BLOOM_INTENSITY;
-	renderingScheme.colorGrading = COLOR_GRADING;
-	renderingScheme.colorGradingFactor = COLOR_GRADING_FACTOR;
-	renderingScheme.fogDistanceFalloffStart = FOG_DISTANCE_FALLOFF_START;
-	renderingScheme.fogDistanceFalloffLength = FOG_DISTANCE_FALLOFF_LENGTH;
-	renderingScheme.fogTiling = FOG_TILING;
-	renderingScheme.windDirection = &windDirection;
-	renderingScheme.windStrength = &windStrength;
 
 	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer, camera,
 		lightingSystem, lightDefines, renderingScheme);

@@ -234,6 +234,9 @@
     <ClCompile Include="Graphics\Assets\Generators\GeneratorUtilities.cpp">
       <Filter>Исходные файлы\Graphics\Assets\Generators</Filter>
     </ClCompile>
+    <ClCompile Include="Common\Logic\SceneEntity\FSR.cpp">
+      <Filter>Исходные файлы\Common\Logic\SceneEntity</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Includes.h">
@@ -424,6 +427,9 @@
     </ClInclude>
     <ClInclude Include="Graphics\Assets\Generators\GeneratorUtilities.h">
       <Filter>Файлы заголовков\Graphics\Assets\Generators</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Logic\SceneEntity\FSR.h">
+      <Filter>Файлы заголовков\Common\Logic\SceneEntity</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

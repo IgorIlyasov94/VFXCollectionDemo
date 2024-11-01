@@ -15,10 +15,14 @@ cbuffer RootConstants : register(b0)
 	float height;
 };
 
+#if defined(FSR)
+Texture2D<float2> sceneMotion : register(t0);
+#else
 Texture2D sceneColor : register(t0);
 Texture2D<float2> sceneMotion : register(t1);
+#endif
 
-RWStructuredBuffer<float4> sceneBuffer : register(u0);
+RWTexture2D<float4> sceneTarget : register(u0);
 
 SamplerState samplerLinear : register(s0);
 
@@ -35,9 +39,11 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 	if (bufferIndex >= area)
 		return;
 	
+	uint2 texCoordU = uint2(bufferIndex % widthU, bufferIndex / widthU);
+	
 	float2 texCoord;
-	texCoord.x = (bufferIndex % widthU) / width;
-	texCoord.y = (bufferIndex / widthU) / height;
+	texCoord.x = texCoordU.x / width;
+	texCoord.y = texCoordU.y / height;
 	
 	float2 motion = sceneMotion.SampleLevel(samplerLinear, saturate(texCoord), 0.0f).xy;
 	float2 motionR = motion * STRENGTH_COEFF.x;
@@ -55,12 +61,24 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float2 offsetG = saturate(texCoord + motionG * t);
 		float2 offsetB = saturate(texCoord + motionB * t);
 		
+#if defined(FSR)
+		uint2 sizeVector = uint2(width, width * height);
+		
+		uint offsetRU = (uint)floor(dot(offsetR, sizeVector));
+		uint offsetGU = (uint)floor(dot(offsetG, sizeVector));
+		uint offsetBU = (uint)floor(dot(offsetB, sizeVector));
+		
+		float2 colorRA = sceneTarget.Load(offsetRU).xw;
+		float colorG = sceneTarget.Load(offsetGU).y;
+		float colorB = sceneTarget.Load(offsetBU).z;
+#else
 		float2 colorRA = sceneColor.SampleLevel(samplerLinear, offsetR, 0.0f).xw;
 		float colorG = sceneColor.SampleLevel(samplerLinear, offsetG, 0.0f).y;
 		float colorB = sceneColor.SampleLevel(samplerLinear, offsetB, 0.0f).z;
+#endif
 		
 		color += float4(colorRA.x, colorG, colorB, colorRA.y) * Weight(sampleIndex, NORMAL_DISTRIBUTION_SIGMA);
 	}
 	
-	sceneBuffer[bufferIndex] = color;
+	sceneTarget[bufferIndex] = color;
 }

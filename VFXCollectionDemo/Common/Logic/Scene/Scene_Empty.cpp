@@ -35,7 +35,8 @@ void Common::Logic::Scene::Scene_Empty::RenderShadows(ID3D12GraphicsCommandList*
 
 }
 
-void Common::Logic::Scene::Scene_Empty::Render(ID3D12GraphicsCommandList* commandList)
+void Common::Logic::Scene::Scene_Empty::Render(ID3D12GraphicsCommandList* commandList,
+	Graphics::DirectX12Renderer* renderer)
 {
 
 }

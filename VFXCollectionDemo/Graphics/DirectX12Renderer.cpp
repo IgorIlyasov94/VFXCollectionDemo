@@ -4,7 +4,7 @@
 
 Graphics::DirectX12Renderer::DirectX12Renderer(const RECT& windowPlacement, HWND windowHandler, bool _isFullscreen)
     : commandManager(nullptr), descriptorManager(nullptr), commandQueueId{},
-    isFullscreen(_isFullscreen), lastWindowRect{}
+    isFullscreen(_isFullscreen), lastWindowRect{}, displaySize{}
 {
     currentWidth = windowPlacement.right - windowPlacement.left;
     currentHeight = windowPlacement.bottom - windowPlacement.top;
@@ -189,6 +189,16 @@ void Graphics::DirectX12Renderer::EndFrame(ID3D12GraphicsCommandList* commandLis
     PrepareToNextFrame();
 }
 
+void Graphics::DirectX12Renderer::ResetDescriptorHeaps(ID3D12GraphicsCommandList* commandList)
+{
+    ID3D12DescriptorHeap* descriptorHeaps[] =
+    {
+        descriptorManager->GetHeap(DescriptorType::CBV_SRV_UAV),
+        descriptorManager->GetHeap(DescriptorType::SAMPLER)
+    };
+    commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+}
+
 void Graphics::DirectX12Renderer::SetRenderToBackBuffer(ID3D12GraphicsCommandList* commandList)
 {
     D3D12_RESOURCE_BARRIER barrier{};
@@ -202,14 +212,19 @@ void Graphics::DirectX12Renderer::SetRenderToBackBuffer(ID3D12GraphicsCommandLis
     commandList->OMSetRenderTargets(1u, &backBufferCPUDescriptors[bufferIndex], true, nullptr);
 }
 
-uint32_t Graphics::DirectX12Renderer::GetWidth()
+uint32_t Graphics::DirectX12Renderer::GetWidth() const
 {
     return currentWidth;
 }
 
-uint32_t Graphics::DirectX12Renderer::GetHeight()
+uint32_t Graphics::DirectX12Renderer::GetHeight() const
 {
     return currentHeight;
+}
+
+const uint2& Graphics::DirectX12Renderer::GetDisplaySize() const
+{
+    return displaySize;
 }
 
 ID3D12Device* Graphics::DirectX12Renderer::GetDevice()
@@ -451,6 +466,16 @@ IDXGISwapChain3* Graphics::DirectX12Renderer::CreateSwapChain(uint32_t width, ui
 
     factory->CreateSwapChainForHwnd(commandQueue, windowHandler, &desc, &fullScreenDesc, nullptr, &newSwapChain1);
     factory->MakeWindowAssociation(windowHandler, DXGI_MWA_NO_ALT_ENTER);
+
+    IDXGIOutput* output;
+    newSwapChain1->GetContainingOutput(&output);
+
+    DXGI_OUTPUT_DESC outputDesc{};
+    output->GetDesc(&outputDesc);
+    output->Release();
+
+    displaySize.x = outputDesc.DesktopCoordinates.right;
+    displaySize.y = outputDesc.DesktopCoordinates.bottom;
 
     IDXGISwapChain3* newSwapChain = nullptr;
     newSwapChain1->QueryInterface(IID_PPV_ARGS(&newSwapChain));

@@ -9,7 +9,7 @@ struct Vegetation
 cbuffer MutableConstants : register(b1)
 {
 	float4x4 viewProjection;
-	
+
 	float3 cameraPosition;
 	float time;
 	
@@ -21,7 +21,16 @@ cbuffer MutableConstants : register(b1)
 	
 	float zNear;
 	float zFar;
-	float2 padding;
+	
+#ifdef OUTPUT_VELOCITY
+	float lastTime;
+	float padding;
+	
+	float3 lastWindDirection;
+	float lastWindStrength;
+	
+	float4x4 lastViewProjection;
+#endif
 };
 
 struct Input
@@ -41,6 +50,9 @@ struct Output
 	float3 tangent : TANGENT;
 	float2 texCoord : TEXCOORD0;
 	float3 worldPosition : TEXCOORD1;
+#ifdef OUTPUT_VELOCITY
+	float2 velocity : TEXCOORD2;
+#endif
 };
 
 StructuredBuffer<Vegetation> vegetationBuffer : register(t0);
@@ -67,10 +79,11 @@ Output main(Input input)
 	float t = saturate(sin(time * windStrength * noise) * 0.5f + 0.5f);
 	
 	float height = abs(vegetation.height);
+	float halfHeight = 0.5f * height;
 	bool isCap = vegetation.height < 0.0f;
 	
 	float3 shift = windDirection;
-	shift.z -= 0.5f * height * dot(windDirection, windDirection);
+	shift.z -= halfHeight * dot(windDirection, windDirection);
 	shift = lerp(shift * vegetation.windInfluence, 0.0f.xxx, t);
 	float shiftCoeff = (1.0f - (isCap ? 0.5f : input.texCoord.y)) * height;
 	
@@ -88,6 +101,22 @@ Output main(Input input)
 	
 	output.texCoord = input.texCoord * atlasElementSize + vegetation.atlasElementOffset;
 	output.worldPosition = worldPosition.xyz;
+	
+#ifdef OUTPUT_VELOCITY
+	float lastT = saturate(sin(lastTime * lastWindStrength * noise) * 0.5f + 0.5f);
+	float3 lastShift = lastWindDirection;
+	lastShift.z -= halfHeight * dot(lastWindDirection, lastWindDirection);
+	lastShift = lerp(lastShift * vegetation.windInfluence, 0.0f.xxx, lastT);
+	
+	float4 lastWorldPosition = float4(worldPosition.xyz + lastShift * shiftCoeff, 1.0f);
+	
+	float4 lastNonHomogeneousPos = mul(lastViewProjection, lastWorldPosition);
+	lastNonHomogeneousPos.xy /= lastNonHomogeneousPos.w;
+	
+	float2 nonHomogeneousPos = output.position.xy / output.position.w;
+	
+	output.velocity = nonHomogeneousPos - lastNonHomogeneousPos.xy;
+#endif
 	
 	return output;
 }

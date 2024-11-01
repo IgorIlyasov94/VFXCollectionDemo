@@ -22,6 +22,7 @@ namespace Common::Logic::SceneEntity
 		float2 map3Tiling;
 
 		bool hasParticleLighting;
+		bool outputVelocity;
 
 		Graphics::Resources::ResourceID lightConstantBufferId;
 		Graphics::Resources::ResourceID lightParticleBufferId;
@@ -156,6 +157,8 @@ namespace Common::Logic::SceneEntity
 			float zNear;
 			float zFar;
 			float2 padding;
+
+			float4x4 lastViewProjection;
 		};
 
 		struct DepthPassConstants

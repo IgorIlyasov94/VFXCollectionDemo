@@ -26,10 +26,14 @@ namespace Graphics
 		ID3D12GraphicsCommandList* StartFrame();
 		void EndFrame(ID3D12GraphicsCommandList* commandList);
 
+		void ResetDescriptorHeaps(ID3D12GraphicsCommandList* commandList);
+
 		void SetRenderToBackBuffer(ID3D12GraphicsCommandList* commandList);
 
-		uint32_t GetWidth();
-		uint32_t GetHeight();
+		uint32_t GetWidth() const;
+		uint32_t GetHeight() const;
+
+		const uint2& GetDisplaySize() const;
 
 		ID3D12Device* GetDevice();
 
@@ -95,6 +99,8 @@ namespace Graphics
 		uint32_t currentWidth;
 		uint32_t currentHeight;
 		uint32_t bufferIndex;
+
+		uint2 displaySize;
 
 		RECT lastWindowRect;
 

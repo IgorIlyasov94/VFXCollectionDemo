@@ -20,7 +20,7 @@ namespace Common::Logic::Scene
 
 		virtual void Update() = 0;
 		virtual void RenderShadows(ID3D12GraphicsCommandList* commandList) = 0;
-		virtual void Render(ID3D12GraphicsCommandList* commandList) = 0;
+		virtual void Render(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer) = 0;
 		virtual void RenderToBackBuffer(ID3D12GraphicsCommandList* commandList) = 0;
 
 		virtual bool IsLoaded() = 0;

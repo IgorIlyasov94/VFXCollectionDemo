@@ -137,7 +137,7 @@ void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* dev
 	circleConstants->colorIntensity = 0.0f;
 	circleConstants->alphaSharpness = CIRCLE_SHARPNESS;
 	circleConstants->distortionStrength = 0.6f;
-	circleConstants->spectralTransitionSharpness = 3.0f;
+	circleConstants->spectralTransitionSharpness = CIRCLE_SPECTRAL_TRANSITION_SHARPNESS;
 
 	bufferDesc.data.resize(sizeof(VFXHaloConstants));
 
@@ -427,7 +427,7 @@ void Common::Logic::SceneEntity::VFXLux::CreateMaterials(ID3D12Device* device, R
 	materialBuilder.SetTexture(0u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
-	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
+	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendAddSetup));
 	materialBuilder.SetDepthStencilFormat(32u, false);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
 	materialBuilder.SetGeometryFormat(circleMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);

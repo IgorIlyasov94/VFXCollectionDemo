@@ -142,15 +142,16 @@ namespace Common::Logic::SceneEntity
 		static constexpr uint32_t ATLAS_SIZE_X = 8u;
 		static constexpr uint32_t ATLAS_SIZE_Y = 8u;
 
-		static constexpr float CIRCLE_INTENSITY = 14.0f;
-		static constexpr float CIRCLE_SHARPNESS = 3.5f;
+		static constexpr float CIRCLE_INTENSITY = 1.0f;
+		static constexpr float CIRCLE_SHARPNESS = 5.0f;
+		static constexpr float CIRCLE_SPECTRAL_TRANSITION_SHARPNESS = 1.4f;
 		
 		static constexpr float HALO_INTENSITY = 3.0f;
 		static constexpr float HALO_SHARPNESS = 3.5f;
 
-		static constexpr float RING_START_OFFSET = 0.1f;
-		static constexpr float RING_WIDTH = 0.2f;
-		static constexpr float RING_FADING_WIDTH = 0.3f;
+		static constexpr float RING_START_OFFSET = 0.15f;
+		static constexpr float RING_WIDTH = 0.55f;
+		static constexpr float RING_FADING_WIDTH = 0.35f;
 		static constexpr float CIRCLE_WIDTH = RING_WIDTH + RING_FADING_WIDTH * 2.0f;
 
 		static constexpr float HALO_RING_START_OFFSET = 0.9f;

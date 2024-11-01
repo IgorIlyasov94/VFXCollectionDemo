@@ -3,6 +3,7 @@
 #include "../../../Includes.h"
 #include "Camera.h"
 #include "LightingSystem.h"
+#include "FSR.h"
 #include "../../../Graphics/DirectX12Renderer.h"
 #include "../../../Graphics/Assets/Material.h"
 #include "../../../Graphics/Assets/ComputeObject.h"
@@ -29,6 +30,7 @@ namespace Common::Logic::SceneEntity
 		bool enableDepthPrepass;
 		bool enableMotionBlur;
 		bool enableVolumetricFog;
+		bool enableFSR;
 		bool useParticleLight;
 	};
 
@@ -49,7 +51,7 @@ namespace Common::Logic::SceneEntity
 
 		void SetMotionBuffer(ID3D12GraphicsCommandList* commandList);
 
-		void Render(ID3D12GraphicsCommandList* commandList);
+		void Render(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer, float deltaTime);
 		void RenderToBackBuffer(ID3D12GraphicsCommandList* commandList);
 
 		const Graphics::Assets::Mesh* GetFullscreenQuadMesh() const;
@@ -82,6 +84,7 @@ namespace Common::Logic::SceneEntity
 
 		void SetMotionBlur(ID3D12GraphicsCommandList* commandList);
 		void SetVolumetricFog(ID3D12GraphicsCommandList* commandList);
+		void SetFSR(ID3D12GraphicsCommandList* commandList, float deltaTime);
 		void SetHDR(ID3D12GraphicsCommandList* commandList);
 
 		struct QuadVertex
@@ -152,6 +155,7 @@ namespace Common::Logic::SceneEntity
 		static constexpr float CLEAR_COLOR[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
 		static constexpr float FOG_MOVING_COEFF = 0.002f;
+		static constexpr float SHARPNESS_FACTOR = 1.0f;
 
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
@@ -161,18 +165,24 @@ namespace Common::Logic::SceneEntity
 		static constexpr uint32_t NOISE_SIZE_Y = 128u;
 		static constexpr uint32_t NOISE_SIZE_Z = 64u;
 
+		static constexpr uint32_t FSR_SIZE_NUMERATOR = 1u;
+		static constexpr uint32_t FSR_SIZE_DENOMINATOR = 2u;
+
 		VolumetricFogConstants* volumetricFogConstants;
 		MotionBlurConstants motionBlurConstants;
 		HDRConstants hdrConstants;
 		ToneMappingConstants toneMappingConstants;
 
 		Camera* _camera;
+		FSR* _fsr;
 
 		uint32_t _width;
 		uint32_t _height;
 
 		D3D12_VIEWPORT viewport;
+		D3D12_VIEWPORT afterFSRViewport;
 		D3D12_RECT scissorRectangle;
+		D3D12_RECT afterFSRScissorRectangle;
 
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneColorTargetDescriptor;
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneDepthTargetDescriptor;
@@ -186,7 +196,8 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::GPUResource* sceneColorTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneDepthTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneMotionTargetGPUResource;
-		Graphics::Resources::GPUResource* sceneBufferGPUResource;
+		//Graphics::Resources::GPUResource* sceneBufferGPUResource;
+		Graphics::Resources::GPUResource* temporaryRWTextureGPUResource;
 		Graphics::Resources::GPUResource* luminanceBufferGPUResource;
 		Graphics::Resources::GPUResource* bloomBufferGPUResource;
 
@@ -195,7 +206,8 @@ namespace Common::Logic::SceneEntity
 
 		Graphics::Resources::ResourceID volumetricFogConstantBufferId;
 		Graphics::Resources::ResourceID sceneMotionTargetId;
-		Graphics::Resources::ResourceID sceneBufferId;
+		//Graphics::Resources::ResourceID sceneBufferId;
+		Graphics::Resources::ResourceID temporaryRWTextureId;
 		Graphics::Resources::ResourceID luminanceBufferId;
 		Graphics::Resources::ResourceID bloomBufferId;
 

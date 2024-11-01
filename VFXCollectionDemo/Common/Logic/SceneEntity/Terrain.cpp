@@ -121,6 +121,7 @@ const float3& Common::Logic::SceneEntity::Terrain::GetMinCorner() const noexcept
 
 void Common::Logic::SceneEntity::Terrain::Update(const Camera* camera, float time)
 {
+	mutableConstantsBuffer->lastViewProjection = mutableConstantsBuffer->viewProjection;
 	mutableConstantsBuffer->viewProjection = camera->GetViewProjection();
 	mutableConstantsBuffer->cameraPosition = camera->GetPosition();
 	mutableConstantsBuffer->time = time;
@@ -361,11 +362,20 @@ void Common::Logic::SceneEntity::Terrain::CreateConstantBuffers(ID3D12Device* de
 void Common::Logic::SceneEntity::Terrain::LoadShaders(ID3D12Device* device,
 	Graphics::Resources::ResourceManager* resourceManager, const TerrainDesc& desc)
 {
+	std::vector<DxcDefine> defines;
+
+	if (desc.outputVelocity)
+		defines.push_back({ L"OUTPUT_VELOCITY", nullptr });
+
+	defines.insert(defines.end(),
+		std::make_move_iterator(desc.lightDefines->begin()),
+		std::make_move_iterator(desc.lightDefines->end()));
+
 	terrainVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\TerrainVS.hlsl",
-		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, defines);
 
 	terrainPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\TerrainPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, *desc.lightDefines);
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, defines);
 }
 
 void Common::Logic::SceneEntity::Terrain::LoadTextures(ID3D12Device* device,
@@ -452,6 +462,10 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
 	materialBuilder.SetDepthStencilFormat(32u, true, true);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+	if (desc.outputVelocity)
+		materialBuilder.SetRenderTargetFormat(1u, DXGI_FORMAT_R16G16_FLOAT);
+
 	materialBuilder.SetGeometryFormat(mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	materialBuilder.SetVertexShader(terrainVS->bytecode);
 	materialBuilder.SetPixelShader(terrainPS->bytecode);

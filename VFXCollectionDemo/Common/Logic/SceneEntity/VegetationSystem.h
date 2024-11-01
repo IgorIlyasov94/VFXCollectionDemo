@@ -29,6 +29,7 @@ namespace Common::Logic::SceneEntity
 		bool hasDepthPass;
 		bool hasDepthCubePass;
 		bool hasParticleLighting;
+		bool outputVelocity;
 
 		uint32_t lightMatricesNumber;
 
@@ -153,7 +154,13 @@ namespace Common::Logic::SceneEntity
 
 			float zNear;
 			float zFar;
-			float2 padding;
+			float lastTime;
+			float padding;
+
+			float3 lastWindDirection;
+			float lastWindStrength;
+
+			float4x4 lastViewProjection;
 		};
 
 		static constexpr uint32_t QUADS_PER_GRASS = 3u;

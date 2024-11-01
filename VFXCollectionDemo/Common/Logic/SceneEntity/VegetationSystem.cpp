@@ -43,9 +43,15 @@ Common::Logic::SceneEntity::VegatationSystem::~VegatationSystem()
 
 void Common::Logic::SceneEntity::VegatationSystem::Update(float time, float deltaTime)
 {
+	mutableConstantsBuffer->lastTime = mutableConstantsBuffer->time;
+	mutableConstantsBuffer->lastWindDirection = mutableConstantsBuffer->windDirection;
+	mutableConstantsBuffer->lastWindStrength = mutableConstantsBuffer->windStrength;
+	mutableConstantsBuffer->lastViewProjection = mutableConstantsBuffer->viewProjection;
+
 	mutableConstantsBuffer->viewProjection = _camera->GetViewProjection();
 	mutableConstantsBuffer->cameraPosition = _camera->GetPosition();
 	mutableConstantsBuffer->time = time;
+	mutableConstantsBuffer->windDirection = *windDirection;
 	mutableConstantsBuffer->windStrength = *windStrength;
 }
 
@@ -210,7 +216,11 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateConstantBuffers(ID3D12D
 	mutableConstantsBuffer->windStrength = *desc.windStrength;
 	mutableConstantsBuffer->zNear = LightingSystem::SHADOW_MAP_Z_NEAR;
 	mutableConstantsBuffer->zFar = LightingSystem::SHADOW_MAP_Z_FAR;
-	mutableConstantsBuffer->padding = {};
+	mutableConstantsBuffer->lastTime = 0.0f;
+	mutableConstantsBuffer->padding = 0.0f;
+	mutableConstantsBuffer->lastWindDirection = mutableConstantsBuffer->windDirection;
+	mutableConstantsBuffer->lastWindStrength = mutableConstantsBuffer->windStrength;
+	mutableConstantsBuffer->lastViewProjection = mutableConstantsBuffer->viewProjection;
 
 	windDirection = desc.windDirection;
 	windStrength = desc.windStrength;
@@ -285,11 +295,20 @@ void Common::Logic::SceneEntity::VegatationSystem::LoadShaders(ID3D12Device* dev
 	std::vector<DxcDefine> definesDepthPrepass;
 	definesDepthPrepass.push_back({ L"DEPTH_PREPASS", nullptr });
 
+	std::vector<DxcDefine> mainDefines;
+
+	if (desc.outputVelocity)
+		mainDefines.push_back({ L"OUTPUT_VELOCITY", nullptr });
+
+	mainDefines.insert(mainDefines.end(),
+		std::make_move_iterator(desc.lightDefines->begin()),
+		std::make_move_iterator(desc.lightDefines->end()));
+
 	vegetationVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationVS.hlsl",
-		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
+		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, mainDefines);
 
 	vegetationPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, *desc.lightDefines);
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, mainDefines);
 
 	vegetationDepthPassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthPassVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, defines);
@@ -362,6 +381,10 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterials(ID3D12Device*
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
 	materialBuilder.SetDepthStencilFormat(32u, true, true);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+	if (desc.outputVelocity)
+		materialBuilder.SetRenderTargetFormat(1u, DXGI_FORMAT_R16G16_FLOAT);
+
 	materialBuilder.SetGeometryFormat(_mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	materialBuilder.SetVertexShader(vegetationVS->bytecode);
 	materialBuilder.SetPixelShader(vegetationPS->bytecode);

@@ -26,6 +26,11 @@ namespace Common::Logic::SceneEntity
 		const float3& GetPosition() const;
 		const float3& GetDirection() const;
 
+		const float GetZNear() const;
+		const float GetZFar() const;
+		const float GetFovY() const;
+		const float GetAspectRatio() const;
+
 	private:
 		Camera() = delete;
 
@@ -39,5 +44,10 @@ namespace Common::Logic::SceneEntity
 
 		float3 _position;
 		float3 direction;
+
+		float _zNear;
+		float _zFar;
+		float _fovY;
+		float _aspectRatio;
 	};
 }

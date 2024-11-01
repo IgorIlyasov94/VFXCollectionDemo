@@ -62,7 +62,7 @@ void Common::Logic::MainLogic::Render()
 	
 	auto commandList = renderer->StartFrame();
 	scene->RenderShadows(commandList);
-	scene->Render(commandList);
+	scene->Render(commandList, renderer);
 
 	renderer->SetRenderToBackBuffer(commandList);
 	scene->RenderToBackBuffer(commandList);

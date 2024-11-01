@@ -26,6 +26,11 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 {
 	auto mainLogic = reinterpret_cast<Logic::MainLogic*>(GetWindowLongPtr(windowHandler, GWLP_USERDATA));
 
+	static uint32_t oldWidth = 1u;
+	static uint32_t oldHeight = 1u;
+	static uint32_t newWidth = 1u;
+	static uint32_t newHeight = 1u;
+
 	switch (message)
 	{
 		//case WM_CREATE:
@@ -62,15 +67,17 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 
 			return 0;
 		}
+		case WM_EXITSIZEMOVE:
+		{
+			if (mainLogic != nullptr && (oldWidth != newWidth || oldHeight != newHeight))
+				mainLogic->OnResize(newWidth, newHeight, windowHandler);
+
+			return 0;
+		}
 		case WM_SIZE:
 		{
-			if (mainLogic != nullptr)
-			{
-				uint32_t newWidth = static_cast<uint32_t>(lParam) & 0xffffu;
-				uint32_t newHeight = static_cast<uint32_t>(lParam >> 16u) & 0xffffu;
-
-				mainLogic->OnResize(newWidth, newHeight, windowHandler);
-			}
+			newWidth = static_cast<uint32_t>(lParam) & 0xffffu;
+			newHeight = static_cast<uint32_t>(lParam >> 16u) & 0xffffu;
 
 			return 0;
 		}
@@ -125,4 +132,6 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 			return DefWindowProc(windowHandler, message, wParam, lParam);
 		}
 	}
+
+	return 0;
 }

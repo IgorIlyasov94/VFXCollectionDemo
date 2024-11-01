@@ -25,11 +25,7 @@ struct Input
 	uint groupIndex : SV_GroupIndex;
 };
 
-#if defined(MOTION_BLUR) || defined(VOLUMETRIC_FOG)
-StructuredBuffer<float4> sceneBuffer : register(t0);
-#else
-Texture2D sceneColor : register(t0);
-#endif
+Texture2D<float4> sceneColor : register(t0);
 
 StructuredBuffer<float> luminanceBuffer : register(t1);
 
@@ -63,27 +59,12 @@ void main(Input input)
 	bool outOfBounds = texCoord.x < HALF_SAMPLES_NUMBER || texCoord.x > (halfWidth - HALF_SAMPLES_NUMBER);
 	
 	texCoord *= 2u;
-	
-	uint4 texIndex = (texCoord.x + texCoord.y * width).xxxx;
-	texIndex.y += width;
-	texIndex.z += 1u;
-	texIndex.w += width + 1u;
-	
-	texIndex = min(texIndex, area - 1);
-	
-#if defined(MOTION_BLUR) || defined(VOLUMETRIC_FOG)
-	float3 color = sceneBuffer[texIndex.x].xyz;
-	color += sceneBuffer[texIndex.y].xyz;
-	color += sceneBuffer[texIndex.z].xyz;
-	color += sceneBuffer[texIndex.w].xyz;
-#else
 	int3 texCoordI = int3(texCoord.x, texCoord.y, 0);
 	
 	float3 color = sceneColor.Load(texCoordI).xyz;
 	color += sceneColor.Load(texCoordI + int3(0, 1, 0)).xyz;
 	color += sceneColor.Load(texCoordI + int3(1, 0, 0)).xyz;
 	color += sceneColor.Load(texCoordI + int3(1, 1, 0)).xyz;
-#endif
 	
 	color = max(color * 0.25f - brightThreshold, 0.0f.xxx);
 	color = ToneMapping(color, luminance);
@@ -94,7 +75,6 @@ void main(Input input)
 	
 	bool isValidRange = input.groupIndex >= (uint)HALF_SAMPLES_NUMBER;
 	isValidRange = isValidRange && (input.groupIndex < (NUM_THREADS - HALF_SAMPLES_NUMBER));
-	
 	isValidRange = isValidRange && (bufferIndex < quartArea);
 	
 	if (!isValidRange)

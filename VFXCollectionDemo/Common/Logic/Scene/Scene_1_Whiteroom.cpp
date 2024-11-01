@@ -191,7 +191,8 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::RenderShadows(ID3D12GraphicsComman
 
 }
 
-void Common::Logic::Scene::Scene_1_WhiteRoom::Render(ID3D12GraphicsCommandList* commandList)
+void Common::Logic::Scene::Scene_1_WhiteRoom::Render(ID3D12GraphicsCommandList* commandList,
+	Graphics::DirectX12Renderer* renderer)
 {
 	ID3D12GraphicsCommandList5* commandList5 = nullptr;
 
@@ -222,7 +223,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Render(ID3D12GraphicsCommandList* 
 
 	postProcessManager->SetMotionBuffer(commandList);
 
-	postProcessManager->Render(commandList);
+	postProcessManager->Render(commandList, renderer, _deltaTime);
 
 	commandList5->Release();
 }
@@ -480,6 +481,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateObjects(ID3D12Device* device
 	commandList5->Release();
 
 	SceneEntity::RenderingScheme renderingScheme{};
+	renderingScheme.enableFSR = false;
 	renderingScheme.enableDepthPrepass = false;
 	renderingScheme.enableMotionBlur = false;
 	renderingScheme.enableVolumetricFog = false;

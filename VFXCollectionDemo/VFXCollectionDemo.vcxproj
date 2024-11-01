@@ -22,6 +22,7 @@
     <ClInclude Include="Common\Application.h" />
     <ClInclude Include="Common\Logic\MainLogic.h" />
     <ClInclude Include="Common\Logic\SceneEntity\Camera.h" />
+    <ClInclude Include="Common\Logic\SceneEntity\FSR.h" />
     <ClInclude Include="Common\Logic\SceneEntity\IDrawable.h" />
     <ClInclude Include="Common\Logic\SceneEntity\LightDesc.h" />
     <ClInclude Include="Common\Logic\SceneEntity\LightingSystem.h" />
@@ -87,6 +88,7 @@
     <ClCompile Include="Common\Application.cpp" />
     <ClCompile Include="Common\Logic\MainLogic.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\Camera.cpp" />
+    <ClCompile Include="Common\Logic\SceneEntity\FSR.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\LightingSystem.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\MeshObject.cpp" />
     <ClCompile Include="Common\Logic\SceneEntity\ParticleSystem.cpp" />
@@ -192,6 +194,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <EnableMicrosoftCodeAnalysis>true</EnableMicrosoftCodeAnalysis>
+    <IncludePath>FSR\ffx-api\include;$(IncludePath)</IncludePath>
+    <LibraryPath>FSR\ffx-api\bin;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

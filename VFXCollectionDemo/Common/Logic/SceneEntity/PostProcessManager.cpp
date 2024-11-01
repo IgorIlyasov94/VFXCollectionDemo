@@ -16,22 +16,34 @@ using namespace DirectX::PackedVector;
 Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer, Camera* camera, LightingSystem* lightingSystem,
 	const std::vector<DxcDefine>& lightDefines, const RenderingScheme& renderingScheme)
-	: _camera(camera), _renderingScheme(renderingScheme)
+	: _camera(camera), _renderingScheme(renderingScheme), viewport{}, scissorRectangle{}
 {
 	auto width = renderer->GetWidth();
 	auto height = renderer->GetHeight();
 
-	viewport.TopLeftX = 0.0f;
-	viewport.TopLeftY = 0.0f;
 	viewport.Width = static_cast<float>(width);
 	viewport.Height = static_cast<float>(height);
-	viewport.MinDepth = 0.0f;
 	viewport.MaxDepth = 1.0f;
 
-	scissorRectangle.left = 0;
-	scissorRectangle.top = 0;
+	afterFSRViewport = viewport;
+
 	scissorRectangle.right = width;
 	scissorRectangle.bottom = height;
+
+	afterFSRScissorRectangle = scissorRectangle;
+
+	auto targetsWidth = width;
+	auto targetsHeight = height;
+
+	if (_renderingScheme.enableFSR)
+	{
+		viewport.Width = std::round(viewport.Width * FSR_SIZE_NUMERATOR / FSR_SIZE_DENOMINATOR);
+		viewport.Height = std::round(viewport.Height * FSR_SIZE_NUMERATOR / FSR_SIZE_DENOMINATOR);
+		scissorRectangle.right = static_cast<uint32_t>(viewport.Width);
+		scissorRectangle.bottom = static_cast<uint32_t>(viewport.Height);
+		targetsWidth = scissorRectangle.right;
+		targetsHeight = scissorRectangle.bottom;
+	}
 
 	hdrConstants.width = width;
 	hdrConstants.area = width * height;
@@ -65,7 +77,8 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 		CreateConstantBuffers(device, resourceManager, width, height);
 
 	CreateQuad(device, commandList, resourceManager);
-	CreateTargets(device, commandList, resourceManager, width, height);
+
+	CreateTargets(device, commandList, resourceManager, targetsWidth, targetsHeight);
 	CreateBuffers(device, commandList, resourceManager, width, height);
 
 	LoadShaders(device, resourceManager, lightDefines);
@@ -75,6 +88,21 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 
 	CreateMaterials(device, resourceManager, renderer);
 	CreateComputeObjects(device, resourceManager, lightingSystem);
+
+	if (_renderingScheme.enableFSR)
+	{
+		FSRDesc fsrDesc{};
+		fsrDesc.colorBuffer = sceneColorTargetGPUResource->GetResource();
+		fsrDesc.depthTarget = sceneDepthTargetGPUResource->GetResource();
+		fsrDesc.motionTarget = sceneMotionTargetGPUResource->GetResource();
+		fsrDesc.reactiveMask = nullptr;
+		fsrDesc.outputBuffer = temporaryRWTextureGPUResource->GetResource();
+		fsrDesc.maxSize = renderer->GetDisplaySize();
+		fsrDesc.enableSharpening = false;
+		fsrDesc.sharpnessFactor = SHARPNESS_FACTOR;
+
+		_fsr = new FSR(device, fsrDesc);
+	}
 
 	barriers.reserve(MAX_SIMULTANEOUS_BARRIER_NUMBER);
 }
@@ -96,18 +124,24 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 	quadMesh->Release(resourceManager);
 	delete quadMesh;
 
+	if (_renderingScheme.enableFSR)
+		delete _fsr;
+
 	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
 	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
+
+	if (_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur)
+		resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
 
 	if (_renderingScheme.enableMotionBlur)
 	{
 		delete motionBlurComputeObject;
 
-		resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
 		resourceManager->DeleteResource<Shader>(motionBlurCSId);
 	}
 
-	resourceManager->DeleteResource<RWBuffer>(sceneBufferId);
+	resourceManager->DeleteResource<RWTexture>(temporaryRWTextureId);
+
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
 
@@ -143,6 +177,22 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	scissorRectangle.right = width;
 	scissorRectangle.bottom = height;
 
+	auto targetsWidth = width;
+	auto targetsHeight = height;
+
+	if (_renderingScheme.enableFSR)
+	{
+		afterFSRViewport = viewport;
+		afterFSRScissorRectangle = scissorRectangle;
+
+		viewport.Width = std::round(viewport.Width * FSR_SIZE_NUMERATOR / FSR_SIZE_DENOMINATOR);
+		viewport.Height = std::round(viewport.Height * FSR_SIZE_NUMERATOR / FSR_SIZE_DENOMINATOR);
+		scissorRectangle.right = static_cast<uint32_t>(viewport.Width);
+		scissorRectangle.bottom = static_cast<uint32_t>(viewport.Height);
+		targetsWidth = scissorRectangle.right;
+		targetsHeight = scissorRectangle.bottom;
+	}
+
 	auto resourceManager = renderer->GetResourceManager();
 
 	if (_renderingScheme.enableVolumetricFog)
@@ -156,42 +206,47 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
 	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
 
-	if (_renderingScheme.enableMotionBlur)
+	if (_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur)
 		resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
 
-	resourceManager->DeleteResource<RWBuffer>(sceneBufferId);
+	resourceManager->DeleteResource<RWTexture>(temporaryRWTextureId);
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
 
 	auto commandList = renderer->StartCreatingResources();
-	CreateTargets(renderer->GetDevice(), commandList, resourceManager, width, height);
+	CreateTargets(renderer->GetDevice(), commandList, resourceManager, targetsWidth, targetsHeight);
 	CreateBuffers(renderer->GetDevice(), commandList, resourceManager, width, height);
 	renderer->EndCreatingResources();
 
-	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 
-	if (_renderingScheme.enableMotionBlur)
-		motionBlurComputeObject->UpdateRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
-
-	if (_renderingScheme.enableVolumetricFog)
-		volumetricFogComputeObject->UpdateRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
-
-	luminanceComputeObject->UpdateBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	luminanceComputeObject->UpdateRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
 
 	luminanceIterationComputeObject->UpdateRWBuffer(0u, luminanceBufferResource->resourceGPUAddress);
 
-	bloomHorizontalObject->UpdateBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	bloomHorizontalObject->UpdateBuffer(1u, luminanceBufferResource->resourceGPUAddress);
 	bloomHorizontalObject->UpdateRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
 
 	bloomVerticalObject->UpdateRWBuffer(0u, bloomBufferResource->resourceGPUAddress);
 
-	toneMappingMaterial->UpdateBuffer(0u, sceneBufferResource->resourceGPUAddress);
 	toneMappingMaterial->UpdateBuffer(1u, luminanceBufferResource->resourceGPUAddress);
 	toneMappingMaterial->UpdateBuffer(2u, bloomBufferResource->resourceGPUAddress);
+
+	if (_renderingScheme.enableFSR)
+	{
+		FSRDesc fsrDesc{};
+		fsrDesc.colorBuffer = sceneColorTargetGPUResource->GetResource();
+		fsrDesc.depthTarget = sceneDepthTargetGPUResource->GetResource();
+		fsrDesc.motionTarget = sceneMotionTargetGPUResource->GetResource();
+		fsrDesc.reactiveMask = nullptr;
+		fsrDesc.outputBuffer = temporaryRWTextureGPUResource->GetResource();
+		fsrDesc.maxSize = renderer->GetDisplaySize();
+		fsrDesc.enableSharpening = false;
+		fsrDesc.sharpnessFactor = SHARPNESS_FACTOR;
+
+		_fsr->OnResize(renderer->GetDevice(), fsrDesc);
+	}
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::SetDepthPrepass(ID3D12GraphicsCommandList* commandList)
@@ -199,7 +254,7 @@ void Common::Logic::SceneEntity::PostProcessManager::SetDepthPrepass(ID3D12Graph
 	if (!_renderingScheme.enableDepthPrepass)
 		return;
 
-	if (_renderingScheme.enableVolumetricFog)
+	if (_renderingScheme.enableFSR || _renderingScheme.enableVolumetricFog)
 		sceneDepthTargetGPUResource->EndBarrier(commandList);
 
 	commandList->RSSetViewports(1u, &viewport);
@@ -223,14 +278,32 @@ void Common::Logic::SceneEntity::PostProcessManager::SetGBuffer(ID3D12GraphicsCo
 	if (sceneColorTargetGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
 
-	if (_renderingScheme.enableVolumetricFog && !_renderingScheme.enableDepthPrepass)
+	if ((_renderingScheme.enableFSR || _renderingScheme.enableVolumetricFog) &&
+		!_renderingScheme.enableDepthPrepass)
 		sceneDepthTargetGPUResource->EndBarrier(commandList);
+
+	if (_renderingScheme.enableFSR && sceneMotionTargetGPUResource->GetEndBarrier(barrier))
+		barriers.push_back(barrier);
 
 	if (!barriers.empty())
 		commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	commandList->ClearRenderTargetView(sceneColorTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
-	commandList->OMSetRenderTargets(1u, &sceneColorTargetDescriptor, true, &sceneDepthTargetDescriptor);
+
+	if (_renderingScheme.enableFSR)
+	{
+		commandList->ClearRenderTargetView(sceneMotionTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
+
+		D3D12_CPU_DESCRIPTOR_HANDLE* mrt[2u]
+		{
+			&sceneColorTargetDescriptor,
+			&sceneMotionTargetDescriptor
+		};
+
+		commandList->OMSetRenderTargets(2u, *mrt, true, &sceneDepthTargetDescriptor);
+	}
+	else
+		commandList->OMSetRenderTargets(1u, &sceneColorTargetDescriptor, true, &sceneDepthTargetDescriptor);
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::SetMotionBuffer(ID3D12GraphicsCommandList* commandList)
@@ -243,23 +316,28 @@ void Common::Logic::SceneEntity::PostProcessManager::SetMotionBuffer(ID3D12Graph
 
 	if (sceneColorTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);
-	if (sceneMotionTargetGPUResource->GetEndBarrier(barrier))
+	if (!_renderingScheme.enableFSR && sceneMotionTargetGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
 
 	if (!barriers.empty())
 		commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
-	commandList->ClearRenderTargetView(sceneMotionTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
+	if (!_renderingScheme.enableFSR)
+		commandList->ClearRenderTargetView(sceneMotionTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
+
 	commandList->OMSetRenderTargets(1u, &sceneMotionTargetDescriptor, true, nullptr);
 }
 
-void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsCommandList* commandList)
+void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsCommandList* commandList,
+	Graphics::DirectX12Renderer* renderer, float deltaTime)
 {
 	D3D12_RESOURCE_BARRIER barrier{};
 	barriers.clear();
 
 	if (_renderingScheme.enableMotionBlur &&
 		sceneMotionTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	else if (_renderingScheme.enableFSR && sceneMotionTargetGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
 
 	if (_renderingScheme.enableMotionBlur)
@@ -273,15 +351,26 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 			barriers.push_back(barrier);
 	}
 
-	if (sceneBufferGPUResource->GetEndBarrier(barrier))
-		barriers.push_back(barrier);
-	if (_renderingScheme.enableVolumetricFog && sceneDepthTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_DEPTH_READ |
-		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+	if (temporaryRWTextureGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
 
+	if ((_renderingScheme.enableFSR || _renderingScheme.enableVolumetricFog) &&
+		sceneDepthTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_DEPTH_READ |
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+		barriers.push_back(barrier);
+	
 	if (!barriers.empty())
 		commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
+	if (_renderingScheme.enableFSR)
+	{
+		SetFSR(commandList, deltaTime);
+
+		renderer->ResetDescriptorHeaps(commandList);
+
+		temporaryRWTextureGPUResource->UAVBarrier(commandList);
+	}
+	
 	if (_renderingScheme.enableMotionBlur)
 		SetMotionBlur(commandList);
 
@@ -291,11 +380,11 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 
 		if (_renderingScheme.enableMotionBlur)
 		{
-			sceneBufferGPUResource->GetUAVBarrier(barrier);
+			temporaryRWTextureGPUResource->GetUAVBarrier(barrier);
 			barriers.push_back(barrier);
 		}
 
-		if (_renderingScheme.enableVolumetricFog && sceneDepthTargetGPUResource->GetEndBarrier(barrier))
+		if (!_renderingScheme.enableFSR && sceneDepthTargetGPUResource->GetEndBarrier(barrier))
 			barriers.push_back(barrier);
 
 		if (!barriers.empty())
@@ -317,12 +406,18 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 	bloomBufferGPUResource->GetUAVBarrier(barrier);
 	barriers.push_back(barrier);
 
-	if (sceneBufferGPUResource->GetEndBarrier(barrier))
+	if (temporaryRWTextureGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
 	if (luminanceBufferGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
 	if (bloomBufferGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
+
+	if (_renderingScheme.enableFSR)
+	{
+		commandList->RSSetViewports(1u, &afterFSRViewport);
+		commandList->RSSetScissorRects(1u, &afterFSRScissorRectangle);
+	}
 
 	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
@@ -339,7 +434,7 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 		sceneMotionTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, barrier))
 		barriers.push_back(barrier);
 
-	if (sceneBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
+	if (temporaryRWTextureGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
 		barriers.push_back(barrier);
 	if (luminanceBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
 		barriers.push_back(barrier);
@@ -432,6 +527,15 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 
 	sceneColorTargetId = resourceManager->CreateTextureResource(device, commandList,
 		TextureResourceType::RENDER_TARGET, sceneTargetDesc);
+
+	if (_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur)
+	{
+		sceneTargetDesc.format = DXGI_FORMAT_R16G16_FLOAT;
+
+		sceneMotionTargetId = resourceManager->CreateTextureResource(device, commandList,
+			TextureResourceType::RENDER_TARGET, sceneTargetDesc);
+	}
+
 	sceneDepthTargetId = resourceManager->CreateTextureResource(device, commandList,
 		TextureResourceType::DEPTH_STENCIL_TARGET, sceneTargetDesc);
 
@@ -444,13 +548,8 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 	sceneColorTargetDescriptor = sceneColorTargetResource->rtvDescriptor.cpuDescriptor;
 	sceneDepthTargetDescriptor = sceneDepthTargetResource->dsvDescriptor.cpuDescriptor;
 
-	if (_renderingScheme.enableMotionBlur)
+	if (_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur)
 	{
-		sceneTargetDesc.format = DXGI_FORMAT_R16G16_FLOAT;
-
-		sceneMotionTargetId = resourceManager->CreateTextureResource(device, commandList,
-			TextureResourceType::RENDER_TARGET, sceneTargetDesc);
-
 		auto sceneMotionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
 		sceneMotionTargetGPUResource = sceneMotionTargetResource->resource;
 		sceneMotionTargetDescriptor = sceneMotionTargetResource->rtvDescriptor.cpuDescriptor;
@@ -460,14 +559,18 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	Graphics::Resources::ResourceManager* resourceManager, uint32_t width, uint32_t height)
 {
-	BufferDesc sceneBufferDesc{};
-	sceneBufferDesc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	sceneBufferDesc.dataStride = sizeof(float) * 4u;
-	sceneBufferDesc.numElements = width * height;
-	sceneBufferDesc.data.resize(static_cast<uint64_t>(sceneBufferDesc.dataStride) * sceneBufferDesc.numElements, 0u);
+	TextureDesc textureDesc{};
+	textureDesc.format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	textureDesc.width = width;
+	textureDesc.height = height;
+	textureDesc.depth = 1u;
+	textureDesc.depthBit = 32u;
+	textureDesc.mipLevels = 1u;
+	textureDesc.dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	textureDesc.srvDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
-	sceneBufferId = resourceManager->CreateBufferResource(device, commandList,
-		BufferResourceType::RW_BUFFER, sceneBufferDesc);
+	temporaryRWTextureId = resourceManager->CreateTextureResource(device, commandList,
+		TextureResourceType::RW_TEXTURE, textureDesc);
 
 	BufferDesc luminanceBufferDesc{};
 	luminanceBufferDesc.format = DXGI_FORMAT_R32_FLOAT;
@@ -487,11 +590,13 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device*
 	bloomBufferId = resourceManager->CreateBufferResource(device, commandList,
 		BufferResourceType::RW_BUFFER, bloomBufferDesc);
 
-	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
+	auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTextureId);
+
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 
-	sceneBufferGPUResource = sceneBufferResource->resource;
+	temporaryRWTextureGPUResource = temporaryRWTextureResource->resource;
+
 	luminanceBufferGPUResource = luminanceBufferResource->resource;
 	bloomBufferGPUResource = bloomBufferResource->resource;
 }
@@ -503,6 +608,9 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 		"Resources\\Shaders\\PostProcess\\QuadVS.hlsl", ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
 	std::vector<DxcDefine> defines;
+
+	if (_renderingScheme.enableFSR)
+		defines.push_back({ L"FSR", nullptr });
 
 	if (_renderingScheme.enableMotionBlur)
 		defines.push_back({ L"MOTION_BLUR", nullptr });
@@ -519,7 +627,7 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 
 	luminanceCSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\LuminanceCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5, defines);
+		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
 
 	luminanceIterationCSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\LuminanceIterationCS.hlsl",
@@ -527,7 +635,7 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 
 	bloomHorizontalCSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\BloomHorizontalCS.hlsl",
-		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5, defines);
+		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
 
 	bloomVerticalCSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\BloomVerticalCS.hlsl",
@@ -535,7 +643,7 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 
 	toneMappingPSId = resourceManager->CreateShaderResource(device,
 		"Resources\\Shaders\\PostProcess\\ToneMappingPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, defines);
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
 
 	if (_renderingScheme.enableVolumetricFog)
 	{
@@ -614,10 +722,12 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetRootConstants(0u, 12u);
 
-	if (_renderingScheme.enableMotionBlur || _renderingScheme.enableVolumetricFog)
+	if (_renderingScheme.enableFSR ||
+		_renderingScheme.enableMotionBlur ||
+		_renderingScheme.enableVolumetricFog)
 	{
-		auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
-		materialBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_PIXEL);
+		auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTextureId);
+		materialBuilder.SetTexture(0u, temporaryRWTextureResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	}
 	else
 	{
@@ -643,7 +753,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 {
 	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
 	auto sceneMotionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
-	auto sceneBufferResource = resourceManager->GetResource<RWBuffer>(sceneBufferId);
+	auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTextureId);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 	
@@ -661,9 +771,18 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 		auto motionBlurCS = resourceManager->GetResource<Shader>(motionBlurCSId);
 		
 		computeObjectBuilder.SetRootConstants(0u, 4u);
-		computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
-		computeObjectBuilder.SetTexture(1u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
-		computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
+
+		if (_renderingScheme.enableFSR)
+		{
+			computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+			computeObjectBuilder.SetTexture(1u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
+		}
+		else
+		{
+			computeObjectBuilder.SetTexture(0u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
+		}
+
+		computeObjectBuilder.SetRWTexture(0u, temporaryRWTextureResource->uavDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetShader(motionBlurCS->bytecode);
 
@@ -701,7 +820,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 		else if (!_renderingScheme.enableMotionBlur)
 			computeObjectBuilder.SetTexture(3u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
 
-		computeObjectBuilder.SetRWBuffer(0u, sceneBufferResource->resourceGPUAddress);
+		computeObjectBuilder.SetRWTexture(0u, temporaryRWTextureResource->uavDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetSampler(0u, samplerLinearWrapResource->samplerDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetShader(volumetricFogCS->bytecode);
 
@@ -710,8 +829,10 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 
 	computeObjectBuilder.SetRootConstants(0u, 2u);
 
-	if (_renderingScheme.enableMotionBlur || _renderingScheme.enableVolumetricFog)
-		computeObjectBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress);
+	if (_renderingScheme.enableFSR ||
+		_renderingScheme.enableMotionBlur ||
+		_renderingScheme.enableVolumetricFog)
+		computeObjectBuilder.SetTexture(0u, temporaryRWTextureResource->srvDescriptor.gpuDescriptor);
 	else
 		computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
 
@@ -728,8 +849,10 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 
 	computeObjectBuilder.SetRootConstants(0u, 7u);
 
-	if (_renderingScheme.enableMotionBlur || _renderingScheme.enableVolumetricFog)
-		computeObjectBuilder.SetBuffer(0u, sceneBufferResource->resourceGPUAddress);
+	if (_renderingScheme.enableFSR ||
+		_renderingScheme.enableMotionBlur ||
+		_renderingScheme.enableVolumetricFog)
+		computeObjectBuilder.SetTexture(0u, temporaryRWTextureResource->srvDescriptor.gpuDescriptor);
 	else
 		computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
 
@@ -786,22 +909,34 @@ void Common::Logic::SceneEntity::PostProcessManager::SetVolumetricFog(ID3D12Grap
 	volumetricFogComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 }
 
+void Common::Logic::SceneEntity::PostProcessManager::SetFSR(ID3D12GraphicsCommandList* commandList, float deltaTime)
+{
+	auto size = uint2(static_cast<uint32_t>(scissorRectangle.right), static_cast<uint32_t>(scissorRectangle.bottom));
+	auto targetSize = uint2(_width, _height);
+
+	_fsr->Dispatch(commandList, size, targetSize, *_camera, {}, deltaTime);
+}
+
 void Common::Logic::SceneEntity::PostProcessManager::SetHDR(ID3D12GraphicsCommandList* commandList)
 {
 	D3D12_RESOURCE_BARRIER barrier{};
 	barriers.clear();
 
-	if (_renderingScheme.enableMotionBlur || _renderingScheme.enableVolumetricFog)
+	if (_renderingScheme.enableMotionBlur ||
+		_renderingScheme.enableVolumetricFog ||
+		_renderingScheme.enableFSR)
 	{
-		sceneBufferGPUResource->GetUAVBarrier(barrier);
+		//sceneBufferGPUResource->GetUAVBarrier(barrier);
+		temporaryRWTextureGPUResource->GetUAVBarrier(barrier);
 		barriers.push_back(barrier);
 	}
 
-	if (sceneBufferGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+	//if (sceneBufferGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+	if (temporaryRWTextureGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);
 	if (luminanceBufferGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
-	if (_renderingScheme.enableVolumetricFog &&
+	if ((_renderingScheme.enableFSR || _renderingScheme.enableVolumetricFog) &&
 		sceneDepthTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_DEPTH_WRITE, barrier))
 		barriers.push_back(barrier);
 
@@ -859,7 +994,8 @@ void Common::Logic::SceneEntity::PostProcessManager::SetHDR(ID3D12GraphicsComman
 
 	barriers.clear();
 
-	if (sceneBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+	//if (sceneBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+	if (temporaryRWTextureGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);
 	if (luminanceBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);

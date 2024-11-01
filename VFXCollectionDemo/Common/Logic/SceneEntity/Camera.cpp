@@ -34,6 +34,11 @@ void Common::Logic::SceneEntity::Camera::Update(const float3& position, const fl
 
 void Common::Logic::SceneEntity::Camera::UpdateProjection(float fovY, float aspectRatio, float zNear, float zFar)
 {
+	_zNear = zNear;
+	_zFar = zFar;
+	_fovY = fovY;
+	_aspectRatio = aspectRatio;
+
 	projection = XMMatrixPerspectiveFovRH(fovY, aspectRatio, zNear, zFar);
 	invProjection = XMMatrixInverse(nullptr, projection);
 
@@ -79,4 +84,24 @@ const float3& Common::Logic::SceneEntity::Camera::GetPosition() const
 const float3& Common::Logic::SceneEntity::Camera::GetDirection() const
 {
 	return direction;
+}
+
+const float Common::Logic::SceneEntity::Camera::GetZNear() const
+{
+	return _zNear;
+}
+
+const float Common::Logic::SceneEntity::Camera::GetZFar() const
+{
+	return _zFar;
+}
+
+const float Common::Logic::SceneEntity::Camera::GetFovY() const
+{
+	return _fovY;
+}
+
+const float Common::Logic::SceneEntity::Camera::GetAspectRatio() const
+{
+	return _aspectRatio;
 }

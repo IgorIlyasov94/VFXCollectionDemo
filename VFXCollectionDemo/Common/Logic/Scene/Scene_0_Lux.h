@@ -31,7 +31,7 @@ namespace Common::Logic::Scene
 
 		void Update() override;
 		void RenderShadows(ID3D12GraphicsCommandList* commandList) override;
-		void Render(ID3D12GraphicsCommandList* commandList) override;
+		void Render(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer) override;
 		void RenderToBackBuffer(ID3D12GraphicsCommandList* commandList) override;
 
 		bool IsLoaded() override;

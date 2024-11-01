@@ -20,6 +20,10 @@
 using ubyte4 = DirectX::PackedVector::XMUBYTE4;
 using ubyte2 = DirectX::PackedVector::XMUBYTE2;
 
+using uint4 = DirectX::XMUINT4;
+using uint3 = DirectX::XMUINT3;
+using uint2 = DirectX::XMUINT2;
+
 using floatN = DirectX::XMVECTOR;
 using float4 = DirectX::XMFLOAT4;
 using float3 = DirectX::XMFLOAT3;

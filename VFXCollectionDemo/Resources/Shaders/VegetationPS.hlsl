@@ -36,11 +36,17 @@ struct Input
 	float3 tangent : TANGENT;
 	float2 texCoord : TEXCOORD0;
 	float3 worldPosition : TEXCOORD1;
+#ifdef OUTPUT_VELOCITY
+	float2 velocity : TEXCOORD2;
+#endif
 };
 
 struct Output
 {
 	float4 color : SV_Target0;
+#ifdef OUTPUT_VELOCITY
+	float2 velocity : SV_Target1;
+#endif
 };
 
 Texture2D albedoRoughness : register(t2);
@@ -121,6 +127,10 @@ Output main(Input input)
 #endif
 	
 	output.color = float4(lightSum, 0.0f);
+	
+#ifdef OUTPUT_VELOCITY
+	output.velocity = input.velocity;
+#endif
 	
 	return output;
 }

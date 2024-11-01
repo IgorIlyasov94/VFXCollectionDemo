@@ -54,19 +54,19 @@ Texture2D<float> sceneDepth : register(t2);
 #if (PARTICLE_LIGHT_SOURCE_NUMBER > 0)
 StructuredBuffer<PointLight> particleLightBuffer : register(t3);
 
-#if !defined(MOTION_BLUR)
+#if !defined(MOTION_BLUR) && !defined(FSR)
 Texture2D sceneColor : register(t4);
 #endif
 
 #else
 
-#if !defined(MOTION_BLUR)
+#if !defined(MOTION_BLUR) && !defined(FSR)
 Texture2D sceneColor : register(t3);
 #endif
 
 #endif
 
-RWStructuredBuffer<float4> sceneBuffer : register(u0);
+RWTexture2D<float4> sceneTarget : register(u0);
 
 SamplerState samplerLinear : register(s0);
 
@@ -193,12 +193,14 @@ void main(Input input)
 	if (bufferIndex >= area)
 		return;
 	
-	float2 texCoord;
-	texCoord.x = (bufferIndex % widthU) / width;
-	texCoord.y = (bufferIndex / widthU) / height;
+	uint2 targetCoord = uint2(bufferIndex % widthU, bufferIndex / widthU);
 	
-#if defined(MOTION_BLUR)
-	float4 sceneDiffuse = sceneBuffer[bufferIndex];
+	float2 texCoord;
+	texCoord.x = targetCoord.x / width;
+	texCoord.y = targetCoord.y / height;
+	
+#if defined(MOTION_BLUR) || defined(FSR)
+	float4 sceneDiffuse = sceneTarget.Load(bufferIndex);
 #else
 	float4 sceneDiffuse = sceneColor.SampleLevel(samplerLinear, texCoord, 0.0f);
 #endif
@@ -215,5 +217,5 @@ void main(Input input)
 	
 	resultColor = lerp(resultColor, sceneDiffuse.xyz, sceneDiffuse.w);
 	
-	sceneBuffer[bufferIndex] = float4(resultColor, sceneDiffuse.w);
+	sceneTarget[targetCoord] = float4(resultColor, sceneDiffuse.w);
 }
