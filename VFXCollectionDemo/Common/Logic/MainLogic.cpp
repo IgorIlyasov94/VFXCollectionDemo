@@ -22,14 +22,14 @@ Common::Logic::MainLogic::~MainLogic()
 	delete renderer;
 }
 
-void Common::Logic::MainLogic::ToggleFullscreen(HWND windowHandler)
+bool Common::Logic::MainLogic::ToggleFullscreen()
 {
-	renderer->ToggleFullscreen(windowHandler);
+	return renderer->ToggleFullscreen();
 }
 
-void Common::Logic::MainLogic::SetFullscreen(bool isFullscreen, HWND windowHandler)
+void Common::Logic::MainLogic::SetFullscreen(bool isFullscreen)
 {
-	renderer->SetFullscreen(isFullscreen, windowHandler);
+	renderer->SetFullscreen(isFullscreen);
 }
 
 void Common::Logic::MainLogic::OnResize(uint32_t newWidth, uint32_t newHeight, HWND windowHandler)

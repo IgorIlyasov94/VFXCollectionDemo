@@ -12,8 +12,8 @@ namespace Common::Logic
 		MainLogic(const RECT& windowPlacement, HWND windowHandler, bool isFullscreen);
 		~MainLogic();
 
-		void ToggleFullscreen(HWND windowHandler);
-		void SetFullscreen(bool isFullscreen, HWND windowHandler);
+		bool ToggleFullscreen();
+		void SetFullscreen(bool isFullscreen);
 
 		void OnResize(uint32_t newWidth, uint32_t newHeight, HWND windowHandler);
 		void OnSetFocus(HWND windowHandler);

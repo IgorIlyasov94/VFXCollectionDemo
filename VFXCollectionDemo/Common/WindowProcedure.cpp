@@ -1,4 +1,5 @@
 #include "WindowProcedure.h"
+#include "Window.h"
 
 Common::WindowProcedure::WindowProcedure()
 {
@@ -30,6 +31,7 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 	static uint32_t oldHeight = 1u;
 	static uint32_t newWidth = 1u;
 	static uint32_t newHeight = 1u;
+	static RECT lastWindowRect{};
 
 	switch (message)
 	{
@@ -47,7 +49,44 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 			if ((wParam == VK_RETURN) && (lParam & (1ull << 29ull)))
 			{
 				if (mainLogic != nullptr)
-					mainLogic->ToggleFullscreen(windowHandler);
+				{
+					auto toFullscreen = mainLogic->ToggleFullscreen();
+
+					if (toFullscreen)
+					{
+						auto width = GetSystemMetrics(SM_CXSCREEN);
+						auto height = GetSystemMetrics(SM_CYSCREEN);
+
+						mainLogic->OnResize(width, height, windowHandler);
+
+						GetWindowRect(windowHandler, &lastWindowRect);
+
+						DWORD borderlessStyles = ~(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU | WS_THICKFRAME);
+
+						SetWindowLong(windowHandler, GWL_STYLE, Common::Window::WINDOW_STYLES & borderlessStyles);
+
+						SetWindowPos(windowHandler, HWND_TOPMOST, 0, 0, width, height, SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+						ShowWindow(windowHandler, SW_MAXIMIZE);
+					}
+					else
+					{
+						mainLogic->OnResize(lastWindowRect.right - lastWindowRect.left,
+							lastWindowRect.bottom - lastWindowRect.top, windowHandler);
+
+						SetWindowLong(windowHandler, GWL_STYLE, Common::Window::WINDOW_STYLES);
+
+						SetWindowPos(windowHandler,
+							HWND_NOTOPMOST,
+							lastWindowRect.left,
+							lastWindowRect.top,
+							lastWindowRect.right - lastWindowRect.left,
+							lastWindowRect.bottom - lastWindowRect.top,
+							SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+						ShowWindow(windowHandler, SW_NORMAL);
+					}
+				}
 			}
 
 			break;

@@ -54,13 +54,19 @@ namespace Common::Logic::Scene
 		bool isLoaded;
 		
 		static constexpr float FOV_Y = DirectX::XM_PI / 4.0f;
-		static constexpr float Z_NEAR = 0.01f;
+		static constexpr float Z_NEAR = 0.1f;
 		static constexpr float Z_FAR = 1000.0f;
 
 		static constexpr float AREA_LIGHT_INTENSITY = 15.0f;
 		static constexpr float AREA_LIGHT_RANGE = 8.0f;
 
 		static constexpr float AMBIENT_LIGHT_INTENSITY = 0.15f;
+
+		static constexpr bool DEPTH_PREPASS_ENABLED = true;
+		static constexpr bool FSR_ENABLED = false;
+		static constexpr bool MOTION_BLUR_ENABLED = false;
+		static constexpr bool VOLUMETRIC_FOG_ENABLED = true;
+		static constexpr bool USING_PARTICLE_LIGHT = true;
 
 		static constexpr float WHITE_CUTOFF = 1.7f;
 		static constexpr float BRIGHT_THRESHOLD = 3.5f;

@@ -460,7 +460,7 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
-	materialBuilder.SetDepthStencilFormat(32u, true, true);
+	materialBuilder.SetDepthStencilFormat(32u, true, desc.hasDepthPrepass);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 	if (desc.outputVelocity)
@@ -472,15 +472,18 @@ void Common::Logic::SceneEntity::Terrain::CreateMaterial(ID3D12Device* device, R
 
 	material = materialBuilder.ComposeStandard(device);
 
-	materialBuilder.SetConstantBuffer(1u, constantsResource->resourceGPUAddress);
-	
-	materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
-	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
-	materialBuilder.SetDepthStencilFormat(32u, true, false, true);
-	materialBuilder.SetGeometryFormat(mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	materialBuilder.SetVertexShader(terrainVS->bytecode);
-	
-	materialDepthPrepass = materialBuilder.ComposeStandard(device);
+	if (desc.hasDepthPrepass)
+	{
+		materialBuilder.SetConstantBuffer(1u, constantsResource->resourceGPUAddress);
+
+		materialBuilder.SetCullMode(D3D12_CULL_MODE_FRONT);
+		materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(blendSetup));
+		materialBuilder.SetDepthStencilFormat(32u, true, false, true);
+		materialBuilder.SetGeometryFormat(mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		materialBuilder.SetVertexShader(terrainVS->bytecode);
+
+		materialDepthPrepass = materialBuilder.ComposeStandard(device);
+	}
 }
 
 void Common::Logic::SceneEntity::Terrain::LoadCache(const std::filesystem::path& fileName, ID3D12Device* device,

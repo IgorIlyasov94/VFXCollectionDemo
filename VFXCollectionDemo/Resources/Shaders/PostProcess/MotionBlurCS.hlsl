@@ -62,11 +62,11 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float2 offsetB = saturate(texCoord + motionB * t);
 		
 #if defined(FSR)
-		uint2 sizeVector = uint2(width, width * height);
+		uint2 sizeVector = uint2(width, height);
 		
-		uint offsetRU = (uint)floor(dot(offsetR, sizeVector));
-		uint offsetGU = (uint)floor(dot(offsetG, sizeVector));
-		uint offsetBU = (uint)floor(dot(offsetB, sizeVector));
+		uint2 offsetRU = (uint2)floor(offsetR * sizeVector);
+		uint2 offsetGU = (uint2)floor(offsetG * sizeVector);
+		uint2 offsetBU = (uint2)floor(offsetB * sizeVector);
 		
 		float2 colorRA = sceneTarget.Load(offsetRU).xw;
 		float colorG = sceneTarget.Load(offsetGU).y;
@@ -80,5 +80,5 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 		color += float4(colorRA.x, colorG, colorB, colorRA.y) * Weight(sampleIndex, NORMAL_DISTRIBUTION_SIGMA);
 	}
 	
-	sceneTarget[bufferIndex] = color;
+	sceneTarget[texCoordU] = color;
 }

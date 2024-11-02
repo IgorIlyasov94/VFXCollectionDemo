@@ -196,10 +196,13 @@ void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* comman
 	vfxLuxSparkles->OnCompute(commandList);
 	vfxLuxDistorters->OnCompute(commandList);
 
-	postProcessManager->SetDepthPrepass(commandList);
+	if constexpr (DEPTH_PREPASS_ENABLED)
+	{
+		postProcessManager->SetDepthPrepass(commandList);
 
-	terrain->DrawDepthPrepass(commandList);
-	vegetationSystem->DrawDepthPrepass(commandList);
+		terrain->DrawDepthPrepass(commandList);
+		vegetationSystem->DrawDepthPrepass(commandList);
+	}
 
 	postProcessManager->SetGBuffer(commandList);
 
@@ -211,9 +214,12 @@ void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* comman
 	vfxLux->Draw(commandList);
 	vfxLuxSparkles->Draw(commandList);
 
-	//postProcessManager->SetMotionBuffer(commandList);
+	if constexpr (FSR_ENABLED || MOTION_BLUR_ENABLED)
+	{
+		postProcessManager->SetMotionBuffer(commandList);
 
-	//vfxLuxDistorters->Draw(commandList);
+		vfxLuxDistorters->Draw(commandList);
+	}
 
 	postProcessManager->Render(commandList, renderer, _deltaTime);
 }
@@ -371,11 +377,11 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
 
 	SceneEntity::RenderingScheme renderingScheme{};
-	renderingScheme.enableFSR = true;
-	renderingScheme.enableDepthPrepass = true;
-	renderingScheme.enableMotionBlur = false;
-	renderingScheme.enableVolumetricFog = false;
-	renderingScheme.useParticleLight = false;
+	renderingScheme.enableFSR = FSR_ENABLED;
+	renderingScheme.enableDepthPrepass = DEPTH_PREPASS_ENABLED;
+	renderingScheme.enableMotionBlur = MOTION_BLUR_ENABLED;
+	renderingScheme.enableVolumetricFog = VOLUMETRIC_FOG_ENABLED;
+	renderingScheme.useParticleLight = USING_PARTICLE_LIGHT;
 	renderingScheme.whiteCutoff = WHITE_CUTOFF;
 	renderingScheme.brightThreshold = BRIGHT_THRESHOLD;
 	renderingScheme.bloomIntensity = BLOOM_INTENSITY;
@@ -398,7 +404,8 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrainDesc.map3Tiling = float2(4.0f, 4.0f);
 	terrainDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
 	terrainDesc.hasParticleLighting = true;
-	terrainDesc.outputVelocity = renderingScheme.enableFSR;
+	terrainDesc.hasDepthPrepass = DEPTH_PREPASS_ENABLED;
+	terrainDesc.outputVelocity = renderingScheme.enableFSR || renderingScheme.enableMotionBlur;
 	terrainDesc.lightParticleBufferId = lightParticleBufferId;
 	terrainDesc.lightDefines = &lightDefines;
 	terrainDesc.shadowMapIds.push_back(areaLightDesc.GetShadowMapId());
@@ -423,10 +430,11 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	vegetationSystemDesc.atlasColumns = 4u;
 	vegetationSystemDesc.grassSizeMin = float3(0.4f, 0.4f, 0.06f);
 	vegetationSystemDesc.grassSizeMax = float3(0.8f, 0.8f, 0.5f);
+	vegetationSystemDesc.hasDepthPrepass = DEPTH_PREPASS_ENABLED;
 	vegetationSystemDesc.hasDepthPass = false;
 	vegetationSystemDesc.hasDepthCubePass = true;
 	vegetationSystemDesc.hasParticleLighting = true;
-	vegetationSystemDesc.outputVelocity = renderingScheme.enableFSR;
+	vegetationSystemDesc.outputVelocity = renderingScheme.enableFSR || renderingScheme.enableMotionBlur;
 	vegetationSystemDesc.lightParticleBufferId = lightParticleBufferId;
 	vegetationSystemDesc.lightMatricesNumber = lightingSystem->GetLightMatricesNumber();
 	vegetationSystemDesc.terrain = terrain;

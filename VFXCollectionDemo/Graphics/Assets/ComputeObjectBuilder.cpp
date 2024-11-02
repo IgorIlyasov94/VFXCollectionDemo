@@ -122,6 +122,15 @@ void Graphics::Assets::ComputeObjectBuilder::SetDescriptorTableParameter(uint32_
 	D3D12_DESCRIPTOR_RANGE_TYPE rangeType, D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor)
 {
 	DescriptorTableSlot slot{};
+
+	if (rangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SRV)
+		slot.tableType = DescriptorTableType::TEXTURE;
+	else if (rangeType == D3D12_DESCRIPTOR_RANGE_TYPE_UAV)
+		slot.tableType = DescriptorTableType::RW_TEXTURE;
+	else
+		slot.tableType = DescriptorTableType::SAMPLER;
+
+	slot.shaderRegisterIndex = registerIndex;
 	slot.rootParameterIndex = static_cast<uint32_t>(rootParameters.size());
 	slot.gpuDescriptor = gpuDescriptor;
 

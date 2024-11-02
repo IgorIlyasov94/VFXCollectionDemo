@@ -82,6 +82,8 @@ namespace Common::Logic::SceneEntity
 		void CreateComputeObjects(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			LightingSystem* lightingSystem);
 
+		void UpdateObjects(Graphics::DirectX12Renderer* renderer);
+
 		void SetMotionBlur(ID3D12GraphicsCommandList* commandList);
 		void SetVolumetricFog(ID3D12GraphicsCommandList* commandList);
 		void SetFSR(ID3D12GraphicsCommandList* commandList, float deltaTime);
@@ -186,7 +188,7 @@ namespace Common::Logic::SceneEntity
 
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneColorTargetDescriptor;
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneDepthTargetDescriptor;
-
+		D3D12_CPU_DESCRIPTOR_HANDLE sceneAlphaTargetDescriptor;
 		D3D12_CPU_DESCRIPTOR_HANDLE sceneMotionTargetDescriptor;
 
 		RenderingScheme _renderingScheme;
@@ -195,18 +197,18 @@ namespace Common::Logic::SceneEntity
 
 		Graphics::Resources::GPUResource* sceneColorTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneDepthTargetGPUResource;
+		Graphics::Resources::GPUResource* sceneAlphaTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneMotionTargetGPUResource;
-		//Graphics::Resources::GPUResource* sceneBufferGPUResource;
 		Graphics::Resources::GPUResource* temporaryRWTextureGPUResource;
 		Graphics::Resources::GPUResource* luminanceBufferGPUResource;
 		Graphics::Resources::GPUResource* bloomBufferGPUResource;
 
 		Graphics::Resources::ResourceID sceneColorTargetId;
 		Graphics::Resources::ResourceID sceneDepthTargetId;
+		Graphics::Resources::ResourceID sceneAlphaTargetId;
 
 		Graphics::Resources::ResourceID volumetricFogConstantBufferId;
 		Graphics::Resources::ResourceID sceneMotionTargetId;
-		//Graphics::Resources::ResourceID sceneBufferId;
 		Graphics::Resources::ResourceID temporaryRWTextureId;
 		Graphics::Resources::ResourceID luminanceBufferId;
 		Graphics::Resources::ResourceID bloomBufferId;
@@ -222,6 +224,7 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID bloomHorizontalCSId;
 		Graphics::Resources::ResourceID bloomVerticalCSId;
 		Graphics::Resources::ResourceID toneMappingPSId;
+		Graphics::Resources::ResourceID copyAlphaPSId;
 
 		Graphics::Assets::Mesh* quadMesh;
 		Graphics::Assets::ComputeObject* motionBlurComputeObject;
@@ -231,5 +234,6 @@ namespace Common::Logic::SceneEntity
 		Graphics::Assets::ComputeObject* bloomHorizontalObject;
 		Graphics::Assets::ComputeObject* bloomVerticalObject;
 		Graphics::Assets::Material* toneMappingMaterial;
+		Graphics::Assets::Material* copyAlphaMaterial;
 	};
 }

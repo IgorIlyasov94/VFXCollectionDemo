@@ -15,8 +15,8 @@ namespace Graphics
 		DirectX12Renderer(const RECT& windowPlacement, HWND windowHandler, bool _isFullscreen);
 		~DirectX12Renderer();
 
-		void ToggleFullscreen(HWND windowHandler);
-		void SetFullscreen(bool _isFullscreen, HWND windowHandler);
+		bool ToggleFullscreen();
+		void SetFullscreen(bool _isFullscreen);
 
 		void OnResize(uint32_t newWidth, uint32_t newHeight, HWND windowHandler);
 		void OnSetFocus(HWND windowHandler);

@@ -26,6 +26,7 @@ namespace Common::Logic::SceneEntity
 		float3 grassSizeMin;
 		float3 grassSizeMax;
 
+		bool hasDepthPrepass;
 		bool hasDepthPass;
 		bool hasDepthCubePass;
 		bool hasParticleLighting;

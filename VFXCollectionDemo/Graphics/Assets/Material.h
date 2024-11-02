@@ -4,6 +4,13 @@
 
 namespace Graphics::Assets
 {
+	enum class DescriptorTableType : uint32_t
+	{
+		TEXTURE = 0u,
+		RW_TEXTURE = 1u,
+		SAMPLER = 2u,
+	};
+
 	struct DescriptorSlot
 	{
 	public:
@@ -15,6 +22,8 @@ namespace Graphics::Assets
 	struct DescriptorTableSlot
 	{
 	public:
+		DescriptorTableType tableType;
+		uint32_t shaderRegisterIndex;
 		uint32_t rootParameterIndex;
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptor;
 	};
@@ -31,6 +40,7 @@ namespace Graphics::Assets
 		void UpdateConstantBuffer(uint32_t cRegisterIndex, D3D12_GPU_VIRTUAL_ADDRESS newGPUAddress);
 		void UpdateBuffer(uint32_t tRegisterIndex, D3D12_GPU_VIRTUAL_ADDRESS newGPUAddress);
 		void UpdateRWBuffer(uint32_t uRegisterIndex, D3D12_GPU_VIRTUAL_ADDRESS newGPUAddress);
+		void UpdateTable(uint32_t registerIndex, DescriptorTableType tableType, D3D12_GPU_DESCRIPTOR_HANDLE newGPUDescriptorHandle);
 
 		void SetRootConstant(ID3D12GraphicsCommandList* commandList, uint32_t cRegisterIndex, const void* value);
 		void SetRootConstants(ID3D12GraphicsCommandList* commandList, uint32_t cRegisterIndex,

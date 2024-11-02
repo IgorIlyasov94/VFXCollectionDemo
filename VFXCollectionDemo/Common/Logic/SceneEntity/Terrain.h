@@ -21,6 +21,7 @@ namespace Common::Logic::SceneEntity
 		float2 map2Tiling;
 		float2 map3Tiling;
 
+		bool hasDepthPrepass;
 		bool hasParticleLighting;
 		bool outputVelocity;
 

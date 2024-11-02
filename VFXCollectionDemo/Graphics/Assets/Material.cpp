@@ -47,6 +47,18 @@ void Graphics::Assets::Material::UpdateRWBuffer(uint32_t uRegisterIndex, D3D12_G
 		}
 }
 
+void Graphics::Assets::Material::UpdateTable(uint32_t registerIndex, DescriptorTableType tableType,
+	D3D12_GPU_DESCRIPTOR_HANDLE newGPUDescriptorHandle)
+{
+	for (auto& descriptorTableSlot : _textureSlots)
+		if (descriptorTableSlot.shaderRegisterIndex == registerIndex &&
+			descriptorTableSlot.tableType == tableType)
+		{
+			descriptorTableSlot.gpuDescriptor = newGPUDescriptorHandle;
+			return;
+		}
+}
+
 void Graphics::Assets::Material::SetRootConstant(ID3D12GraphicsCommandList* commandList, uint32_t cRegisterIndex,
 	const void* value)
 {

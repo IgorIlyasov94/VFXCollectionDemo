@@ -310,20 +310,29 @@ void Common::Logic::SceneEntity::VegatationSystem::LoadShaders(ID3D12Device* dev
 	vegetationPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationPS.hlsl",
 		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, mainDefines);
 
-	vegetationDepthPassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthPassVS.hlsl",
-		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, defines);
+	if (desc.hasDepthPrepass)
+	{
+		vegetationDepthPassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthPassVS.hlsl",
+			ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, defines);
+	}
 
-	vegetationDepthPassPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthPassPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, definesDepthPrepass);
-	
-	vegetationDepthCubePassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassVS.hlsl",
-		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
+	if (desc.hasDepthPrepass || desc.hasDepthPass)
+	{
+		vegetationDepthPassPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthPassPS.hlsl",
+			ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, definesDepthPrepass);
+	}
 
-	vegetationDepthCubePassGSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassGS.hlsl",
-		ShaderType::GEOMETRY_SHADER, ShaderVersion::SM_6_5, defines);
+	if (desc.hasDepthCubePass)
+	{
+		vegetationDepthCubePassVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassVS.hlsl",
+			ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
 
-	vegetationDepthCubePassPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
+		vegetationDepthCubePassGSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassGS.hlsl",
+			ShaderType::GEOMETRY_SHADER, ShaderVersion::SM_6_5, defines);
+
+		vegetationDepthCubePassPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassPS.hlsl",
+			ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
+	}
 }
 
 void Common::Logic::SceneEntity::VegatationSystem::LoadTextures(ID3D12Device* device,
@@ -379,7 +388,7 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterials(ID3D12Device*
 	materialBuilder.SetSampler(1u, samplerShadowResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_BACK);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
-	materialBuilder.SetDepthStencilFormat(32u, true, true);
+	materialBuilder.SetDepthStencilFormat(32u, true, desc.hasDepthPrepass);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 	if (desc.outputVelocity)
@@ -391,30 +400,32 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterials(ID3D12Device*
 
 	_material = materialBuilder.ComposeStandard(device);
 
-	auto lightMatricesConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightMatricesConstantBufferId);
+	if (desc.hasDepthPrepass)
+	{
+		auto vegetationDepthPassPS = resourceManager->GetResource<Shader>(vegetationDepthPassPSId);
 
-	auto vegetationDepthPassPS = resourceManager->GetResource<Shader>(vegetationDepthPassPSId);
+		materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetBuffer(0u, vegetationBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetTexture(1u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetTexture(2u, normalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+		materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+		materialBuilder.SetCullMode(D3D12_CULL_MODE_BACK);
+		materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
+		materialBuilder.SetDepthStencilFormat(32u, true, false, true);
+		materialBuilder.SetGeometryFormat(_mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		materialBuilder.SetVertexShader(vegetationVS->bytecode);
+		materialBuilder.SetPixelShader(vegetationDepthPassPS->bytecode);
 
-	materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
-	materialBuilder.SetBuffer(0u, vegetationBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
-	materialBuilder.SetTexture(1u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
-	materialBuilder.SetTexture(2u, normalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
-	materialBuilder.SetCullMode(D3D12_CULL_MODE_BACK);
-	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
-	materialBuilder.SetDepthStencilFormat(32u, true, false, true);
-	materialBuilder.SetGeometryFormat(_mesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	materialBuilder.SetVertexShader(vegetationVS->bytecode);
-	materialBuilder.SetPixelShader(vegetationDepthPassPS->bytecode);
+		materialDepthPrepass = materialBuilder.ComposeStandard(device);
+	}
 
-	materialDepthPrepass = materialBuilder.ComposeStandard(device);
-	
 	if (desc.hasDepthPass)
 	{
 		auto lightMatricesConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(lightMatricesConstantBufferId);
 		
 		auto vegetationDepthPassVS = resourceManager->GetResource<Shader>(vegetationDepthPassVSId);
-		
+		auto vegetationDepthPassPS = resourceManager->GetResource<Shader>(vegetationDepthPassPSId);
+
 		materialBuilder.SetRootConstants(0u, 1u, D3D12_SHADER_VISIBILITY_VERTEX);
 		materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
 		materialBuilder.SetConstantBuffer(2u, lightMatricesConstantBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);

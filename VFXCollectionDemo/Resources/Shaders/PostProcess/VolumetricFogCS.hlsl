@@ -56,12 +56,16 @@ StructuredBuffer<PointLight> particleLightBuffer : register(t3);
 
 #if !defined(MOTION_BLUR) && !defined(FSR)
 Texture2D sceneColor : register(t4);
+#elif defined(FSR)
+Texture2D sceneAlpha : register(t4);
 #endif
 
 #else
 
 #if !defined(MOTION_BLUR) && !defined(FSR)
 Texture2D sceneColor : register(t3);
+#elif defined(FSR)
+Texture2D sceneAlpha : register(t3);
 #endif
 
 #endif
@@ -200,7 +204,12 @@ void main(Input input)
 	texCoord.y = targetCoord.y / height;
 	
 #if defined(MOTION_BLUR) || defined(FSR)
-	float4 sceneDiffuse = sceneTarget.Load(bufferIndex);
+	float4 sceneDiffuse = sceneTarget.Load(targetCoord);
+	
+#if defined(FSR)
+	sceneDiffuse.w = sceneAlpha.SampleLevel(samplerLinear, texCoord, 0.0f).x;
+#endif
+	
 #else
 	float4 sceneDiffuse = sceneColor.SampleLevel(samplerLinear, texCoord, 0.0f);
 #endif

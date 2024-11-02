@@ -17,6 +17,7 @@ namespace Graphics::Assets
 		void UpdateConstantBuffer(uint32_t cRegisterIndex, D3D12_GPU_VIRTUAL_ADDRESS newGPUAddress);
 		void UpdateBuffer(uint32_t tRegisterIndex, D3D12_GPU_VIRTUAL_ADDRESS newGPUAddress);
 		void UpdateRWBuffer(uint32_t uRegisterIndex, D3D12_GPU_VIRTUAL_ADDRESS newGPUAddress);
+		void UpdateTable(uint32_t registerIndex, DescriptorTableType tableType, D3D12_GPU_DESCRIPTOR_HANDLE newGPUDescriptorHandle);
 
 		void SetRootConstant(ID3D12GraphicsCommandList* commandList, uint32_t cRegisterIndex, const void* value);
 		void SetRootConstants(ID3D12GraphicsCommandList* commandList, uint32_t cRegisterIndex,

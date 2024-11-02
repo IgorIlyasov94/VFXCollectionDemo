@@ -360,6 +360,15 @@ void Graphics::Assets::RaytracingObjectBuilder::SetDescriptorTableParameter(uint
 	std::vector<DescriptorTableSlot>& slots, RootSignatureVariant signatureVariant)
 {
 	DescriptorTableSlot slot{};
+
+	if (rangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SRV)
+		slot.tableType = DescriptorTableType::TEXTURE;
+	else if (rangeType == D3D12_DESCRIPTOR_RANGE_TYPE_UAV)
+		slot.tableType = DescriptorTableType::RW_TEXTURE;
+	else
+		slot.tableType = DescriptorTableType::SAMPLER;
+
+	slot.shaderRegisterIndex = registerIndex;
 	slot.rootParameterIndex = rootSignatureIndexCounter++;
 	slot.gpuDescriptor = gpuDescriptor;
 

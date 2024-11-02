@@ -54,57 +54,17 @@ Graphics::DirectX12Renderer::~DirectX12Renderer()
     device->Release();
 }
 
-void Graphics::DirectX12Renderer::ToggleFullscreen(HWND windowHandler)
+bool Graphics::DirectX12Renderer::ToggleFullscreen()
 {
-    if (isFullscreen)
-    {
-        SetWindowLong(windowHandler, GWL_STYLE, Common::Window::WINDOW_STYLES);
-
-        SetWindowPos(windowHandler,
-            HWND_NOTOPMOST,
-            lastWindowRect.left,
-            lastWindowRect.top,
-            lastWindowRect.right - lastWindowRect.left,
-            lastWindowRect.bottom - lastWindowRect.top,
-            SWP_FRAMECHANGED | SWP_NOACTIVATE);
-
-        ShowWindow(windowHandler, SW_NORMAL);
-    }
-    else
-    {
-        GetWindowRect(windowHandler, &lastWindowRect);
-
-        DWORD borderlessStyles = ~(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU | WS_THICKFRAME);
-
-        SetWindowLong(windowHandler, GWL_STYLE, Common::Window::WINDOW_STYLES & borderlessStyles);
-
-        IDXGIOutput* output;
-        swapChain->GetContainingOutput(&output);
-
-        DXGI_OUTPUT_DESC outputDesc{};
-        output->GetDesc(&outputDesc);
-        output->Release();
-
-        auto fullscreenWindowRect = outputDesc.DesktopCoordinates;
-        
-        SetWindowPos(windowHandler,
-            HWND_TOPMOST,
-            fullscreenWindowRect.left,
-            fullscreenWindowRect.top,
-            fullscreenWindowRect.right,
-            fullscreenWindowRect.bottom,
-            SWP_FRAMECHANGED | SWP_NOACTIVATE);
-
-        ShowWindow(windowHandler, SW_MAXIMIZE);
-    }
-
     isFullscreen = !isFullscreen;
+
+    return isFullscreen;
 }
 
-void Graphics::DirectX12Renderer::SetFullscreen(bool _isFullscreen, HWND windowHandler)
+void Graphics::DirectX12Renderer::SetFullscreen(bool _isFullscreen)
 {
     if (isFullscreen != _isFullscreen)
-        ToggleFullscreen(windowHandler);
+        ToggleFullscreen();
 }
 
 void Graphics::DirectX12Renderer::OnResize(uint32_t newWidth, uint32_t newHeight, HWND windowHandler)

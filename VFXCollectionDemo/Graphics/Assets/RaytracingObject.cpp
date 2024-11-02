@@ -72,6 +72,18 @@ void Graphics::Assets::RaytracingObject::UpdateRWBuffer(uint32_t uRegisterIndex,
 		}
 }
 
+void Graphics::Assets::RaytracingObject::UpdateTable(uint32_t registerIndex, DescriptorTableType tableType,
+	D3D12_GPU_DESCRIPTOR_HANDLE newGPUDescriptorHandle)
+{
+	for (auto& descriptorTableSlot : _textureSlots)
+		if (descriptorTableSlot.shaderRegisterIndex == registerIndex &&
+			descriptorTableSlot.tableType == tableType)
+		{
+			descriptorTableSlot.gpuDescriptor = newGPUDescriptorHandle;
+			return;
+		}
+}
+
 void Graphics::Assets::RaytracingObject::SetRootConstant(ID3D12GraphicsCommandList4* commandList,
 	uint32_t cRegisterIndex, const void* value)
 {
