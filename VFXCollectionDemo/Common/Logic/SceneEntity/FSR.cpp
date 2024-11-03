@@ -4,6 +4,8 @@
 Common::Logic::SceneEntity::FSR::FSR(ID3D12Device* device, const FSRDesc& desc)
 	: upscaleDesc{}, upscaleContext{}
 {
+	jitterSequence.reserve(AVERAGE_SEQUENCE_LENGTH);
+
 	CreateContexts(device, desc);
 }
 
@@ -18,26 +20,31 @@ void Common::Logic::SceneEntity::FSR::OnResize(ID3D12Device* device, const FSRDe
 	CreateContexts(device, desc);
 }
 
+void Common::Logic::SceneEntity::FSR::UpdateJitter()
+{
+	upscaleDesc.jitterOffset.x = jitterSequence[jitterPhaseIndex].x;
+	upscaleDesc.jitterOffset.y = jitterSequence[jitterPhaseIndex].y;
+
+	jitterPhaseIndex = (++jitterPhaseIndex) % jitterSequence.size();
+}
+
+float2 Common::Logic::SceneEntity::FSR::GetJitter() const
+{
+	return float2(upscaleDesc.jitterOffset.x, upscaleDesc.jitterOffset.y);
+}
+
 void Common::Logic::SceneEntity::FSR::ResetUpscaler()
 {
+	jitterPhaseIndex = 0u;
+
 	upscaleDesc.reset = true;
 }
 
-void Common::Logic::SceneEntity::FSR::Dispatch(ID3D12GraphicsCommandList* commandList, const uint2& size, const uint2& targetSize,
-	const Camera& camera, float2 jitterOffset, float deltaTime)
+void Common::Logic::SceneEntity::FSR::Dispatch(ID3D12GraphicsCommandList* commandList, float deltaTime)
 {
 	upscaleDesc.commandList = commandList;
-	upscaleDesc.jitterOffset.x = jitterOffset.x;
-	upscaleDesc.jitterOffset.y = jitterOffset.y;
 	upscaleDesc.frameTimeDelta = deltaTime * 1000.0f;
-	upscaleDesc.renderSize.width = size.x;
-	upscaleDesc.renderSize.height = size.y;
-	upscaleDesc.upscaleSize.width = targetSize.x;
-	upscaleDesc.upscaleSize.height = targetSize.y;
-	upscaleDesc.cameraNear = camera.GetZNear();
-	upscaleDesc.cameraFar = camera.GetZFar();
-	upscaleDesc.cameraFovAngleVertical = camera.GetFovY();
-
+	
 	ffx::Dispatch(upscaleContext, upscaleDesc);
 
 	upscaleDesc.reset = false;
@@ -53,13 +60,26 @@ void Common::Logic::SceneEntity::FSR::CreateContexts(ID3D12Device* device, const
 	upscaleDesc.transparencyAndComposition = ffxApiGetResourceDX12(nullptr, FFX_API_RESOURCE_STATE_COMPUTE_READ);
 	upscaleDesc.output = ffxApiGetResourceDX12(desc.outputBuffer, FFX_API_RESOURCE_STATE_UNORDERED_ACCESS);
 
-	upscaleDesc.motionVectorScale = { 1.0f, 1.0f };
+	upscaleDesc.renderSize.width = desc.size.x;
+	upscaleDesc.renderSize.height = desc.size.y;
+	upscaleDesc.upscaleSize.width = desc.targetSize.x;
+	upscaleDesc.upscaleSize.height = desc.targetSize.y;
+	upscaleDesc.cameraNear = desc.zNear;
+	upscaleDesc.cameraFar = desc.zFar;
+	upscaleDesc.cameraFovAngleVertical = desc.fovY;
+	upscaleDesc.motionVectorScale = { -static_cast<float>(desc.size.x), static_cast<float>(desc.size.y) };
+
 	upscaleDesc.enableSharpening = desc.enableSharpening;
 	upscaleDesc.sharpness = desc.sharpnessFactor;
 	upscaleDesc.preExposure = 1.0f;
 	upscaleDesc.viewSpaceToMetersFactor = 1.0f;
 	upscaleDesc.reset = true;
 	upscaleDesc.flags = FFX_UPSCALE_ENABLE_MOTION_VECTORS_JITTER_CANCELLATION;
+
+	auto jitterPhaseCount = CalculateJitterPhaseCount(desc.size, desc.targetSize);
+	CacheJitterSequence(jitterPhaseCount);
+
+	jitterPhaseIndex = 0u;
 
 	ffx::CreateBackendDX12Desc createBackendDesc{};
 	createBackendDesc.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;
@@ -89,6 +109,49 @@ void Common::Logic::SceneEntity::FSR::DestroyContexts()
 	}
 }
 
+uint32_t Common::Logic::SceneEntity::FSR::CalculateJitterPhaseCount(const uint2& size, const uint2& targetSize) const
+{
+	auto diagonal = static_cast<float>(std::sqrt(size.x * size.x + size.y * size.y));
+	auto targetDiagonal = static_cast<float>(std::sqrt(targetSize.x * targetSize.x + targetSize.y * targetSize.y));
+
+	auto sizeFactorSqr = targetDiagonal / diagonal;
+	sizeFactorSqr *= sizeFactorSqr;
+
+	return static_cast<uint32_t>(std::ceil(8.0f * sizeFactorSqr));
+}
+
+void Common::Logic::SceneEntity::FSR::CacheJitterSequence(uint32_t jitterPhaseCount)
+{
+	jitterSequence.clear();
+
+	for (uint32_t index = 1u; index <= jitterPhaseCount; index++)
+	{
+		float2 jitter{};
+		jitter.x = HaltonSequence(index, 2u) - 0.5f;
+		jitter.y = HaltonSequence(index, 3u) - 0.5f;
+
+		jitterSequence.push_back(std::move(jitter));
+	}
+}
+
+float Common::Logic::SceneEntity::FSR::HaltonSequence(uint32_t index, uint32_t base)
+{
+	auto currentIndex = index;
+	auto sumElement = 1.0f;
+	auto result = 0.0f;
+
+	while (currentIndex > 0u)
+	{
+		currentIndex = static_cast<uint32_t>(std::floor(currentIndex / static_cast<float>(base)));
+		sumElement /= static_cast<float>(base);
+
+		result += sumElement * static_cast<float>(currentIndex % base);
+	}
+
+	return result;
+}
+
+#ifdef _DEBUG
 void Common::Logic::SceneEntity::FSR::DebugMessage(uint32_t type, const wchar_t* message)
 {
 	if (type == FFX_API_MESSAGE_TYPE_ERROR)
@@ -108,3 +171,4 @@ void Common::Logic::SceneEntity::FSR::DebugMessage(uint32_t type, const wchar_t*
 		OutputDebugString(messageString.c_str());
 	}
 }
+#endif

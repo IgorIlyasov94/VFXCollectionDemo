@@ -18,6 +18,16 @@ cbuffer MutableConstants : register(b1)
 	
 	float3 windDirection;
 	float windStrength;
+	
+	float zNear;
+	float zFar;
+	float lastTime;
+	float mipBias;
+	
+	float3 lastWindDirection;
+	float lastWindStrength;
+	
+	float4x4 lastViewProjection;
 };
 
 struct Input

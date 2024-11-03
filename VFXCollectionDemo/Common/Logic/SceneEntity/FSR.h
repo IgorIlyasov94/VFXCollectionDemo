@@ -2,7 +2,6 @@
 
 #include "../../../Includes.h"
 #include "../../../Graphics/DirectX12Includes.h"
-#include "Camera.h"
 
 #include <ffx_api/ffx_upscale.hpp>
 
@@ -18,6 +17,11 @@ namespace Common::Logic::SceneEntity
 		ID3D12Resource* reactiveMask;
 		ID3D12Resource* outputBuffer;
 		uint2 maxSize;
+		uint2 size;
+		uint2 targetSize;
+		float zNear;
+		float zFar;
+		float fovY;
 		bool enableSharpening;
 		float sharpnessFactor;
 	};
@@ -30,9 +34,11 @@ namespace Common::Logic::SceneEntity
 
 		void OnResize(ID3D12Device* device, const FSRDesc& desc);
 
+		void UpdateJitter();
+		float2 GetJitter() const;
+
 		void ResetUpscaler();
-		void Dispatch(ID3D12GraphicsCommandList* commandList, const uint2& size, const uint2& targetSize,
-			const Camera& camera, float2 jitterOffset, float deltaTime);
+		void Dispatch(ID3D12GraphicsCommandList* commandList, float deltaTime);
 
 	private:
 		FSR() = delete;
@@ -40,7 +46,19 @@ namespace Common::Logic::SceneEntity
 		void CreateContexts(ID3D12Device* device, const FSRDesc& desc);
 		void DestroyContexts();
 
+		uint32_t CalculateJitterPhaseCount(const uint2& size, const uint2& targetSize) const;
+		void CacheJitterSequence(uint32_t jitterPhaseCount);
+		float HaltonSequence(uint32_t index, uint32_t base);
+
+#ifdef _DEBUG
 		static void DebugMessage(uint32_t type, const wchar_t* message);
+#endif
+
+		static constexpr uint32_t AVERAGE_SEQUENCE_LENGTH = 32u;
+
+		uint32_t jitterPhaseIndex;
+
+		std::vector<float2> jitterSequence;
 
 		ffx::DispatchDescUpscale upscaleDesc;
 		ffx::Context upscaleContext;

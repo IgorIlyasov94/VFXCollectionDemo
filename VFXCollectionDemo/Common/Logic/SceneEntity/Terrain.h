@@ -28,7 +28,7 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID lightConstantBufferId;
 		Graphics::Resources::ResourceID lightParticleBufferId;
 		std::vector<Graphics::Resources::ResourceID> shadowMapIds;
-		const std::vector<DxcDefine>* lightDefines;
+		const std::vector<DxcDefine>* shaderDefines;
 		
 		Graphics::Assets::Material* materialDepthPass;
 		Graphics::Assets::Material* materialDepthCubePass;
@@ -157,7 +157,8 @@ namespace Common::Logic::SceneEntity
 
 			float zNear;
 			float zFar;
-			float2 padding;
+			float mipBias;
+			float padding;
 
 			float4x4 lastViewProjection;
 		};

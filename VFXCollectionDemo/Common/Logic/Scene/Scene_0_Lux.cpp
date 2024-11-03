@@ -15,11 +15,11 @@ using namespace Common::Logic::SceneEntity;
 Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	: isLoaded(false), terrain(nullptr), vegetationSystem(nullptr), lightingSystem(nullptr),
 	camera(nullptr), postProcessManager(nullptr), mutableConstantsBuffer{}, mutableConstantsId{},
-	vfxAtlasId{}, perlinNoiseId{}, pbrStandardVSId{}, pbrStandardPSId{}, particleSimulationCSId{},
-	environmentWorld{}, timer{}, _deltaTime{}, fps(60.0f), cpuTimeCounter{}, prevTimePoint{}, frameCounter{},
-	vfxLux{}, vfxLuxSparkles{}, vfxLuxDistorters{}, areaLightId{}, ambientLightId{}, depthPassVSId{},
+	vfxAtlasId{}, perlinNoiseId{}, particleSimulationCSId{}, environmentWorld{}, timer{},
+	_deltaTime{}, fps(60.0f), cpuTimeCounter{}, prevTimePoint{}, frameCounter{}, vfxLux{},
+	vfxLuxSparkles{}, vfxLuxDistorters{}, areaLightId{}, ambientLightId{}, depthPassVSId{},
 	depthCubePassVSId{}, depthCubePassGSId{}, depthPassMaterial{}, depthCubePassMaterial{},
-	lightParticleBufferId{}, particleLightSimulationCSId{}
+	lightParticleBufferId{}, particleLightSimulationCSId{}, renderSize{}
 {
 	environmentPosition = float3(0.0f, 0.0f, 0.0f);
 	cameraPosition = float3(0.0f, 0.0f, 5.0f);
@@ -49,12 +49,12 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 
 	auto commandList = renderer->StartCreatingResources();
 
-	auto width = renderer->GetWidth();
-	auto height = renderer->GetHeight();
+	renderSize.x = renderer->GetWidth();
+	renderSize.y = renderer->GetHeight();
 
 	CreateLights(commandList, renderer);
 
-	CreateConstantBuffers(device, resourceManager, width, height);
+	CreateConstantBuffers(device, resourceManager, renderSize.x, renderSize.y);
 	LoadShaders(device, resourceManager);
 	LoadTextures(device, commandList, resourceManager);
 
@@ -90,8 +90,6 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 	resourceManager->DeleteResource<Texture>(vfxAtlasId);
 	resourceManager->DeleteResource<Texture>(perlinNoiseId);
 
-	resourceManager->DeleteResource<Shader>(pbrStandardVSId);
-	resourceManager->DeleteResource<Shader>(pbrStandardPSId);
 	resourceManager->DeleteResource<Shader>(depthCubePassVSId);
 	resourceManager->DeleteResource<Shader>(depthCubePassGSId);
 
@@ -117,10 +115,10 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 
 void Common::Logic::Scene::Scene_0_Lux::OnResize(Graphics::DirectX12Renderer* renderer)
 {
-	auto width = renderer->GetWidth();
-	auto height = renderer->GetHeight();
+	renderSize.x = renderer->GetWidth();
+	renderSize.y = renderer->GetHeight();
 
-	auto aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+	auto aspectRatio = static_cast<float>(renderSize.x) / static_cast<float>(renderSize.y);
 
 	camera->UpdateProjection(FOV_Y, aspectRatio, Z_NEAR, Z_FAR);
 	
@@ -134,6 +132,14 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 	cameraPosition.x = std::cos(timer * 0.2f) * 5.0f;
 	cameraPosition.y = std::sin(timer * 0.2f) * 5.0f;
 	cameraPosition.z = 3.0f;
+
+	if constexpr (FSR_ENABLED)
+	{
+		float2 jitter{};
+		postProcessManager->UpdateFSR(jitter);
+
+		camera->AddJitter(jitter, float2(static_cast<float>(renderSize.x), static_cast<float>(renderSize.y)));
+	}
 
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 
@@ -272,12 +278,6 @@ void Common::Logic::Scene::Scene_0_Lux::LoadShaders(ID3D12Device* device, Graphi
 	std::vector<DxcDefine> defines;
 	defines.push_back({ L"LIGHT_MATRICES_NUMBER", lightMatricesNumberString.c_str() });
 
-	pbrStandardVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\PBRStandardVS.hlsl",
-		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
-
-	pbrStandardPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\PBRStandardPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
-
 	particleSimulationCSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\ParticleSimulationCS.hlsl",
 		ShaderType::COMPUTE_SHADER, ShaderVersion::SM_6_5);
 
@@ -338,8 +338,6 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
 		Graphics::DefaultFilterSetup::FILTER_TRILINEAR_WRAP);
 
-	auto pbrStandardVS = resourceManager->GetResource<Shader>(pbrStandardVSId);
-	auto pbrStandardPS = resourceManager->GetResource<Shader>(pbrStandardPSId);
 	auto depthCubePassVS = resourceManager->GetResource<Shader>(depthCubePassVSId);
 	auto depthCubePassGS = resourceManager->GetResource<Shader>(depthCubePassGSId);
 
@@ -364,15 +362,18 @@ void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Gr
 void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer)
 {
-	std::vector<DxcDefine> lightDefines;
-	lightDefines.push_back({ L"AREA_LIGHT", nullptr });
+	std::vector<DxcDefine> shaderDefines;
+	shaderDefines.push_back({ L"AREA_LIGHT", nullptr });
+
+	if constexpr (FSR_ENABLED)
+		shaderDefines.push_back({ L"FSR", nullptr });
 
 	std::wstringstream lightParticleNumberStream;
 	lightParticleNumberStream << SPARKLES_NUMBER;
 	std::wstring lightParticleNumberString;
 	lightParticleNumberStream >> lightParticleNumberString;
 
-	lightDefines.push_back({ L"PARTICLE_LIGHT_SOURCE_NUMBER", lightParticleNumberString.c_str() });
+	shaderDefines.push_back({ L"PARTICLE_LIGHT_SOURCE_NUMBER", lightParticleNumberString.c_str() });
 	
 	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
 
@@ -407,7 +408,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrainDesc.hasDepthPrepass = DEPTH_PREPASS_ENABLED;
 	terrainDesc.outputVelocity = renderingScheme.enableFSR || renderingScheme.enableMotionBlur;
 	terrainDesc.lightParticleBufferId = lightParticleBufferId;
-	terrainDesc.lightDefines = &lightDefines;
+	terrainDesc.shaderDefines = &shaderDefines;
 	terrainDesc.shadowMapIds.push_back(areaLightDesc.GetShadowMapId());
 	terrainDesc.materialDepthPass = depthPassMaterial;
 	terrainDesc.materialDepthCubePass = depthCubePassMaterial;
@@ -445,7 +446,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	vegetationSystemDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
 	vegetationSystemDesc.lightMatricesConstantBufferId = lightingSystem->GetLightMatricesConstantBufferId();
 	vegetationSystemDesc.shadowMapIds.push_back(areaLightDesc.GetShadowMapId());
-	vegetationSystemDesc.lightDefines = &lightDefines;
+	vegetationSystemDesc.shaderDefines = &shaderDefines;
 	vegetationSystemDesc.vegetationCacheFileName = "Resources\\Meshes\\Lux_Vegetation.bin";
 	vegetationSystemDesc.vegetationMapFileName = "Resources\\Textures\\Terrain\\Lux_VegetationMap.dds";
 	vegetationSystemDesc.albedoMapFileName = "Resources\\Textures\\Terrain\\VegetationAlbedoAtlas.dds";
@@ -467,7 +468,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	vegetationSystem = new VegatationSystem(commandList, renderer, vegetationSystemDesc, camera);
 
 	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer, camera,
-		lightingSystem, lightDefines, renderingScheme);
+		lightingSystem, shaderDefines, renderingScheme);
 
 	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, vfxAtlasId, camera,
 		float3(0.0f, 0.0f, 1.25f));

@@ -12,7 +12,8 @@ cbuffer MutableConstants : register(b1)
 	
 	float zNear;
 	float zFar;
-	float2 padding;
+	float mipBias;
+	float padding;
 	
 #ifdef OUTPUT_VELOCITY
 	float4x4 lastViewProjection;
@@ -64,6 +65,7 @@ Output main(Input input)
 	float2 nonHomogeneousPos = output.position.xy / output.position.w;
 	
 	output.velocity = nonHomogeneousPos - lastNonHomogeneousPos.xy;
+	output.velocity *= 0.5f;
 #endif
 	
 	return output;

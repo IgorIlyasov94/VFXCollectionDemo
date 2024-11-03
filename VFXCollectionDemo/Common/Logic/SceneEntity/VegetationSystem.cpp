@@ -1,5 +1,6 @@
 #include "VegetationSystem.h"
 #include "LightingSystem.h"
+#include "PostProcessManager.h"
 #include "../../../Graphics/Assets/MaterialBuilder.h"
 #include "../../../Graphics/Assets/Loaders/OBJLoader.h"
 #include "../../../Graphics/Assets/Loaders/DDSLoader.h"
@@ -217,7 +218,10 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateConstantBuffers(ID3D12D
 	mutableConstantsBuffer->zNear = LightingSystem::SHADOW_MAP_Z_NEAR;
 	mutableConstantsBuffer->zFar = LightingSystem::SHADOW_MAP_Z_FAR;
 	mutableConstantsBuffer->lastTime = 0.0f;
-	mutableConstantsBuffer->padding = 0.0f;
+
+	mutableConstantsBuffer->mipBias = std::log2(PostProcessManager::FSR_SIZE_NUMERATOR /
+		static_cast<float>(PostProcessManager::FSR_SIZE_DENOMINATOR)) - 2.0f;
+
 	mutableConstantsBuffer->lastWindDirection = mutableConstantsBuffer->windDirection;
 	mutableConstantsBuffer->lastWindStrength = mutableConstantsBuffer->windStrength;
 	mutableConstantsBuffer->lastViewProjection = mutableConstantsBuffer->viewProjection;
@@ -301,8 +305,12 @@ void Common::Logic::SceneEntity::VegatationSystem::LoadShaders(ID3D12Device* dev
 		mainDefines.push_back({ L"OUTPUT_VELOCITY", nullptr });
 
 	mainDefines.insert(mainDefines.end(),
-		std::make_move_iterator(desc.lightDefines->begin()),
-		std::make_move_iterator(desc.lightDefines->end()));
+		std::make_move_iterator(desc.shaderDefines->begin()),
+		std::make_move_iterator(desc.shaderDefines->end()));
+
+	definesDepthPrepass.insert(definesDepthPrepass.end(),
+		std::make_move_iterator(desc.shaderDefines->begin()),
+		std::make_move_iterator(desc.shaderDefines->end()));
 
 	vegetationVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, mainDefines);
@@ -331,7 +339,7 @@ void Common::Logic::SceneEntity::VegatationSystem::LoadShaders(ID3D12Device* dev
 			ShaderType::GEOMETRY_SHADER, ShaderVersion::SM_6_5, defines);
 
 		vegetationDepthCubePassPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\VegetationDepthCubePassPS.hlsl",
-			ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
+			ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, mainDefines);
 	}
 }
 
@@ -404,7 +412,7 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterials(ID3D12Device*
 	{
 		auto vegetationDepthPassPS = resourceManager->GetResource<Shader>(vegetationDepthPassPSId);
 
-		materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress);
 		materialBuilder.SetBuffer(0u, vegetationBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
 		materialBuilder.SetTexture(1u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);
 		materialBuilder.SetTexture(2u, normalResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -427,7 +435,7 @@ void Common::Logic::SceneEntity::VegatationSystem::CreateMaterials(ID3D12Device*
 		auto vegetationDepthPassPS = resourceManager->GetResource<Shader>(vegetationDepthPassPSId);
 
 		materialBuilder.SetRootConstants(0u, 1u, D3D12_SHADER_VISIBILITY_VERTEX);
-		materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
+		materialBuilder.SetConstantBuffer(1u, mutableConstantsResource->resourceGPUAddress);
 		materialBuilder.SetConstantBuffer(2u, lightMatricesConstantBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
 		materialBuilder.SetBuffer(0u, vegetationBufferResource->resourceGPUAddress, D3D12_SHADER_VISIBILITY_VERTEX);
 		materialBuilder.SetTexture(1u, perlinNoiseResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_VERTEX);

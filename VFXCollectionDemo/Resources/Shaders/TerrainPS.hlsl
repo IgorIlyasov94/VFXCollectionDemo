@@ -24,7 +24,12 @@ cbuffer MutableConstants : register(b1)
 	
 	float zNear;
 	float zFar;
-	float2 padding;
+	float mipBias;
+	float padding;
+	
+#ifdef OUTPUT_VELOCITY
+	float4x4 lastViewProjection;
+#endif
 };
 
 struct Input
@@ -78,22 +83,40 @@ Output main(Input input)
 {
 	Output output = (Output)0;
 	
+#ifdef FSR
+	float4 blendFactor = blendMap.SampleBias(samplerAnisotropic, input.texCoord, mipBias);
+#else
 	float4 blendFactor = blendMap.Sample(samplerAnisotropic, input.texCoord);
+#endif
 	blendFactor = blendFactor;
 	blendFactor /= max(blendFactor.x + blendFactor.y + blendFactor.z + blendFactor.w, 0.001f);
 	
+#ifdef FSR
+	float4 texData = albedoRoughness0.SampleBias(samplerAnisotropic, input.texCoord01.xy, mipBias) * blendFactor.x;
+	texData += albedoRoughness1.SampleBias(samplerAnisotropic, input.texCoord01.zw, mipBias) * blendFactor.y;
+	texData += albedoRoughness2.SampleBias(samplerAnisotropic, input.texCoord23.xy, mipBias) * blendFactor.z;
+	texData += albedoRoughness3.SampleBias(samplerAnisotropic, input.texCoord23.zw, mipBias) * blendFactor.w;
+#else
 	float4 texData = albedoRoughness0.Sample(samplerAnisotropic, input.texCoord01.xy) * blendFactor.x;
 	texData += albedoRoughness1.Sample(samplerAnisotropic, input.texCoord01.zw) * blendFactor.y;
 	texData += albedoRoughness2.Sample(samplerAnisotropic, input.texCoord23.xy) * blendFactor.z;
 	texData += albedoRoughness3.Sample(samplerAnisotropic, input.texCoord23.zw) * blendFactor.w;
+#endif
 	
 	float3 albedo = texData.xyz;
 	float roughness = texData.w * texData.w;
 	
+#ifdef FSR
+	texData = normalMetalness0.SampleBias(samplerAnisotropic, input.texCoord01.xy, mipBias) * blendFactor.x;
+	texData += normalMetalness1.SampleBias(samplerAnisotropic, input.texCoord01.zw, mipBias) * blendFactor.y;
+	texData += normalMetalness2.SampleBias(samplerAnisotropic, input.texCoord23.xy, mipBias) * blendFactor.z;
+	texData += normalMetalness3.SampleBias(samplerAnisotropic, input.texCoord23.zw, mipBias) * blendFactor.w;
+#else
 	texData = normalMetalness0.Sample(samplerAnisotropic, input.texCoord01.xy) * blendFactor.x;
 	texData += normalMetalness1.Sample(samplerAnisotropic, input.texCoord01.zw) * blendFactor.y;
 	texData += normalMetalness2.Sample(samplerAnisotropic, input.texCoord23.xy) * blendFactor.z;
 	texData += normalMetalness3.Sample(samplerAnisotropic, input.texCoord23.zw) * blendFactor.w;
+#endif
 	
 	float3 normal = texData.xyz * 2.0f - 1.0f.xxx;
 	normal = BumpMapping(normal, input.normal, input.binormal, input.tangent);

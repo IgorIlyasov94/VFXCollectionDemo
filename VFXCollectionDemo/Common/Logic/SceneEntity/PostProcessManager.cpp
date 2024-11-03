@@ -98,8 +98,14 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 		fsrDesc.reactiveMask = sceneAlphaTargetGPUResource->GetResource();
 		fsrDesc.outputBuffer = temporaryRWTextureGPUResource->GetResource();
 		fsrDesc.maxSize = renderer->GetDisplaySize();
-		fsrDesc.enableSharpening = false;
+		fsrDesc.enableSharpening = SHARPNESS_ENABLED;
 		fsrDesc.sharpnessFactor = SHARPNESS_FACTOR;
+
+		fsrDesc.size = uint2(static_cast<uint32_t>(scissorRectangle.right), static_cast<uint32_t>(scissorRectangle.bottom));
+		fsrDesc.targetSize = uint2(_width, _height);
+		fsrDesc.zNear = _camera->GetZNear();
+		fsrDesc.zFar = _camera->GetZFar();
+		fsrDesc.fovY = _camera->GetFovY();
 
 		_fsr = new FSR(device, fsrDesc);
 	}
@@ -225,6 +231,15 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	renderer->EndCreatingResources();
 
 	UpdateObjects(renderer);
+}
+
+void Common::Logic::SceneEntity::PostProcessManager::UpdateFSR(float2& jitter)
+{
+	if (!_renderingScheme.enableFSR)
+		return;
+
+	_fsr->UpdateJitter();
+	jitter = _fsr->GetJitter();
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::SetDepthPrepass(ID3D12GraphicsCommandList* commandList)
@@ -1004,8 +1019,14 @@ void Common::Logic::SceneEntity::PostProcessManager::UpdateObjects(Graphics::Dir
 		fsrDesc.reactiveMask = sceneAlphaTargetGPUResource->GetResource();
 		fsrDesc.outputBuffer = temporaryRWTextureGPUResource->GetResource();
 		fsrDesc.maxSize = renderer->GetDisplaySize();
-		fsrDesc.enableSharpening = false;
+		fsrDesc.enableSharpening = SHARPNESS_ENABLED;
 		fsrDesc.sharpnessFactor = SHARPNESS_FACTOR;
+
+		fsrDesc.size = uint2(static_cast<uint32_t>(scissorRectangle.right), static_cast<uint32_t>(scissorRectangle.bottom));
+		fsrDesc.targetSize = uint2(_width, _height);
+		fsrDesc.zNear = _camera->GetZNear();
+		fsrDesc.zFar = _camera->GetZFar();
+		fsrDesc.fovY = _camera->GetFovY();
 
 		_fsr->OnResize(renderer->GetDevice(), fsrDesc);
 	}
@@ -1056,7 +1077,7 @@ void Common::Logic::SceneEntity::PostProcessManager::SetFSR(ID3D12GraphicsComman
 	auto size = uint2(static_cast<uint32_t>(scissorRectangle.right), static_cast<uint32_t>(scissorRectangle.bottom));
 	auto targetSize = uint2(_width, _height);
 
-	_fsr->Dispatch(commandList, size, targetSize, *_camera, {}, deltaTime);
+	_fsr->Dispatch(commandList, deltaTime);
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::SetHDR(ID3D12GraphicsCommandList* commandList)

@@ -15,6 +15,8 @@ namespace Common::Logic::SceneEntity
 		void Update(const float3& position, const float3& lookAt, const float3& upVector);
 		void UpdateProjection(float fovY, float aspectRatio, float zNear, float zFar);
 
+		void AddJitter(const float2& jitter, const float2& renderSize);
+
 		const float4x4& GetView() const;
 		const float4x4& GetProjection() const;
 		const float4x4& GetViewProjection() const;
@@ -44,6 +46,8 @@ namespace Common::Logic::SceneEntity
 
 		float3 _position;
 		float3 direction;
+
+		float4x4 baseProjection;
 
 		float _zNear;
 		float _zFar;

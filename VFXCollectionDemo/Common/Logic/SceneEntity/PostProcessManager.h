@@ -46,6 +46,8 @@ namespace Common::Logic::SceneEntity
 
 		void OnResize(Graphics::DirectX12Renderer* renderer);
 
+		void UpdateFSR(float2& jitter);
+
 		void SetDepthPrepass(ID3D12GraphicsCommandList* commandList);
 		void SetGBuffer(ID3D12GraphicsCommandList* commandList);
 
@@ -55,6 +57,9 @@ namespace Common::Logic::SceneEntity
 		void RenderToBackBuffer(ID3D12GraphicsCommandList* commandList);
 
 		const Graphics::Assets::Mesh* GetFullscreenQuadMesh() const;
+
+		static constexpr uint32_t FSR_SIZE_NUMERATOR = 1u;
+		static constexpr uint32_t FSR_SIZE_DENOMINATOR = 2u;
 
 	private:
 		PostProcessManager() = delete;
@@ -159,6 +164,8 @@ namespace Common::Logic::SceneEntity
 		static constexpr float FOG_MOVING_COEFF = 0.002f;
 		static constexpr float SHARPNESS_FACTOR = 1.0f;
 
+		static constexpr bool SHARPNESS_ENABLED = true;
+
 		static constexpr uint32_t THREADS_PER_GROUP = 64u;
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
 		static constexpr uint32_t MAX_SIMULTANEOUS_BARRIER_NUMBER = 5u;
@@ -166,9 +173,6 @@ namespace Common::Logic::SceneEntity
 		static constexpr uint32_t NOISE_SIZE_X = 128u;
 		static constexpr uint32_t NOISE_SIZE_Y = 128u;
 		static constexpr uint32_t NOISE_SIZE_Z = 64u;
-
-		static constexpr uint32_t FSR_SIZE_NUMERATOR = 1u;
-		static constexpr uint32_t FSR_SIZE_DENOMINATOR = 2u;
 
 		VolumetricFogConstants* volumetricFogConstants;
 		MotionBlurConstants motionBlurConstants;

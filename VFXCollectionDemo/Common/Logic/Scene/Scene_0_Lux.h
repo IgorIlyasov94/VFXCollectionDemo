@@ -63,8 +63,8 @@ namespace Common::Logic::Scene
 		static constexpr float AMBIENT_LIGHT_INTENSITY = 0.15f;
 
 		static constexpr bool DEPTH_PREPASS_ENABLED = true;
-		static constexpr bool FSR_ENABLED = false;
-		static constexpr bool MOTION_BLUR_ENABLED = false;
+		static constexpr bool FSR_ENABLED = true;
+		static constexpr bool MOTION_BLUR_ENABLED = true;
 		static constexpr bool VOLUMETRIC_FOG_ENABLED = true;
 		static constexpr bool USING_PARTICLE_LIGHT = true;
 
@@ -95,6 +95,8 @@ namespace Common::Logic::Scene
 		float3 cameraLookAt;
 		float3 cameraUpVector;
 		
+		uint2 renderSize;
+
 		float timer;
 		float _deltaTime;
 		float fps;
@@ -116,9 +118,6 @@ namespace Common::Logic::Scene
 		Graphics::Resources::ResourceID vfxAtlasId;
 		Graphics::Resources::ResourceID perlinNoiseId;
 		Graphics::Resources::ResourceID lightParticleBufferId;
-
-		Graphics::Resources::ResourceID pbrStandardVSId;
-		Graphics::Resources::ResourceID pbrStandardPSId;
 
 		Graphics::Resources::ResourceID depthPassVSId;
 

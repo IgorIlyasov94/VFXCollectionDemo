@@ -4,6 +4,7 @@
 #include "../../../Graphics/Assets/Loaders/DDSLoader.h"
 #include "../../../Graphics/Assets/GeometryUtilities.h"
 #include "LightingSystem.h"
+#include "PostProcessManager.h"
 
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -356,6 +357,8 @@ void Common::Logic::SceneEntity::Terrain::CreateConstantBuffers(ID3D12Device* de
 	mutableConstantsBuffer->mapTiling3 = desc.map3Tiling;
 	mutableConstantsBuffer->zNear = LightingSystem::SHADOW_MAP_Z_NEAR;
 	mutableConstantsBuffer->zFar = LightingSystem::SHADOW_MAP_Z_FAR;
+	mutableConstantsBuffer->mipBias = std::log2(PostProcessManager::FSR_SIZE_NUMERATOR /
+		static_cast<float>(PostProcessManager::FSR_SIZE_DENOMINATOR)) - 1.0f;
 	mutableConstantsBuffer->padding = {};
 }
 
@@ -368,8 +371,8 @@ void Common::Logic::SceneEntity::Terrain::LoadShaders(ID3D12Device* device,
 		defines.push_back({ L"OUTPUT_VELOCITY", nullptr });
 
 	defines.insert(defines.end(),
-		std::make_move_iterator(desc.lightDefines->begin()),
-		std::make_move_iterator(desc.lightDefines->end()));
+		std::make_move_iterator(desc.shaderDefines->begin()),
+		std::make_move_iterator(desc.shaderDefines->end()));
 
 	terrainVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\TerrainVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5, defines);

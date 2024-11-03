@@ -25,7 +25,13 @@ cbuffer MutableConstants : register(b1)
 	
 	float zNear;
 	float zFar;
-	float2 padding;
+	float lastTime;
+	float mipBias;
+	
+	float3 lastWindDirection;
+	float lastWindStrength;
+	
+	float4x4 lastViewProjection;
 };
 
 struct Input
@@ -70,11 +76,21 @@ Output main(Input input)
 {
 	Output output = (Output)0;
 	
+#ifdef FSR
+	float4 texData = albedoRoughness.SampleBias(samplerLinear, input.texCoord, mipBias);
+#else
 	float4 texData = albedoRoughness.SampleBias(samplerLinear, input.texCoord, -1.0f);
+#endif
+	
 	float3 albedo = texData.xyz;
 	float roughness = texData.w * texData.w;
 	
+#ifdef FSR
+	texData = normalAlpha.SampleBias(samplerLinear, input.texCoord, mipBias);
+#else
 	texData = normalAlpha.SampleBias(samplerLinear, input.texCoord, -1.0f);
+#endif
+	
 	float3 normal = texData.xyz * 2.0f - 1.0f.xxx;
 	
 	normal = BumpMapping(normal, normalize(input.normal), normalize(input.binormal), normalize(input.tangent));

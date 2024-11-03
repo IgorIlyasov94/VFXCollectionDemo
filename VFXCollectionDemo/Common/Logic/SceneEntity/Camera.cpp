@@ -44,6 +44,16 @@ void Common::Logic::SceneEntity::Camera::UpdateProjection(float fovY, float aspe
 
 	viewProjection = view * projection;
 	invViewProjection = XMMatrixInverse(nullptr, viewProjection);
+
+	baseProjection = projection;
+}
+
+void Common::Logic::SceneEntity::Camera::AddJitter(const float2& jitter, const float2& renderSize)
+{
+	auto jitterVector = XMVectorSet(2.0f * jitter.x / renderSize.x, -2.0f * jitter.y / renderSize.y, 0.0f, 1.0f);
+	auto jitterMatrix = XMMatrixTranslationFromVector(jitterVector);
+
+	projection = jitterMatrix * baseProjection;
 }
 
 const float4x4& Common::Logic::SceneEntity::Camera::GetView() const

@@ -21,16 +21,13 @@ cbuffer MutableConstants : register(b1)
 	
 	float zNear;
 	float zFar;
-	
-#ifdef OUTPUT_VELOCITY
 	float lastTime;
-	float padding;
+	float mipBias;
 	
 	float3 lastWindDirection;
 	float lastWindStrength;
 	
 	float4x4 lastViewProjection;
-#endif
 };
 
 struct Input
@@ -87,9 +84,9 @@ Output main(Input input)
 	shift = lerp(shift * vegetation.windInfluence, 0.0f.xxx, t);
 	float shiftCoeff = (1.0f - (isCap ? 0.5f : input.texCoord.y)) * height;
 	
-	worldPosition.xyz += shift * shiftCoeff;
+	output.worldPosition = worldPosition.xyz + shift * shiftCoeff;
 	
-	output.position = mul(viewProjection, worldPosition);
+	output.position = mul(viewProjection, float4(output.worldPosition, worldPosition.w));
 	
 	float3 normal = normalize(mul((float3x3)vegetation.world, input.normal.xyz));
 	float3 tangent = normalize(mul((float3x3)vegetation.world, input.tangent.xyz));
@@ -100,7 +97,6 @@ Output main(Input input)
 	output.binormal = cross(output.tangent, output.normal);
 	
 	output.texCoord = input.texCoord * atlasElementSize + vegetation.atlasElementOffset;
-	output.worldPosition = worldPosition.xyz;
 	
 #ifdef OUTPUT_VELOCITY
 	float lastT = saturate(sin(lastTime * lastWindStrength * noise) * 0.5f + 0.5f);
@@ -116,6 +112,7 @@ Output main(Input input)
 	float2 nonHomogeneousPos = output.position.xy / output.position.w;
 	
 	output.velocity = nonHomogeneousPos - lastNonHomogeneousPos.xy;
+	output.velocity *= 0.5f;
 #endif
 	
 	return output;

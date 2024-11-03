@@ -47,7 +47,7 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID lightMatricesConstantBufferId;
 		
 		std::vector<Graphics::Resources::ResourceID> shadowMapIds;
-		const std::vector<DxcDefine>* lightDefines;
+		const std::vector<DxcDefine>* shaderDefines;
 		
 		std::map<uint32_t, VegetationSystemTable> grassTable;
 
@@ -156,7 +156,7 @@ namespace Common::Logic::SceneEntity
 			float zNear;
 			float zFar;
 			float lastTime;
-			float padding;
+			float mipBias;
 
 			float3 lastWindDirection;
 			float lastWindStrength;
