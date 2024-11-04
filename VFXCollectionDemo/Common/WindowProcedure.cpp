@@ -97,6 +97,11 @@ LRESULT Common::WindowProcedure::Procedure(HWND windowHandler, UINT message, WPA
 
 			if (keyData == VK_ESCAPE)
 				PostQuitMessage(0);
+			else if (wParam == VK_SPACE)
+			{
+				if (mainLogic != nullptr)
+					mainLogic->SwitchToNextScene();
+			}
 
 			return 0;
 		}

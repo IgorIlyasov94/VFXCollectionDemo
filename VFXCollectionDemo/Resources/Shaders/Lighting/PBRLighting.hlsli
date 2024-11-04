@@ -21,9 +21,9 @@ static const float CLOUD_UPPER_WATER_PARTICLE_SIZE = 30E-6;
 static const float3 AIR_IOR = float3(1.00027657f, 1.00027784f, 1.00028004f);
 static const float3 WATER_IOR = float3(1.3318f, 1.3330f, 1.3364f);
 
-static const float3 AIR_ABSORPTION_COEFF = float3(0.002f, 0.002f, 0.002f);
-static const float3 AIR_WET_ABSORPTION_COEFF = float3(0.004f, 0.004f, 0.004f);
-static const float3 WATER_ABSORPTION_COEFF = float3(2.8723f, 0.44782f, 0.26335f) * 1E-5;
+static const float3 AIR_ABSORPTION_COEFF = float3(0.6f, 0.6f, 0.6f);
+static const float3 AIR_WET_ABSORPTION_COEFF = float3(1.2f, 1.2f, 1.2f);
+static const float3 WATER_ABSORPTION_COEFF = float3(2.8723f, 0.44782f, 0.26335f) * 3E-3;
 
 static const float3 INV_WAVELENGTH_4 = 1.0f.xxx / pow(float3(630E-3, 550E-3, 464E-3), 4.0f);
 
@@ -286,6 +286,11 @@ float DoubleHenyeyGreensteinPhase(float cosAngle)
 	float backwardPhase = HenyeyGreensteinPhase(cosAngle, HG_BACKWARD_G);
 	
 	return lerp(backwardPhase, forwardPhase, HG_LERP_FACTOR);
+}
+
+float4 BouguerLambertBeerLaw(float4 radiance, float thickness, float4 absorptionCoeff)
+{
+	return radiance * exp(-absorptionCoeff * thickness);
 }
 
 float3 BouguerLambertBeerLaw(float3 radiance, float thickness, float3 absorptionCoeff)

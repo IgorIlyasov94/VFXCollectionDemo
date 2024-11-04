@@ -17,6 +17,7 @@ namespace Common::Logic
 		Scene::IScene* GetCurrentScene();
 
 		void LoadScene(Scene::SceneID id, Graphics::DirectX12Renderer* renderer);
+		void SwitchToNextScene(Graphics::DirectX12Renderer* renderer);
 
 	private:
 		SceneManager(const SceneManager&) = delete;

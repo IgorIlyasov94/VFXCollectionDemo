@@ -15,7 +15,7 @@ cbuffer RootConstants : register(b0)
 	float height;
 };
 
-#if defined(FSR)
+#if defined(FSR) || defined(VOLUMETRIC_FOG)
 Texture2D<float2> sceneMotion : register(t0);
 #else
 Texture2D sceneColor : register(t0);
@@ -61,7 +61,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float2 offsetG = saturate(texCoord + motionG * t);
 		float2 offsetB = saturate(texCoord + motionB * t);
 		
-#if defined(FSR)
+#if defined(FSR) || defined(VOLUMETRIC_FOG)
 		uint2 sizeVector = uint2(width, height);
 		
 		uint2 offsetRU = (uint2)floor(offsetR * sizeVector);

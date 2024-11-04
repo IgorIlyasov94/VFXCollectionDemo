@@ -20,7 +20,8 @@ Common::Logic::Scene::Scene_1_WhiteRoom::Scene_1_WhiteRoom()
 	postProcessManager{}, groupsNumberX(1u), groupsNumberY(1u), accelerationStructureDesc{},
 	accelerationStructureCrystalDesc{}, lightIntensity0{}, lightIntensity1{}, quadMesh{}, pointLight0Id{}, pointLight1Id{},
 	quadVSId{}, quadPSId{}, texturedQuadMaterial{}, noiseId{}, crystalVertexBufferResource{}, crystalIndexBufferResource{},
-	crystalVertexBufferId{}, crystalIndexBufferId{}
+	crystalVertexBufferId{}, crystalIndexBufferId{}, depthVelocityTargetId{}, depthVelocityTargetResource{},
+	renderSize{}
 {
 	cameraPosition = float3(5.5f, 5.5f, 2.5f);
 	cameraLookAt = float3(-2.5f, 2.5f, 2.5f);
@@ -49,6 +50,17 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Load(Graphics::DirectX12Renderer* 
 
 	auto width = renderer->GetWidth();
 	auto height = renderer->GetHeight();
+
+	if constexpr (FSR_ENABLED)
+	{
+		width = static_cast<uint32_t>(std::floor(width * PostProcessManager::FSR_SIZE_NUMERATOR /
+			static_cast<float>(PostProcessManager::FSR_SIZE_DENOMINATOR)));
+
+		height = static_cast<uint32_t>(std::floor(height * PostProcessManager::FSR_SIZE_NUMERATOR /
+			static_cast<float>(PostProcessManager::FSR_SIZE_DENOMINATOR)));
+	}
+
+	renderSize = float2(static_cast<float>(width), static_cast<float>(height));
 
 	groupsNumberX = width == 0u ? 1u : width;
 	groupsNumberY = height == 0u ? 1u : height;
@@ -98,6 +110,9 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Unload(Graphics::DirectX12Renderer
 
 	resourceManager->DeleteResource<RWTexture>(resultTargetId);
 
+	if constexpr (FSR_ENABLED)
+		resourceManager->DeleteResource<RWTexture>(depthVelocityTargetId);
+
 	resourceManager->DeleteResource<Shader>(lightingRSId);
 	resourceManager->DeleteResource<Shader>(quadVSId);
 	resourceManager->DeleteResource<Shader>(quadPSId);
@@ -118,6 +133,17 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::OnResize(Graphics::DirectX12Render
 	auto width = renderer->GetWidth();
 	auto height = renderer->GetHeight();
 
+	if constexpr (FSR_ENABLED)
+	{
+		width = static_cast<uint32_t>(std::floor(width * PostProcessManager::FSR_SIZE_NUMERATOR /
+			static_cast<float>(PostProcessManager::FSR_SIZE_DENOMINATOR)));
+
+		height = static_cast<uint32_t>(std::floor(height * PostProcessManager::FSR_SIZE_NUMERATOR /
+			static_cast<float>(PostProcessManager::FSR_SIZE_DENOMINATOR)));
+	}
+
+	renderSize = float2(static_cast<float>(width), static_cast<float>(height));
+
 	auto aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 
 	camera->UpdateProjection(FOV_Y, aspectRatio, Z_NEAR, Z_FAR);
@@ -133,6 +159,25 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::OnResize(Graphics::DirectX12Render
 	auto commandList = renderer->StartCreatingResources();
 	CreateTargets(renderer->GetDevice(), commandList, resourceManager, width, height);
 	renderer->EndCreatingResources();
+
+	auto resultTargetTextureResource = resourceManager->GetResource<RWTexture>(resultTargetId);
+	
+	lightingObject->UpdateTable(0u, DescriptorTableType::RW_TEXTURE,
+		resultTargetTextureResource->uavDescriptor.gpuDescriptor);
+
+	texturedQuadMaterial->UpdateTable(0u, DescriptorTableType::TEXTURE,
+		resultTargetTextureResource->srvDescriptor.gpuDescriptor);
+
+	if constexpr (FSR_ENABLED)
+	{
+		auto depthVelocityTargetTextureResource = resourceManager->GetResource<RWTexture>(depthVelocityTargetId);
+
+		lightingObject->UpdateTable(1u, DescriptorTableType::RW_TEXTURE,
+			depthVelocityTargetTextureResource->uavDescriptor.gpuDescriptor);
+
+		texturedQuadMaterial->UpdateTable(1u, DescriptorTableType::TEXTURE,
+			depthVelocityTargetTextureResource->srvDescriptor.gpuDescriptor);
+	}
 
 	postProcessManager->OnResize(renderer);
 }
@@ -152,6 +197,18 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Update()
 
 	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
 
+	mutableConstantsBuffer->lastViewProjection = mutableConstantsBuffer->viewProjection;
+	mutableConstantsBuffer->viewProjection = camera->GetViewProjection();
+
+	//if constexpr (FSR_ENABLED)
+	//{
+	//	float2 jitter{};
+	//	postProcessManager->UpdateFSR(jitter);
+	//
+	//	camera->AddJitter(jitter, renderSize);
+	//	camera->Update(cameraPosition, cameraLookAt, cameraUpVector);
+	//}
+
 	auto& light0Desc = lightingSystem->GetSourceDesc(pointLight0Id);
 	light0Desc.intensity = std::sin(timer * 1.8f) * 0.5f + 8.0f;
 	lightingSystem->UpdateSourceDesc(pointLight0Id);
@@ -166,7 +223,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Update()
 
 	mutableConstantsBuffer->invViewProjection = camera->GetInvViewProjection();
 	mutableConstantsBuffer->cameraPosition = camera->GetPosition();
-
+	
 	auto currentTimePoint = std::chrono::high_resolution_clock::now();
 	auto deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(currentTimePoint - prevTimePoint);
 
@@ -198,11 +255,26 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Render(ID3D12GraphicsCommandList* 
 
 	commandList->QueryInterface(IID_PPV_ARGS(&commandList5));
 
-	resultTargetResource->EndBarrier(commandList);
+	D3D12_RESOURCE_BARRIER barrier{};
+
+	if constexpr (FSR_ENABLED)
+	{
+		barriers.clear();
+
+		if (resultTargetResource->GetEndBarrier(barrier))
+			barriers.push_back(barrier);
+
+		if (depthVelocityTargetResource->GetEndBarrier(barrier))
+			barriers.push_back(barrier);
+
+		if (!barriers.empty())
+			commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
+	}
+	else
+		resultTargetResource->EndBarrier(commandList);
 
 	lightingObject->Dispatch(commandList5, groupsNumberX, groupsNumberY, 1u);
 
-	D3D12_RESOURCE_BARRIER barrier{};
 	barriers.clear();
 
 	resultTargetResource->GetUAVBarrier(barrier);
@@ -211,6 +283,15 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Render(ID3D12GraphicsCommandList* 
 	if (resultTargetResource->GetBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);
 
+	if constexpr (FSR_ENABLED)
+	{
+		depthVelocityTargetResource->GetUAVBarrier(barrier);
+		barriers.push_back(barrier);
+
+		if (depthVelocityTargetResource->GetBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+			barriers.push_back(barrier);
+	}
+	
 	commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 
 	postProcessManager->SetDepthPrepass(commandList);
@@ -219,7 +300,21 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::Render(ID3D12GraphicsCommandList* 
 	texturedQuadMaterial->Set(commandList);
 	quadMesh->Draw(commandList);
 
-	resultTargetResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	if constexpr (FSR_ENABLED)
+	{
+		barriers.clear();
+
+		if (resultTargetResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
+			barriers.push_back(barrier);
+
+		if (depthVelocityTargetResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
+			barriers.push_back(barrier);
+
+		if (!barriers.empty())
+			commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
+	}
+	else
+		resultTargetResource->BeginBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	postProcessManager->SetMotionBuffer(commandList);
 
@@ -317,17 +412,24 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateConstantBuffers(ID3D12Device
 	mutableConstantsBuffer = reinterpret_cast<MutableConstants*>(mutableConstantsResource->resourceCPUAddress);
 	mutableConstantsBuffer->invViewProjection = camera->GetInvViewProjection();
 	mutableConstantsBuffer->cameraPosition = camera->GetPosition();
+	mutableConstantsBuffer->viewProjection = camera->GetViewProjection();
+	mutableConstantsBuffer->lastViewProjection = camera->GetViewProjection();
 }
 
 void Common::Logic::Scene::Scene_1_WhiteRoom::LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager)
 {
+	std::vector<DxcDefine> defines;
+	
+	if constexpr (FSR_ENABLED)
+		defines.push_back({ L"FSR", nullptr });
+
 	lightingRSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\Lighting\\LightingRS.hlsl",
-		ShaderType::RAYTRACING_SHADER, ShaderVersion::SM_6_5);
+		ShaderType::RAYTRACING_SHADER, ShaderVersion::SM_6_5, defines);
 
 	quadVSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\PostProcess\\QuadVS.hlsl",
 		ShaderType::VERTEX_SHADER, ShaderVersion::SM_6_5);
-	quadPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\PostProcess\\TexturedPS.hlsl",
-		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5);
+	quadPSId = resourceManager->CreateShaderResource(device, "Resources\\Shaders\\PostProcess\\ResolveTargetsPS.hlsl",
+		ShaderType::PIXEL_SHADER, ShaderVersion::SM_6_5, defines);
 }
 
 void Common::Logic::Scene::Scene_1_WhiteRoom::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -380,14 +482,20 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateTargets(ID3D12Device* device
 	targetDesc.srvDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
 	resultTargetId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::RW_TEXTURE, targetDesc);
-
 	auto resultTarget = resourceManager->GetResource<RWTexture>(resultTargetId);
 	resultTargetResource = resultTarget->resource;
+
+	if constexpr (FSR_ENABLED)
+	{
+		depthVelocityTargetId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::RW_TEXTURE, targetDesc);
+		auto resultDepthVelocityTarget = resourceManager->GetResource<RWTexture>(depthVelocityTargetId);
+		depthVelocityTargetResource = resultDepthVelocityTarget->resource;
+	}
 }
 
 void Common::Logic::Scene::Scene_1_WhiteRoom::CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager)
 {
-	auto resultTargetTextureResource = resourceManager->GetResource<Texture>(resultTargetId);
+	auto resultTargetTextureResource = resourceManager->GetResource<RWTexture>(resultTargetId);
 	auto samplerLinearResource = resourceManager->GetDefaultSampler(device,
 		Graphics::DefaultFilterSetup::FILTER_POINT_CLAMP);
 
@@ -396,11 +504,26 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateMaterials(ID3D12Device* devi
 
 	MaterialBuilder materialBuilder{};
 	materialBuilder.SetTexture(0u, resultTargetTextureResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	if constexpr (FSR_ENABLED)
+	{
+		auto depthVelocityTargetTextureResource = resourceManager->GetResource<RWTexture>(depthVelocityTargetId);
+		materialBuilder.SetTexture(1u, depthVelocityTargetTextureResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+	}
+
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE));
-	materialBuilder.SetDepthStencilFormat(32u, false, true);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+	if constexpr (FSR_ENABLED)
+	{
+		materialBuilder.SetDepthStencilFormat(32u, true);
+		materialBuilder.SetRenderTargetFormat(1u, DXGI_FORMAT_R16G16_FLOAT);
+	}
+	else
+		materialBuilder.SetDepthStencilFormat(32u, false, true);
+
 	materialBuilder.SetGeometryFormat(quadMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	materialBuilder.SetVertexShader(quadVS->bytecode);
 	materialBuilder.SetPixelShader(quadPS->bytecode);
@@ -472,6 +595,13 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateObjects(ID3D12Device* device
 	raytracingBuilder.SetTexture(6, whiteroomNormal->srvDescriptor.gpuDescriptor);
 	raytracingBuilder.SetTexture(7, noise->srvDescriptor.gpuDescriptor);
 	raytracingBuilder.SetRWTexture(0, resultTarget->uavDescriptor.gpuDescriptor);
+
+	if constexpr (FSR_ENABLED)
+	{
+		auto depthVelocityResource = resourceManager->GetResource<RWTexture>(depthVelocityTargetId);
+		raytracingBuilder.SetRWTexture(1, depthVelocityResource->uavDescriptor.gpuDescriptor);
+	}
+
 	raytracingBuilder.SetSampler(0, linearSampler->samplerDescriptor.gpuDescriptor);
 	raytracingBuilder.SetSampler(1, pointSampler->samplerDescriptor.gpuDescriptor);
 	raytracingBuilder.SetShader(libraryDesc);
@@ -481,7 +611,7 @@ void Common::Logic::Scene::Scene_1_WhiteRoom::CreateObjects(ID3D12Device* device
 	commandList5->Release();
 
 	SceneEntity::RenderingScheme renderingScheme{};
-	renderingScheme.enableFSR = false;
+	renderingScheme.enableFSR = FSR_ENABLED;
 	renderingScheme.enableDepthPrepass = false;
 	renderingScheme.enableMotionBlur = false;
 	renderingScheme.enableVolumetricFog = false;

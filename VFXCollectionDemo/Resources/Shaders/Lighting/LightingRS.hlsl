@@ -26,8 +26,8 @@ static const float REFRACT_BIAS = 1.00001f;
 static const float MAX_INNER_DISTANCE = 1.5f;
 
 //https://refractiveindex.info/
-static const float3 SAPPHIRE_IOR = float3(1.766f, 1.771f, 1.778f);
-static const float3 SAPPHIRE_INV_IOR = float3(0.566f, 0.565f, 0.562f);
+static const float SAPPHIRE_IOR = 1.772f;
+static const float SAPPHIRE_INV_IOR = 0.564f;
 static const float3 SAPPHIRE_F0 = float3(0.1711f, 0.1730f, 0.1746f);
 static const float3 SAPPHIRE_ABSORPTION_COEFF = float3(90.0f, 50.0f, 10.0f);
 static const float3 SAPPHIRE_ALBEDO = float3(0.3f, 0.4f, 1.0f);
@@ -71,6 +71,8 @@ cbuffer MutableConstants : register(b1)
 	float4x4 invViewProjection;
 	float3 cameraPosition;
 	float padding;
+	float4x4 viewProjection;
+	float4x4 lastViewProjection;
 };
 
 RaytracingAccelerationStructure sceneStructure : register(t0);
@@ -87,6 +89,10 @@ SamplerState samplerLinear : register(s0);
 SamplerState samplerPoint : register(s1);
 
 RWTexture2D<float4> resultTarget : register(u0);
+
+#if defined(FSR)
+RWTexture2D<float4> resultDepthVelocityTarget : register(u1);
+#endif
 
 void CalculateTangents(float3 normal, out float3 tangent, out float3 binormal)
 {
@@ -282,7 +288,23 @@ void RayGeneration()
 	
 	Payload resultPayload = TraceLightRay(rayDesc, 0u, RAY_FLAG_CULL_BACK_FACING_TRIANGLES);
 	
-	resultTarget[rayIndex] = float4(resultPayload.color, 1.0f);
+	resultTarget[rayIndex] = float4(resultPayload.color, 0.0f);
+	
+#if defined(FSR)
+	float3 worldPos = rayDesc.Origin + rayDesc.Direction * resultPayload.hitT;
+	
+	float4 nonHomogeneousPos = mul(viewProjection, float4(worldPos, 1.0f));
+	float4 lastNonHomogeneousPos = mul(lastViewProjection, float4(worldPos, 1.0f));
+	
+	nonHomogeneousPos /= nonHomogeneousPos.w;
+	lastNonHomogeneousPos /= lastNonHomogeneousPos.w;
+	
+	float depth = nonHomogeneousPos.z;
+	float2 velocity = nonHomogeneousPos.xy - lastNonHomogeneousPos.xy;
+	velocity *= 0.5f;
+	
+	resultDepthVelocityTarget[rayIndex] = float4(depth, velocity.x, velocity.y, 0.0f);
+#endif
 }
 
 [shader("closesthit")]
@@ -389,7 +411,7 @@ void CrystalClosestHit(inout Payload payload, in BuiltInTriangleIntersectionAttr
 	bool isInner = hitT < MAX_INNER_DISTANCE;
 	
 	normal = isIncident ? normal : -normal;
-	float3 ior = isInner ? 1.0f : isIncident ? SAPPHIRE_INV_IOR : SAPPHIRE_IOR;
+	float ior = isInner ? 1.0f : isIncident ? SAPPHIRE_INV_IOR : SAPPHIRE_IOR;
 	
 	Surface surface;
 	surface.position = hitPosition;
@@ -407,18 +429,14 @@ void CrystalClosestHit(inout Payload payload, in BuiltInTriangleIntersectionAttr
 	for (uint lightSourceIndex = 0u; lightSourceIndex < LIGHT_SOURCE_NUMBER; lightSourceIndex++)
 		lighting += ProcessLightSource(lightSources[lightSourceIndex], surface, material, rayDirection, payload.recursionDepth, 0.5f.xxx);
 	
-	RayDesc rayRedDesc = BuildRefractRay(hitPosition, rayDirection, normal, ior.x);
-	RayDesc rayBlueDesc = BuildRefractRay(hitPosition, rayDirection, normal, ior.y);
-	RayDesc rayGreenDesc = BuildRefractRay(hitPosition, rayDirection, normal, ior.z);
+	RayDesc rayDesc = BuildRefractRay(hitPosition, rayDirection, normal, ior);
 	
-	Payload payloadRed = TraceLightRay(rayRedDesc, payload.recursionDepth, RAY_FLAG_NONE);
-	Payload payloadGreen = TraceLightRay(rayBlueDesc, payload.recursionDepth, RAY_FLAG_NONE);
-	Payload payloadBlue = TraceLightRay(rayGreenDesc, payload.recursionDepth, RAY_FLAG_NONE);
+	Payload resultPayload = TraceLightRay(rayDesc, payload.recursionDepth, RAY_FLAG_NONE);
 	
-	payload.color = float3(payloadRed.color.x, payloadGreen.color.y, payloadBlue.color.z);
+	payload.color = resultPayload.color;
 	payload.color *= isInner ? BouguerLambertBeerLaw(payload.color, hitT, SAPPHIRE_ABSORPTION_COEFF) : SAPPHIRE_ALBEDO;
 	payload.color += lighting;
-	payload.recursionDepth = payloadRed.recursionDepth;
+	payload.recursionDepth = resultPayload.recursionDepth;
 	payload.hitT = hitT;
 }
 

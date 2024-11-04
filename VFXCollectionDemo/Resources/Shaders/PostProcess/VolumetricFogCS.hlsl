@@ -34,10 +34,6 @@ cbuffer MutableConstants : register(b1)
 
 	float3 fogOffset;
 	float distanceFalloffLength;
-	
-	float zNear;
-	float zFar;
-	float2 padding;
 };
 
 struct Input
@@ -50,24 +46,10 @@ struct Input
 Texture3D<float4> fogMap : register(t0);
 Texture3D<float4> turbulenceMap : register(t1);
 Texture2D<float> sceneDepth : register(t2);
+Texture2D<float4> sceneColor : register(t3);
 
 #if (PARTICLE_LIGHT_SOURCE_NUMBER > 0)
-StructuredBuffer<PointLight> particleLightBuffer : register(t3);
-
-#if !defined(MOTION_BLUR) && !defined(FSR)
-Texture2D sceneColor : register(t4);
-#elif defined(FSR)
-Texture2D sceneAlpha : register(t4);
-#endif
-
-#else
-
-#if !defined(MOTION_BLUR) && !defined(FSR)
-Texture2D sceneColor : register(t3);
-#elif defined(FSR)
-Texture2D sceneAlpha : register(t3);
-#endif
-
+StructuredBuffer<PointLight> particleLightBuffer : register(t4);
 #endif
 
 RWTexture2D<float4> sceneTarget : register(u0);
@@ -94,10 +76,20 @@ float CalculateVisibilityFalloff(float sceneDistance)
 	return result;
 }
 
+#if defined(FSR)
+float4 ProcessLightSources(float3 sceneDiffuse, float3 lightColor, float3 screenPoint, float3 worldPosition,
+	float3 lightPosition, float3 viewStep, float3 viewDirection)
+#else
 float3 ProcessLightSources(float3 sceneDiffuse, float3 lightColor, float3 screenPoint, float3 worldPosition,
 	float3 lightPosition, float3 viewStep, float3 viewDirection)
+#endif
 {
+#if defined(FSR)
+	float4 resultColor = float4(sceneDiffuse, 1.0f);
+#else
 	float3 resultColor = sceneDiffuse;
+#endif
+	
 	float3 vWayPoint = screenPoint;
 	
 	[unroll]
@@ -118,10 +110,14 @@ float3 ProcessLightSources(float3 sceneDiffuse, float3 lightColor, float3 screen
 		occlusion *= CalculateVisibilityFalloff(length(worldToWayPoint));
 		occlusion *= lerp(0.0f, 0.8f, CalculateVisibilityFalloff(distance(worldPosition, float3(0.0f, 0.0f, 1.25f))));
 		
-		float3 absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha) * 300.0f;
+		float3 absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha);
 		absorptionCoeff *= occlusion;
 		
+#if defined(FSR)
+		resultColor = BouguerLambertBeerLaw(resultColor, VIEW_STEP_SIZE, absorptionCoeff.xyzz);
+#else
 		resultColor = BouguerLambertBeerLaw(resultColor, VIEW_STEP_SIZE, absorptionCoeff);
+#endif
 		
 		float3 lightDir = vWayPoint - lightPosition;
 		float lightStepLength = length(lightDir) / NUM_LIGHT_STEPS;
@@ -155,7 +151,12 @@ float3 ProcessLightSources(float3 sceneDiffuse, float3 lightColor, float3 screen
 		scatteredLight *= 4.0f * PI * SCATTERING_CONST * saturate(phaseValue) * occlusion / NUM_VIEW_STEPS;
 		scatteredLight *= INV_WAVELENGTH_4;
 		
+#if defined(FSR)
+		resultColor.xyz += scatteredLight;
+		resultColor.w = max(resultColor.w, max(scatteredLight.x, max(scatteredLight.y, scatteredLight.z)));
+#else
 		resultColor += scatteredLight;
+#endif
 		
 #if (PARTICLE_LIGHT_SOURCE_NUMBER > 0)
 		[unroll]
@@ -174,14 +175,22 @@ float3 ProcessLightSources(float3 sceneDiffuse, float3 lightColor, float3 screen
 			
 			fogAlpha = fogMap.SampleLevel(samplerLinear, particlePosition * fogTiling + fogMapDistortion + fogOffset, 0.0f).w;
 			
-			absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha) * 300.0f;
+			absorptionCoeff = lerp(AIR_WET_ABSORPTION_COEFF, WATER_ABSORPTION_COEFF, fogAlpha);
 			
 			scatteredLight = BouguerLambertBeerLaw(particleLightBuffer[lightSourceIndex].color, lightStepLength, absorptionCoeff);
 			
 			cosAngle = dot(viewDirection, -lightDir);
 			phaseValue = DoubleHenyeyGreensteinPhase(cosAngle);
 			
-			resultColor += scatteredLight * saturate(phaseValue) * occlusion * SCATTERING_CONST * INV_WAVELENGTH_4 * 4.0f * PI / NUM_VIEW_STEPS;
+			scatteredLight *= 4.0f * PI * SCATTERING_CONST * saturate(phaseValue) * occlusion / NUM_VIEW_STEPS;
+			scatteredLight *= INV_WAVELENGTH_4;
+			
+#if defined(FSR)
+			resultColor.xyz += scatteredLight;
+			resultColor.w = max(resultColor.w, max(scatteredLight.x, max(scatteredLight.y, scatteredLight.z)));
+#else
+			resultColor += scatteredLight;
+#endif
 		}
 #endif
 	}
@@ -203,16 +212,7 @@ void main(Input input)
 	texCoord.x = targetCoord.x / width;
 	texCoord.y = targetCoord.y / height;
 	
-#if defined(MOTION_BLUR) || defined(FSR)
-	float4 sceneDiffuse = sceneTarget.Load(targetCoord);
-	
-#if defined(FSR)
-	sceneDiffuse.w = sceneAlpha.SampleLevel(samplerLinear, texCoord, 0.0f).x;
-#endif
-	
-#else
 	float4 sceneDiffuse = sceneColor.SampleLevel(samplerLinear, texCoord, 0.0f);
-#endif
 	
 	float depth = sceneDepth.SampleLevel(samplerLinear, texCoord, 0.0f).x;
 	float3 worldPosition = ReconstructWorldPosition(texCoord, depth, invViewProjection);
@@ -221,10 +221,20 @@ void main(Input input)
 	float3 viewDirection = normalize(worldPosition - cameraPosition + 0.00001f.xxx);
 	float3 viewStep = viewDirection * VIEW_STEP_SIZE;
 	
+#if defined(FSR)
+	float4 resultColor = ProcessLightSources(sceneDiffuse.xyz, areaLight.color, screenWorldPosition,
+		worldPosition, areaLight.position, viewStep, viewDirection);
+	
+	resultColor.xyz = lerp(resultColor.xyz, sceneDiffuse.xyz, sceneDiffuse.w);
+	
+	sceneTarget[targetCoord] = float4(resultColor.xyz, saturate(max(1.0f - resultColor.w, sceneDiffuse.w)));
+#else
 	float3 resultColor = ProcessLightSources(sceneDiffuse.xyz, areaLight.color, screenWorldPosition,
 		worldPosition, areaLight.position, viewStep, viewDirection);
 	
 	resultColor = lerp(resultColor, sceneDiffuse.xyz, sceneDiffuse.w);
 	
 	sceneTarget[targetCoord] = float4(resultColor, sceneDiffuse.w);
+	
+#endif
 }

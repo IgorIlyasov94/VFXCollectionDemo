@@ -44,8 +44,19 @@ void Common::Logic::SceneManager::LoadScene(Scene::SceneID id, Graphics::DirectX
 
 	_renderer = renderer;
 
+	_renderer->FlushQueue();
+
 	scenes[currentScene]->Unload(renderer);
 	scenes[id]->Load(renderer);
 
 	currentScene = id;
+}
+
+void Common::Logic::SceneManager::SwitchToNextScene(Graphics::DirectX12Renderer* renderer)
+{
+	auto nextSceneId = static_cast<Scene::SceneID>((static_cast<uint64_t>(currentScene) + 1u) % scenes.size());
+	if (nextSceneId == 0u)
+		nextSceneId++;
+
+	LoadScene(nextSceneId, renderer);
 }

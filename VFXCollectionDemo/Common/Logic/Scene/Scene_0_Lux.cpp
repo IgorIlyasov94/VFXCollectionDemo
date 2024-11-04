@@ -22,7 +22,8 @@ Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
 	_deltaTime{}, fps(60.0f), cpuTimeCounter{}, prevTimePoint{}, frameCounter{}, vfxLux{},
 	vfxLuxSparkles{}, vfxLuxDistorters{}, areaLightId{}, ambientLightId{}, depthPassVSId{},
 	depthCubePassVSId{}, depthCubePassGSId{}, depthPassMaterial{}, depthCubePassMaterial{},
-	lightParticleBufferId{}, particleLightSimulationCSId{}, renderSize{}
+	lightParticleBufferId{}, particleLightSimulationCSId{}, renderSize{}, turbulenceMapId{},
+	volumeNoiseId{}
 {
 	environmentPosition = float3(0.0f, 0.0f, 0.0f);
 	cameraPosition = float3(0.0f, 0.0f, 5.0f);
@@ -234,7 +235,7 @@ void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* comman
 	{
 		postProcessManager->SetMotionBuffer(commandList);
 
-		//vfxLuxDistorters->Draw(commandList);
+		vfxLuxDistorters->Draw(commandList);
 	}
 
 	postProcessManager->Render(commandList, renderer, _deltaTime);
@@ -433,12 +434,17 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 		shaderDefines.push_back({ L"FSR", nullptr });
 
 	std::wstringstream lightParticleNumberStream;
-	lightParticleNumberStream << SPARKLES_NUMBER;
+
+	if constexpr (USING_PARTICLE_LIGHT)
+		lightParticleNumberStream << SPARKLES_NUMBER;
+	else
+		lightParticleNumberStream << 0u;
+
 	std::wstring lightParticleNumberString;
 	lightParticleNumberStream >> lightParticleNumberString;
 
 	shaderDefines.push_back({ L"PARTICLE_LIGHT_SOURCE_NUMBER", lightParticleNumberString.c_str() });
-	
+
 	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
 
 	SceneEntity::RenderingScheme renderingScheme{};
@@ -470,7 +476,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	terrainDesc.map2Tiling = float2(4.0f, 4.0f);
 	terrainDesc.map3Tiling = float2(4.0f, 4.0f);
 	terrainDesc.lightConstantBufferId = lightingSystem->GetLightConstantBufferId();
-	terrainDesc.hasParticleLighting = true;
+	terrainDesc.hasParticleLighting = USING_PARTICLE_LIGHT;
 	terrainDesc.hasDepthPrepass = DEPTH_PREPASS_ENABLED;
 	terrainDesc.outputVelocity = renderingScheme.enableFSR || renderingScheme.enableMotionBlur;
 	terrainDesc.lightParticleBufferId = lightParticleBufferId;
@@ -500,7 +506,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	vegetationSystemDesc.hasDepthPrepass = DEPTH_PREPASS_ENABLED;
 	vegetationSystemDesc.hasDepthPass = false;
 	vegetationSystemDesc.hasDepthCubePass = true;
-	vegetationSystemDesc.hasParticleLighting = true;
+	vegetationSystemDesc.hasParticleLighting = USING_PARTICLE_LIGHT;
 	vegetationSystemDesc.outputVelocity = renderingScheme.enableFSR || renderingScheme.enableMotionBlur;
 	vegetationSystemDesc.lightParticleBufferId = lightParticleBufferId;
 	vegetationSystemDesc.lightMatricesNumber = lightingSystem->GetLightMatricesNumber();

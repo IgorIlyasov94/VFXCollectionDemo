@@ -86,11 +86,16 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 	if (_renderingScheme.enableFSR)
 	{
 		FSRDesc fsrDesc{};
-		fsrDesc.colorBuffer = sceneColorTargetGPUResource->GetResource();
+
+		if (_renderingScheme.enableVolumetricFog)
+			fsrDesc.colorBuffer = temporaryRWTexture1GPUResource->GetResource();
+		else
+			fsrDesc.colorBuffer = sceneColorTargetGPUResource->GetResource();
+
 		fsrDesc.depthTarget = sceneDepthTargetGPUResource->GetResource();
 		fsrDesc.motionTarget = sceneMotionTargetGPUResource->GetResource();
 		fsrDesc.reactiveMask = sceneAlphaTargetGPUResource->GetResource();
-		fsrDesc.outputBuffer = temporaryRWTextureGPUResource->GetResource();
+		fsrDesc.outputBuffer = temporaryRWTexture0GPUResource->GetResource();
 		fsrDesc.maxSize = renderer->GetDisplaySize();
 		fsrDesc.enableSharpening = SHARPNESS_ENABLED;
 		fsrDesc.sharpnessFactor = SHARPNESS_FACTOR;
@@ -115,8 +120,7 @@ Common::Logic::SceneEntity::PostProcessManager::~PostProcessManager()
 void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* resourceManager)
 {
 	delete toneMappingMaterial;
-	delete copyAlphaMaterial;
-
+	
 	delete luminanceComputeObject;
 	delete luminanceIterationComputeObject;
 	delete bloomHorizontalObject;
@@ -126,10 +130,18 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 	delete quadMesh;
 
 	if (_renderingScheme.enableFSR)
+	{
 		delete _fsr;
+		delete copyAlphaMaterial;
+
+		if (_renderingScheme.enableVolumetricFog)
+			resourceManager->DeleteResource<RWTexture>(temporaryRWTexture1Id);
+
+		resourceManager->DeleteResource<Shader>(copyAlphaPSId);
+		resourceManager->DeleteResource<RenderTarget>(sceneAlphaTargetId);
+	}
 
 	resourceManager->DeleteResource<RenderTarget>(sceneColorTargetId);
-	resourceManager->DeleteResource<RenderTarget>(sceneAlphaTargetId);
 	resourceManager->DeleteResource<DepthStencilTarget>(sceneDepthTargetId);
 
 	if (_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur)
@@ -142,7 +154,7 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 		resourceManager->DeleteResource<Shader>(motionBlurCSId);
 	}
 
-	resourceManager->DeleteResource<RWTexture>(temporaryRWTextureId);
+	resourceManager->DeleteResource<RWTexture>(temporaryRWTexture0Id);
 
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
@@ -161,7 +173,6 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 	resourceManager->DeleteResource<Shader>(bloomHorizontalCSId);
 	resourceManager->DeleteResource<Shader>(bloomVerticalCSId);
 	resourceManager->DeleteResource<Shader>(toneMappingPSId);
-	resourceManager->DeleteResource<Shader>(copyAlphaPSId);
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX12Renderer* renderer)
@@ -181,6 +192,8 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	auto targetsWidth = width;
 	auto targetsHeight = height;
 
+	auto resourceManager = renderer->GetResourceManager();
+
 	if (_renderingScheme.enableFSR)
 	{
 		afterFSRViewport = viewport;
@@ -192,9 +205,10 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 		scissorRectangle.bottom = static_cast<uint32_t>(viewport.Height);
 		targetsWidth = scissorRectangle.right;
 		targetsHeight = scissorRectangle.bottom;
-	}
 
-	auto resourceManager = renderer->GetResourceManager();
+		if (_renderingScheme.enableVolumetricFog)
+			resourceManager->DeleteResource<RWTexture>(temporaryRWTexture1Id);
+	}
 
 	if (_renderingScheme.enableVolumetricFog)
 	{
@@ -213,7 +227,7 @@ void Common::Logic::SceneEntity::PostProcessManager::OnResize(Graphics::DirectX1
 	if (_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur)
 		resourceManager->DeleteResource<RenderTarget>(sceneMotionTargetId);
 
-	resourceManager->DeleteResource<RWTexture>(temporaryRWTextureId);
+	resourceManager->DeleteResource<RWTexture>(temporaryRWTexture0Id);
 	resourceManager->DeleteResource<RWBuffer>(luminanceBufferId);
 	resourceManager->DeleteResource<RWBuffer>(bloomBufferId);
 
@@ -276,6 +290,9 @@ void Common::Logic::SceneEntity::PostProcessManager::SetGBuffer(ID3D12GraphicsCo
 
 	commandList->ClearRenderTargetView(sceneColorTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
 
+	if (!_renderingScheme.enableDepthPrepass)
+		commandList->ClearDepthStencilView(sceneDepthTargetDescriptor, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0u, 0u, nullptr);
+
 	if (_renderingScheme.enableFSR)
 	{
 		commandList->ClearRenderTargetView(sceneMotionTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
@@ -313,16 +330,35 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 	Graphics::DirectX12Renderer* renderer, float deltaTime)
 {
 	D3D12_RESOURCE_BARRIER barrier{};
-	
+
+	if (_renderingScheme.enableVolumetricFog)
+	{
+		if (_renderingScheme.enableFSR)
+			temporaryRWTexture1GPUResource->EndBarrier(commandList);
+
+		SetVolumetricFog(commandList);
+	}
+
 	if (_renderingScheme.enableFSR)
 	{
 		barriers.clear();
 
 		if (sceneMotionTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
 			barriers.push_back(barrier);
-
-		if (sceneColorTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+		
+		if (_renderingScheme.enableVolumetricFog)
+		{
+			temporaryRWTexture1GPUResource->GetUAVBarrier(barrier);
 			barriers.push_back(barrier);
+
+			if (temporaryRWTexture1GPUResource->GetBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+				barriers.push_back(barrier);
+		}
+		else
+		{
+			if (sceneColorTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+				barriers.push_back(barrier);
+		}
 
 		if (sceneAlphaTargetGPUResource->GetEndBarrier(barrier))
 			barriers.push_back(barrier);
@@ -350,9 +386,21 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 			barriers.push_back(barrier);
 	}
 
-	if (sceneColorTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+	if (_renderingScheme.enableFSR && _renderingScheme.enableVolumetricFog)
+	{
+		temporaryRWTexture1GPUResource->GetUAVBarrier(barrier);
 		barriers.push_back(barrier);
-	if (temporaryRWTextureGPUResource->GetEndBarrier(barrier))
+
+		if (temporaryRWTexture1GPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+			barriers.push_back(barrier);
+	}
+	else
+	{
+		if (sceneColorTargetGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+			barriers.push_back(barrier);
+	}
+
+	if (temporaryRWTexture0GPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
 
 	if ((_renderingScheme.enableFSR || _renderingScheme.enableVolumetricFog) &&
@@ -373,27 +421,20 @@ void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsComman
 
 		renderer->ResetDescriptorHeaps(commandList);
 
-		temporaryRWTextureGPUResource->UAVBarrier(commandList);
+		barriers.clear();
+
+		temporaryRWTexture0GPUResource->GetUAVBarrier(barrier);
+		barriers.push_back(barrier);
+
+		if (_renderingScheme.enableVolumetricFog &&
+			temporaryRWTexture1GPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
+			barriers.push_back(barrier);
+
+		commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
 	}
 	
 	if (_renderingScheme.enableMotionBlur)
 		SetMotionBlur(commandList);
-
-	if (_renderingScheme.enableVolumetricFog)
-	{
-		barriers.clear();
-
-		if (_renderingScheme.enableMotionBlur)
-		{
-			temporaryRWTextureGPUResource->GetUAVBarrier(barrier);
-			barriers.push_back(barrier);
-		}
-
-		if (!barriers.empty())
-			commandList->ResourceBarrier(static_cast<uint32_t>(barriers.size()), barriers.data());
-
-		SetVolumetricFog(commandList);
-	}
 
 	SetHDR(commandList);
 }
@@ -408,7 +449,7 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 	bloomBufferGPUResource->GetUAVBarrier(barrier);
 	barriers.push_back(barrier);
 
-	if (temporaryRWTextureGPUResource->GetEndBarrier(barrier))
+	if (temporaryRWTexture0GPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
 	if (luminanceBufferGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
@@ -436,7 +477,7 @@ void Common::Logic::SceneEntity::PostProcessManager::RenderToBackBuffer(ID3D12Gr
 		sceneMotionTargetGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, barrier))
 		barriers.push_back(barrier);
 
-	if (temporaryRWTextureGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
+	if (temporaryRWTexture0GPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
 		barriers.push_back(barrier);
 	if (luminanceBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, barrier))
 		barriers.push_back(barrier);
@@ -473,9 +514,6 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateConstantBuffers(ID3D1
 	volumetricFogConstants->distanceFalloffLength = _renderingScheme.fogDistanceFalloffLength;
 	volumetricFogConstants->fogTiling = _renderingScheme.fogTiling;
 	volumetricFogConstants->fogOffset = {};
-	volumetricFogConstants->zNear = LightingSystem::SHADOW_MAP_Z_NEAR;
-	volumetricFogConstants->zFar = LightingSystem::SHADOW_MAP_Z_FAR;
-	volumetricFogConstants->padding = {};
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateQuad(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
@@ -530,6 +568,27 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 	sceneColorTargetId = resourceManager->CreateTextureResource(device, commandList,
 		TextureResourceType::RENDER_TARGET, sceneTargetDesc);
 
+	if (_renderingScheme.enableFSR)
+	{
+		if (_renderingScheme.enableVolumetricFog)
+		{
+			temporaryRWTexture1Id = resourceManager->CreateTextureResource(device, commandList,
+				TextureResourceType::RW_TEXTURE, sceneTargetDesc);
+
+			auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTexture1Id);
+			temporaryRWTexture1GPUResource = temporaryRWTextureResource->resource;
+		}
+
+		sceneTargetDesc.format = DXGI_FORMAT_R8_UNORM;
+
+		sceneAlphaTargetId = resourceManager->CreateTextureResource(device, commandList,
+			TextureResourceType::RENDER_TARGET, sceneTargetDesc);
+
+		auto sceneAlphaTargetResource = resourceManager->GetResource<RenderTarget>(sceneAlphaTargetId);
+		sceneAlphaTargetGPUResource = sceneAlphaTargetResource->resource;
+		sceneAlphaTargetDescriptor = sceneAlphaTargetResource->rtvDescriptor.cpuDescriptor;
+	}
+
 	if (_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur)
 	{
 		sceneTargetDesc.format = DXGI_FORMAT_R16G16_FLOAT;
@@ -540,18 +599,6 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateTargets(ID3D12Device*
 		auto sceneMotionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
 		sceneMotionTargetGPUResource = sceneMotionTargetResource->resource;
 		sceneMotionTargetDescriptor = sceneMotionTargetResource->rtvDescriptor.cpuDescriptor;
-	}
-
-	if (_renderingScheme.enableFSR)
-	{
-		sceneTargetDesc.format = DXGI_FORMAT_R8_UNORM;
-
-		sceneAlphaTargetId = resourceManager->CreateTextureResource(device, commandList,
-			TextureResourceType::RENDER_TARGET, sceneTargetDesc);
-
-		auto sceneAlphaTargetResource = resourceManager->GetResource<RenderTarget>(sceneAlphaTargetId);
-		sceneAlphaTargetGPUResource = sceneAlphaTargetResource->resource;
-		sceneAlphaTargetDescriptor = sceneAlphaTargetResource->rtvDescriptor.cpuDescriptor;
 	}
 
 	sceneDepthTargetId = resourceManager->CreateTextureResource(device, commandList,
@@ -580,7 +627,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device*
 	textureDesc.dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 	textureDesc.srvDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
-	temporaryRWTextureId = resourceManager->CreateTextureResource(device, commandList,
+	temporaryRWTexture0Id = resourceManager->CreateTextureResource(device, commandList,
 		TextureResourceType::RW_TEXTURE, textureDesc);
 
 	BufferDesc luminanceBufferDesc{};
@@ -601,12 +648,11 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateBuffers(ID3D12Device*
 	bloomBufferId = resourceManager->CreateBufferResource(device, commandList,
 		BufferResourceType::RW_BUFFER, bloomBufferDesc);
 
-	auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTextureId);
+	auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTexture0Id);
+	temporaryRWTexture0GPUResource = temporaryRWTextureResource->resource;
 
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
-
-	temporaryRWTextureGPUResource = temporaryRWTextureResource->resource;
 
 	luminanceBufferGPUResource = luminanceBufferResource->resource;
 	bloomBufferGPUResource = bloomBufferResource->resource;
@@ -679,8 +725,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 	
 	auto quadVS = resourceManager->GetResource<Shader>(quadVSId);
 	auto toneMappingPS = resourceManager->GetResource<Shader>(toneMappingPSId);
-	auto copyAlphaPS = resourceManager->GetResource<Shader>(copyAlphaPSId);
-
+	
 	auto blendMode = Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_OPAQUE);
 
 	MaterialBuilder materialBuilder{};
@@ -690,7 +735,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 		_renderingScheme.enableMotionBlur ||
 		_renderingScheme.enableVolumetricFog)
 	{
-		auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTextureId);
+		auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTexture0Id);
 		materialBuilder.SetTexture(0u, temporaryRWTextureResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
 	}
 	else
@@ -710,16 +755,28 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Devic
 
 	toneMappingMaterial = materialBuilder.ComposeStandard(device);
 
-	materialBuilder.SetTexture(0u, sceneColorResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
-	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
-	materialBuilder.SetBlendMode(blendMode);
-	materialBuilder.SetDepthStencilFormat(0u, false);
-	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R8_UNORM);
-	materialBuilder.SetGeometryFormat(quadMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	materialBuilder.SetVertexShader(quadVS->bytecode);
-	materialBuilder.SetPixelShader(copyAlphaPS->bytecode);
+	if (_renderingScheme.enableFSR)
+	{
+		auto copyAlphaPS = resourceManager->GetResource<Shader>(copyAlphaPSId);
 
-	copyAlphaMaterial = materialBuilder.ComposeStandard(device);
+		if (_renderingScheme.enableVolumetricFog)
+		{
+			auto temporaryRWTexture1Resource = resourceManager->GetResource<RWTexture>(temporaryRWTexture1Id);
+			materialBuilder.SetTexture(0u, temporaryRWTexture1Resource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+		}
+		else
+			materialBuilder.SetTexture(0u, sceneColorResource->srvDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_PIXEL);
+
+		materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
+		materialBuilder.SetBlendMode(blendMode);
+		materialBuilder.SetDepthStencilFormat(0u, false);
+		materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R8_UNORM);
+		materialBuilder.SetGeometryFormat(quadMesh->GetDesc().vertexFormat, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		materialBuilder.SetVertexShader(quadVS->bytecode);
+		materialBuilder.SetPixelShader(copyAlphaPS->bytecode);
+
+		copyAlphaMaterial = materialBuilder.ComposeStandard(device);
+	}
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12Device* device,
@@ -727,7 +784,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 {
 	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
 	auto sceneMotionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
-	auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTextureId);
+	auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTexture0Id);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
 	
@@ -739,29 +796,6 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 	auto bloomVerticalCS = resourceManager->GetResource<Shader>(bloomVerticalCSId);
 
 	ComputeObjectBuilder computeObjectBuilder{};
-
-	if (_renderingScheme.enableMotionBlur)
-	{
-		auto motionBlurCS = resourceManager->GetResource<Shader>(motionBlurCSId);
-		
-		computeObjectBuilder.SetRootConstants(0u, 4u);
-
-		if (_renderingScheme.enableFSR)
-		{
-			computeObjectBuilder.SetTexture(0u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
-		}
-		else
-		{
-			computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
-			computeObjectBuilder.SetTexture(1u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
-		}
-
-		computeObjectBuilder.SetRWTexture(0u, temporaryRWTextureResource->uavDescriptor.gpuDescriptor);
-		computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
-		computeObjectBuilder.SetShader(motionBlurCS->bytecode);
-
-		motionBlurComputeObject = computeObjectBuilder.Compose(device);
-	}
 
 	if (_renderingScheme.enableVolumetricFog)
 	{
@@ -781,36 +815,49 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 		computeObjectBuilder.SetTexture(0u, fogMapResource->srvDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetTexture(1u, turbulenceMapResource->srvDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetTexture(2u, sceneDepthTargetResource->srvDescriptor.gpuDescriptor);
-		
+		computeObjectBuilder.SetTexture(3u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+
 		if (_renderingScheme.useParticleLight)
 		{
 			auto lightParticleBufferResource = resourceManager->GetResource<RWBuffer>(lightingSystem->GetLightParticleBuffer());
-
-			computeObjectBuilder.SetBuffer(3u, lightParticleBufferResource->resourceGPUAddress);
-
-			if (!(_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur))
-				computeObjectBuilder.SetTexture(4u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
-			else if (_renderingScheme.enableFSR)
-			{
-				auto sceneAlphaTargetResource = resourceManager->GetResource<RenderTarget>(sceneAlphaTargetId);
-				computeObjectBuilder.SetTexture(4u, sceneAlphaTargetResource->srvDescriptor.gpuDescriptor);
-			}
+			computeObjectBuilder.SetBuffer(4u, lightParticleBufferResource->resourceGPUAddress);
 		}
-		else if (!(_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur))
+
+		if (_renderingScheme.enableFSR)
 		{
-			computeObjectBuilder.SetTexture(3u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+			auto temporaryRWTexture1Resource = resourceManager->GetResource<RWTexture>(temporaryRWTexture1Id);
+			computeObjectBuilder.SetRWTexture(0u, temporaryRWTexture1Resource->uavDescriptor.gpuDescriptor);
 		}
-		else if (_renderingScheme.enableFSR)
-		{
-			auto sceneAlphaTargetResource = resourceManager->GetResource<RenderTarget>(sceneAlphaTargetId);
-			computeObjectBuilder.SetTexture(3u, sceneAlphaTargetResource->srvDescriptor.gpuDescriptor);
-		}
+		else
+			computeObjectBuilder.SetRWTexture(0u, temporaryRWTextureResource->uavDescriptor.gpuDescriptor);
 
-		computeObjectBuilder.SetRWTexture(0u, temporaryRWTextureResource->uavDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetSampler(0u, samplerLinearWrapResource->samplerDescriptor.gpuDescriptor);
 		computeObjectBuilder.SetShader(volumetricFogCS->bytecode);
 
 		volumetricFogComputeObject = computeObjectBuilder.Compose(device);
+	}
+
+	if (_renderingScheme.enableMotionBlur)
+	{
+		auto motionBlurCS = resourceManager->GetResource<Shader>(motionBlurCSId);
+
+		computeObjectBuilder.SetRootConstants(0u, 4u);
+
+		if (_renderingScheme.enableFSR || _renderingScheme.enableVolumetricFog)
+		{
+			computeObjectBuilder.SetTexture(0u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
+		}
+		else
+		{
+			computeObjectBuilder.SetTexture(0u, sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+			computeObjectBuilder.SetTexture(1u, sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
+		}
+
+		computeObjectBuilder.SetRWTexture(0u, temporaryRWTextureResource->uavDescriptor.gpuDescriptor);
+		computeObjectBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor);
+		computeObjectBuilder.SetShader(motionBlurCS->bytecode);
+
+		motionBlurComputeObject = computeObjectBuilder.Compose(device);
 	}
 
 	computeObjectBuilder.SetRootConstants(0u, 2u);
@@ -860,15 +907,38 @@ void Common::Logic::SceneEntity::PostProcessManager::UpdateObjects(Graphics::Dir
 	auto resourceManager = renderer->GetResourceManager();
 
 	auto sceneColorTargetResource = resourceManager->GetResource<RenderTarget>(sceneColorTargetId);
-	auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTextureId);
+	auto temporaryRWTextureResource = resourceManager->GetResource<RWTexture>(temporaryRWTexture0Id);
 	auto luminanceBufferResource = resourceManager->GetResource<RWBuffer>(luminanceBufferId);
 	auto bloomBufferResource = resourceManager->GetResource<RWBuffer>(bloomBufferId);
+
+	if (_renderingScheme.enableVolumetricFog)
+	{
+		auto sceneDepthTargetResource = resourceManager->GetResource<DepthStencilTarget>(sceneDepthTargetId);
+
+		volumetricFogComputeObject->UpdateTable(2u, DescriptorTableType::TEXTURE,
+			sceneDepthTargetResource->srvDescriptor.gpuDescriptor);
+
+		volumetricFogComputeObject->UpdateTable(3u, DescriptorTableType::TEXTURE,
+			sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+
+		if (_renderingScheme.enableFSR)
+		{
+			auto temporaryRWTexture1Resource = resourceManager->GetResource<RWTexture>(temporaryRWTexture1Id);
+			volumetricFogComputeObject->UpdateTable(0u, DescriptorTableType::RW_TEXTURE,
+				temporaryRWTexture1Resource->uavDescriptor.gpuDescriptor);
+		}
+		else
+		{
+			volumetricFogComputeObject->UpdateTable(0u, DescriptorTableType::RW_TEXTURE,
+				temporaryRWTextureResource->uavDescriptor.gpuDescriptor);
+		}
+	}
 
 	if (_renderingScheme.enableMotionBlur)
 	{
 		auto sceneMotionTargetResource = resourceManager->GetResource<RenderTarget>(sceneMotionTargetId);
 
-		if (_renderingScheme.enableFSR)
+		if (_renderingScheme.enableFSR || _renderingScheme.enableVolumetricFog)
 		{
 			motionBlurComputeObject->UpdateTable(0u, DescriptorTableType::TEXTURE,
 				sceneMotionTargetResource->srvDescriptor.gpuDescriptor);
@@ -883,31 +953,6 @@ void Common::Logic::SceneEntity::PostProcessManager::UpdateObjects(Graphics::Dir
 		}
 
 		motionBlurComputeObject->UpdateTable(0u, DescriptorTableType::RW_TEXTURE,
-			temporaryRWTextureResource->uavDescriptor.gpuDescriptor);
-	}
-
-	if (_renderingScheme.enableVolumetricFog)
-	{
-		auto sceneDepthTargetResource = resourceManager->GetResource<DepthStencilTarget>(sceneDepthTargetId);
-
-		volumetricFogComputeObject->UpdateTable(2u, DescriptorTableType::TEXTURE,
-			sceneDepthTargetResource->srvDescriptor.gpuDescriptor);
-
-		auto lightBufferIncrement = _renderingScheme.useParticleLight ? 1u : 0u;
-
-		if (!(_renderingScheme.enableFSR || _renderingScheme.enableMotionBlur))
-		{
-			volumetricFogComputeObject->UpdateTable(3u + lightBufferIncrement, DescriptorTableType::TEXTURE,
-				sceneColorTargetResource->srvDescriptor.gpuDescriptor);
-		}
-		else if (_renderingScheme.enableFSR)
-		{
-			auto sceneAlphaTargetResource = resourceManager->GetResource<RenderTarget>(sceneAlphaTargetId);
-			volumetricFogComputeObject->UpdateTable(3u + lightBufferIncrement, DescriptorTableType::TEXTURE,
-				sceneAlphaTargetResource->srvDescriptor.gpuDescriptor);
-		}
-
-		volumetricFogComputeObject->UpdateTable(0u, DescriptorTableType::RW_TEXTURE,
 			temporaryRWTextureResource->uavDescriptor.gpuDescriptor);
 	}
 
@@ -951,11 +996,16 @@ void Common::Logic::SceneEntity::PostProcessManager::UpdateObjects(Graphics::Dir
 	if (_renderingScheme.enableFSR)
 	{
 		FSRDesc fsrDesc{};
-		fsrDesc.colorBuffer = sceneColorTargetGPUResource->GetResource();
+
+		if (_renderingScheme.enableVolumetricFog)
+			fsrDesc.colorBuffer = temporaryRWTexture1GPUResource->GetResource();
+		else
+			fsrDesc.colorBuffer = sceneColorTargetGPUResource->GetResource();
+
 		fsrDesc.depthTarget = sceneDepthTargetGPUResource->GetResource();
 		fsrDesc.motionTarget = sceneMotionTargetGPUResource->GetResource();
 		fsrDesc.reactiveMask = sceneAlphaTargetGPUResource->GetResource();
-		fsrDesc.outputBuffer = temporaryRWTextureGPUResource->GetResource();
+		fsrDesc.outputBuffer = temporaryRWTexture0GPUResource->GetResource();
 		fsrDesc.maxSize = renderer->GetDisplaySize();
 		fsrDesc.enableSharpening = SHARPNESS_ENABLED;
 		fsrDesc.sharpnessFactor = SHARPNESS_FACTOR;
@@ -967,6 +1017,18 @@ void Common::Logic::SceneEntity::PostProcessManager::UpdateObjects(Graphics::Dir
 		fsrDesc.fovY = _camera->GetFovY();
 
 		_fsr->OnResize(renderer->GetDevice(), fsrDesc);
+
+		if (_renderingScheme.enableVolumetricFog)
+		{
+			auto temporaryRWTexture1Resource = resourceManager->GetResource<RWTexture>(temporaryRWTexture1Id);
+			copyAlphaMaterial->UpdateTable(0u, DescriptorTableType::TEXTURE,
+				temporaryRWTexture1Resource->srvDescriptor.gpuDescriptor);
+		}
+		else
+		{
+			copyAlphaMaterial->UpdateTable(0u, DescriptorTableType::TEXTURE,
+				sceneColorTargetResource->srvDescriptor.gpuDescriptor);
+		}
 	}
 }
 
@@ -991,6 +1053,27 @@ void Common::Logic::SceneEntity::PostProcessManager::SetVolumetricFog(ID3D12Grap
 	volumetricFogConstants->cameraPosition = _camera->GetPosition();
 	volumetricFogConstants->cameraDirection = _camera->GetDirection();
 
+	float numGroupsF = 1.0f;
+
+	if (_renderingScheme.enableFSR)
+	{
+		volumetricFogConstants->widthU = static_cast<uint32_t>(scissorRectangle.right);
+		volumetricFogConstants->area = static_cast<uint32_t>(scissorRectangle.right * scissorRectangle.bottom);
+		volumetricFogConstants->width = static_cast<float>(scissorRectangle.right);
+		volumetricFogConstants->height = static_cast<float>(scissorRectangle.bottom);
+
+		numGroupsF = std::ceil(volumetricFogConstants->area / static_cast<float>(THREADS_PER_GROUP));
+	}
+	else
+	{
+		volumetricFogConstants->widthU = _width;
+		volumetricFogConstants->area = _width * _height;
+		volumetricFogConstants->width = static_cast<float>(_width);
+		volumetricFogConstants->height = static_cast<float>(_height);
+
+		numGroupsF = std::ceil(volumetricFogConstants->area / static_cast<float>(THREADS_PER_GROUP));
+	}
+
 	if ((_renderingScheme.windStrength != nullptr) && (_renderingScheme.windDirection != nullptr))
 	{
 		float windStrength = (*_renderingScheme.windStrength) * FOG_MOVING_COEFF;
@@ -1003,7 +1086,6 @@ void Common::Logic::SceneEntity::PostProcessManager::SetVolumetricFog(ID3D12Grap
 		volumetricFogConstants->fogOffset.z -= std::floor(volumetricFogConstants->fogOffset.z);
 	}
 
-	float numGroupsF = std::ceil(_width * _height / static_cast<float>(THREADS_PER_GROUP));
 	uint32_t numGroupsX = std::max(static_cast<uint32_t>(numGroupsF), 1u);
 
 	volumetricFogComputeObject->Set(commandList);
@@ -1026,11 +1108,11 @@ void Common::Logic::SceneEntity::PostProcessManager::SetHDR(ID3D12GraphicsComman
 	if (_renderingScheme.enableMotionBlur ||
 		_renderingScheme.enableVolumetricFog)
 	{
-		temporaryRWTextureGPUResource->GetUAVBarrier(barrier);
+		temporaryRWTexture0GPUResource->GetUAVBarrier(barrier);
 		barriers.push_back(barrier);
 	}
 
-	if (temporaryRWTextureGPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
+	if (temporaryRWTexture0GPUResource->GetBarrier(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);
 	if (luminanceBufferGPUResource->GetEndBarrier(barrier))
 		barriers.push_back(barrier);
@@ -1096,7 +1178,7 @@ void Common::Logic::SceneEntity::PostProcessManager::SetHDR(ID3D12GraphicsComman
 
 	barriers.clear();
 
-	if (temporaryRWTextureGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
+	if (temporaryRWTexture0GPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);
 	if (luminanceBufferGPUResource->GetBeginBarrier(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barrier))
 		barriers.push_back(barrier);

@@ -68,8 +68,14 @@ namespace Common::Logic::Scene
 		bool isLoaded;
 		
 		static constexpr float FOV_Y = DirectX::XM_PI / 2.5f;
-		static constexpr float Z_NEAR = 0.01f;
+		static constexpr float Z_NEAR = 0.1f;
 		static constexpr float Z_FAR = 1000.0f;
+
+		static constexpr bool DEPTH_PREPASS_ENABLED = false;
+		static constexpr bool FSR_ENABLED = true;
+		static constexpr bool MOTION_BLUR_ENABLED = false;
+		static constexpr bool VOLUMETRIC_FOG_ENABLED = false;
+		static constexpr bool USING_PARTICLE_LIGHT = false;
 
 		static constexpr float WHITE_CUTOFF = 0.7f;
 		static constexpr float BRIGHT_THRESHOLD = 3.5f;
@@ -87,6 +93,8 @@ namespace Common::Logic::Scene
 			float4x4 invViewProjection;
 			float3 cameraPosition;
 			float padding;
+			float4x4 viewProjection;
+			float4x4 lastViewProjection;
 		};
 
 		struct Payload
@@ -122,6 +130,7 @@ namespace Common::Logic::Scene
 
 		uint32_t groupsNumberX;
 		uint32_t groupsNumberY;
+		float2 renderSize;
 
 		std::chrono::steady_clock::time_point prevTimePoint;
 
@@ -142,12 +151,14 @@ namespace Common::Logic::Scene
 		std::vector<D3D12_RESOURCE_BARRIER> barriers;
 
 		Graphics::Resources::GPUResource* resultTargetResource;
+		Graphics::Resources::GPUResource* depthVelocityTargetResource;
 		Graphics::Resources::GPUResource* whiteroomVertexBufferResource;
 		Graphics::Resources::GPUResource* whiteroomIndexBufferResource;
 		Graphics::Resources::GPUResource* crystalVertexBufferResource;
 		Graphics::Resources::GPUResource* crystalIndexBufferResource;
 
 		Graphics::Resources::ResourceID resultTargetId;
+		Graphics::Resources::ResourceID depthVelocityTargetId;
 
 		Graphics::Resources::ResourceID mutableConstantsId;
 		Graphics::Resources::ResourceID whiteroomAlbedoId;

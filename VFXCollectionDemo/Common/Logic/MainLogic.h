@@ -22,6 +22,8 @@ namespace Common::Logic
 		void Update();
 		void Render();
 
+		void SwitchToNextScene();
+
 		bool NeedBackgroundUpdate() const;
 
 	private:

@@ -119,10 +119,6 @@ namespace Common::Logic::SceneEntity
 
 			float3 fogOffset;
 			float distanceFalloffLength;
-
-			float zNear;
-			float zFar;
-			float2 padding;
 		};
 
 		struct MotionBlurConstants
@@ -199,7 +195,8 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::GPUResource* sceneDepthTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneAlphaTargetGPUResource;
 		Graphics::Resources::GPUResource* sceneMotionTargetGPUResource;
-		Graphics::Resources::GPUResource* temporaryRWTextureGPUResource;
+		Graphics::Resources::GPUResource* temporaryRWTexture0GPUResource;
+		Graphics::Resources::GPUResource* temporaryRWTexture1GPUResource;
 		Graphics::Resources::GPUResource* luminanceBufferGPUResource;
 		Graphics::Resources::GPUResource* bloomBufferGPUResource;
 
@@ -209,7 +206,8 @@ namespace Common::Logic::SceneEntity
 
 		Graphics::Resources::ResourceID volumetricFogConstantBufferId;
 		Graphics::Resources::ResourceID sceneMotionTargetId;
-		Graphics::Resources::ResourceID temporaryRWTextureId;
+		Graphics::Resources::ResourceID temporaryRWTexture0Id;
+		Graphics::Resources::ResourceID temporaryRWTexture1Id;
 		Graphics::Resources::ResourceID luminanceBufferId;
 		Graphics::Resources::ResourceID bloomBufferId;
 

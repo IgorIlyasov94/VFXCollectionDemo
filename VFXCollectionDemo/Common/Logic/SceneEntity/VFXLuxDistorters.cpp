@@ -103,8 +103,8 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateConstantBuffers(ID3D12D
 	distortersConstants->time = 0.0f;
 	distortersConstants->deltaTime = 0.0f;
 	distortersConstants->particleNumber = 10.0f;
-	distortersConstants->noiseStrength = 0.002f;
-	distortersConstants->velocityStrength = 0.02f;
+	distortersConstants->noiseStrength = 0.01f;
+	distortersConstants->velocityStrength = 1.0f;
 	distortersConstants->padding = {};
 }
 
@@ -167,9 +167,9 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateParticleSystems(ID3D12G
 	particleSystemDesc.emitterOrigin = new float3(0.0f, 0.0f, 1.35f);
 	particleSystemDesc.emitterRadiusOffset = 0.3f;
 	particleSystemDesc.emitterRadius = float3(0.3f, 0.3f, 0.3f);
-	particleSystemDesc.minParticleVelocity = float3(-0.2f, -0.4f, -0.05f);
+	particleSystemDesc.minParticleVelocity = float3(-0.2f, -0.2f, -0.05f);
 	particleSystemDesc.particleDamping = 0.996f;
-	particleSystemDesc.maxParticleVelocity = float3(0.2f, 0.2f, 0.15f);
+	particleSystemDesc.maxParticleVelocity = float3(0.2f, 0.2f, 0.5f);
 	particleSystemDesc.particleTurbulence = 0.0f;
 	particleSystemDesc.minRotation = 0.0f;
 	particleSystemDesc.maxRotation = static_cast<float>(std::numbers::pi * 2.0);

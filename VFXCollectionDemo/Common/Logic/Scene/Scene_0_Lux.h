@@ -60,28 +60,28 @@ namespace Common::Logic::Scene
 		static constexpr float Z_NEAR = 0.1f;
 		static constexpr float Z_FAR = 1000.0f;
 
-		static constexpr float AREA_LIGHT_INTENSITY = 20.0f;
+		static constexpr float AREA_LIGHT_INTENSITY = 15.0f;
 		static constexpr float AREA_LIGHT_RANGE = 7.0f;
 
 		static constexpr float AMBIENT_LIGHT_INTENSITY = 0.15f;
 
 		static constexpr bool DEPTH_PREPASS_ENABLED = true;
-		static constexpr bool FSR_ENABLED = true;
+		static constexpr bool FSR_ENABLED = false;
 		static constexpr bool MOTION_BLUR_ENABLED = false;
 		static constexpr bool VOLUMETRIC_FOG_ENABLED = true;
 		static constexpr bool USING_PARTICLE_LIGHT = true;
 
 		static constexpr float WHITE_CUTOFF = 1.7f;
-		static constexpr float BRIGHT_THRESHOLD = 3.5f;
+		static constexpr float BRIGHT_THRESHOLD = 2.0f;
 		static constexpr float BLOOM_INTENSITY = 1.0f;
 
 		static constexpr float FOG_DISTANCE_FALLOFF_START = 0.5f;
 		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 5.0f;
 		static constexpr float FOG_TILING = 0.12f;
 
-		static constexpr float COLOR_GRADING_FACTOR = 0.25f;
+		static constexpr float COLOR_GRADING_FACTOR = 0.4f;
 
-		static constexpr float3 COLOR_GRADING = float3(1.0f, 1.1f, 1.4f);
+		static constexpr float3 COLOR_GRADING = float3(1.0f, 1.4f, 1.8f);
 		
 		static constexpr uint32_t SPARKLES_NUMBER = 20u;
 

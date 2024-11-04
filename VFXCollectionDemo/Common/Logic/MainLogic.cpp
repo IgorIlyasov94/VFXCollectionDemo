@@ -70,6 +70,11 @@ void Common::Logic::MainLogic::Render()
 	renderer->EndFrame(commandList);
 }
 
+void Common::Logic::MainLogic::SwitchToNextScene()
+{
+	sceneManager->SwitchToNextScene(renderer);
+}
+
 bool Common::Logic::MainLogic::NeedBackgroundUpdate() const
 {
 	return needBackgroundUpdate;
