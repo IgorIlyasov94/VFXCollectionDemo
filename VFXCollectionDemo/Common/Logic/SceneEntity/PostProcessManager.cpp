@@ -4,13 +4,10 @@
 #include "../../Graphics/Assets/MaterialBuilder.h"
 #include "../../Graphics/Assets/ComputeObjectBuilder.h"
 #include "../../Graphics/Assets/Loaders/DDSLoader.h"
-#include "../../Graphics/Assets/Generators/NoiseGenerator.h"
-#include "../../Graphics/Assets/Generators/TurbulenceMapGenerator.h"
 
 using namespace Graphics::Resources;
 using namespace Graphics::Assets;
 using namespace Graphics::Assets::Loaders;
-using namespace Graphics::Assets::Generators;
 using namespace DirectX::PackedVector;
 
 Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12GraphicsCommandList* commandList,
@@ -83,9 +80,6 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 
 	LoadShaders(device, resourceManager, lightDefines);
 
-	if (_renderingScheme.enableVolumetricFog)
-		CreateTextures(device, commandList, resourceManager);
-
 	CreateMaterials(device, resourceManager, renderer);
 	CreateComputeObjects(device, resourceManager, lightingSystem);
 
@@ -157,8 +151,6 @@ void Common::Logic::SceneEntity::PostProcessManager::Release(ResourceManager* re
 	{
 		delete volumetricFogComputeObject;
 
-		resourceManager->DeleteResource<Texture>(fogMapId);
-		resourceManager->DeleteResource<Texture>(turbulenceMapId);
 		resourceManager->DeleteResource<ConstantBuffer>(volumetricFogConstantBufferId);
 		resourceManager->DeleteResource<Shader>(volumetricFogCSId);
 	}
@@ -678,60 +670,6 @@ void Common::Logic::SceneEntity::PostProcessManager::LoadShaders(ID3D12Device* d
 	}
 }
 
-void Common::Logic::SceneEntity::PostProcessManager::CreateTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-	Graphics::Resources::ResourceManager* resourceManager)
-{
-	TextureDesc textureDesc{};
-
-	std::filesystem::path fileName("Resources\\Textures\\FogMap.dds");
-	
-	if (std::filesystem::exists(fileName))
-		DDSLoader::Load(fileName, textureDesc);
-	else
-	{
-		NoiseGenerator noiseGenerator{};
-
-		std::vector<floatN> noiseData;
-		noiseGenerator.Generate(NOISE_SIZE_X, NOISE_SIZE_Y, NOISE_SIZE_Z, float3(4.0f, 4.0f, 4.0f), noiseData);
-
-		DDSSaveDesc ddsSaveDesc{};
-		ddsSaveDesc.width = NOISE_SIZE_X;
-		ddsSaveDesc.height = NOISE_SIZE_Y;
-		ddsSaveDesc.depth = NOISE_SIZE_Z;
-		ddsSaveDesc.targetFormat = DDSFormat::R8G8B8A8_UNORM;
-		ddsSaveDesc.dimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-		
-		DDSLoader::Save(fileName, ddsSaveDesc, noiseData);
-		DDSLoader::Load(fileName, textureDesc);
-	}
-
-	fogMapId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
-
-	fileName = "Resources\\Textures\\TurbulenceMap.dds";
-
-	if (std::filesystem::exists(fileName))
-		DDSLoader::Load(fileName, textureDesc);
-	else
-	{
-		TurbulenceMapGenerator turbulenceMapGenerator{};
-
-		std::vector<floatN> turbulenceData;
-		turbulenceMapGenerator.Generate(NOISE_SIZE_X, NOISE_SIZE_Y, NOISE_SIZE_Z, float3(4.0f, 4.0f, 4.0f), turbulenceData);
-
-		DDSSaveDesc ddsSaveDesc{};
-		ddsSaveDesc.width = NOISE_SIZE_X;
-		ddsSaveDesc.height = NOISE_SIZE_Y;
-		ddsSaveDesc.depth = NOISE_SIZE_Z;
-		ddsSaveDesc.targetFormat = DDSFormat::R8G8B8A8_UNORM;
-		ddsSaveDesc.dimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-
-		DDSLoader::Save(fileName, ddsSaveDesc, turbulenceData);
-		DDSLoader::Load(fileName, textureDesc);
-	}
-
-	turbulenceMapId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
-}
-
 void Common::Logic::SceneEntity::PostProcessManager::CreateMaterials(ID3D12Device* device, ResourceManager* resourceManager,
 	Graphics::DirectX12Renderer* renderer)
 {
@@ -831,8 +769,8 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 		auto volumetricFogConstantBufferResource = resourceManager->GetResource<ConstantBuffer>(volumetricFogConstantBufferId);
 		auto sceneDepthTargetResource = resourceManager->GetResource<DepthStencilTarget>(sceneDepthTargetId);
 
-		auto fogMapResource = resourceManager->GetResource<Texture>(fogMapId);
-		auto turbulenceMapResource = resourceManager->GetResource<Texture>(turbulenceMapId);
+		auto fogMapResource = resourceManager->GetResource<Texture>(_renderingScheme.fogMapId);
+		auto turbulenceMapResource = resourceManager->GetResource<Texture>(_renderingScheme.turbulenceMapId);
 
 		auto samplerLinearWrapResource = resourceManager->GetDefaultSampler(device, Graphics::DefaultFilterSetup::FILTER_BILINEAR_WRAP);
 		

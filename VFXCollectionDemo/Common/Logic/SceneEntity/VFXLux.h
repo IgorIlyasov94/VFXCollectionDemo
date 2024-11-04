@@ -13,7 +13,8 @@ namespace Common::Logic::SceneEntity
 	{
 	public:
 		VFXLux(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer,
-			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID vfxAtlasId,
+			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID volumeNoiseId,
+			Graphics::Resources::ResourceID turbulenceMapId, Graphics::Resources::ResourceID vfxAtlasId,
 			Camera* camera, const float3& position);
 		~VFXLux() override;
 
@@ -48,11 +49,9 @@ namespace Common::Logic::SceneEntity
 		void CreateHaloMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager);
 
-		void CreateFlareMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-			Graphics::Resources::ResourceManager* resourceManager);
-
 		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
-			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID vfxAtlasId);
+			Graphics::Resources::ResourceID perlinNoiseId, Graphics::Resources::ResourceID volumeNoiseId,
+			Graphics::Resources::ResourceID turbulenceMapId, Graphics::Resources::ResourceID vfxAtlasId);
 
 		uint8_t FloatToColorChannel(float value);
 		uint32_t SetColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
@@ -64,28 +63,20 @@ namespace Common::Logic::SceneEntity
 			DirectX::PackedVector::XMHALF2 texCoord;
 		};
 
-		struct VFXVertexFlare
-		{
-			float3 position;
-			DirectX::PackedVector::XMHALF2 texCoord;
-		};
-
-		struct VFXPillarConstants
+		struct VFXCircleConstants
 		{
 			float4x4 invView;
 			float4x4 viewProjection;
-			float4 color0;
-			float4 color1;
+			float3 color0;
+			float colorIntensity;
+			float3 color1;
+			float distortionStrength;
 			float3 worldPosition;
 			float time;
 			float2 tiling0;
 			float2 tiling1;
 			float2 scrollSpeed0;
 			float2 scrollSpeed1;
-			float colorIntensity;
-			float alphaSharpness;
-			float spectralTransitionSharpness;
-			float distortionStrength;
 		};
 
 		struct VFXHaloConstants
@@ -102,20 +93,6 @@ namespace Common::Logic::SceneEntity
 			float alphaSharpness;
 			float distortionStrength;
 			float padding;
-		};
-
-		struct VFXFlareConstants
-		{
-			float4x4 invView;
-			float4x4 viewProjection;
-			float4 color0;
-			float4 color1;
-			float3 worldPosition;
-			float colorIntensity;
-			float2 minSize;
-			float2 maxSize;
-			float cosTime;
-			float3 padding;
 		};
 
 		static constexpr uint32_t TOTAL_SEGMENT_NUMBER = 12u;
@@ -142,30 +119,21 @@ namespace Common::Logic::SceneEntity
 		static constexpr uint32_t ATLAS_SIZE_X = 8u;
 		static constexpr uint32_t ATLAS_SIZE_Y = 8u;
 
-		static constexpr float CIRCLE_INTENSITY = 1.0f;
-		static constexpr float CIRCLE_SHARPNESS = 5.0f;
-		static constexpr float CIRCLE_SPECTRAL_TRANSITION_SHARPNESS = 1.4f;
-		
+		static constexpr float CIRCLE_INTENSITY = 2.25f;
+		static constexpr float CIRCLE_DISTORTION_INTENSITY = 0.3f;
+
 		static constexpr float HALO_INTENSITY = 3.0f;
 		static constexpr float HALO_SHARPNESS = 3.5f;
 
-		static constexpr float RING_START_OFFSET = 0.15f;
-		static constexpr float RING_WIDTH = 0.55f;
-		static constexpr float RING_FADING_WIDTH = 0.35f;
+		static constexpr float RING_START_OFFSET = 0.0f;
+		static constexpr float RING_WIDTH = 0.4f;
+		static constexpr float RING_FADING_WIDTH = 0.8f;
 		static constexpr float CIRCLE_WIDTH = RING_WIDTH + RING_FADING_WIDTH * 2.0f;
 
-		static constexpr float HALO_RING_START_OFFSET = 0.9f;
-		static constexpr float HALO_RING_WIDTH = 0.7f;
-		static constexpr float HALO_RING_FADING_WIDTH = 0.7f;
+		static constexpr float HALO_RING_START_OFFSET = 0.2f;
+		static constexpr float HALO_RING_WIDTH = 0.35f;
+		static constexpr float HALO_RING_FADING_WIDTH = 1.4f;
 		static constexpr float HALO_WIDTH = HALO_RING_WIDTH + HALO_RING_FADING_WIDTH * 2.0f;
-
-		static constexpr float4 FLARE_COLOR0 = float4(1.0f, 0.8f, 0.1f, 1.0f);
-		static constexpr float4 FLARE_COLOR1 = float4(2.0f, 1.7f, 0.6f, 1.0f);
-		static constexpr float2 FLARE_MIN_SIZE = float2(3.0f, 0.3f);
-		static constexpr float2 FLARE_MAX_SIZE = float2(3.25f, 0.4f);
-		static constexpr float FLARE_ANIMATION_SPEED = 0.75f;
-		static constexpr float FLARE_COLOR_INTENSITY_MIN = 0.1f;
-		static constexpr float FLARE_COLOR_INTENSITY_MAX = 0.4f;
 
 		static constexpr uint32_t INDEX_OFFSETS[INDICES_PER_SEGMENT] =
 		{
@@ -205,30 +173,24 @@ namespace Common::Logic::SceneEntity
 
 		float4x4 circleWorld;
 		
-		VFXPillarConstants* circleConstants;
+		VFXCircleConstants* circleConstants;
 		VFXHaloConstants* haloConstants;
-		VFXFlareConstants* flareConstants;
 
 		Camera* _camera;
 		
 		Graphics::Resources::ResourceID circleConstantsId;
 		Graphics::Resources::ResourceID haloConstantsId;
-		Graphics::Resources::ResourceID flareConstantsId;
 
 		Graphics::Resources::ResourceID vfxLuxHaloSpectrumId;
 
 		Graphics::Resources::ResourceID vfxLuxCircleVSId;
 		Graphics::Resources::ResourceID vfxLuxHaloVSId;
-		Graphics::Resources::ResourceID vfxLuxFlareVSId;
 		Graphics::Resources::ResourceID vfxLuxCirclePSId;
 		Graphics::Resources::ResourceID vfxLuxHaloPSId;
-		Graphics::Resources::ResourceID vfxLuxFlarePSId;
 
 		Graphics::Assets::Mesh* circleMesh;
 		Graphics::Assets::Mesh* haloMesh;
-		Graphics::Assets::Mesh* flareMesh;
 		Graphics::Assets::Material* circleMaterial;
 		Graphics::Assets::Material* haloMaterial;
-		Graphics::Assets::Material* flareMaterial;
 	};
 }

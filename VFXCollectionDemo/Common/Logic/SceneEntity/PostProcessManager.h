@@ -24,6 +24,9 @@ namespace Common::Logic::SceneEntity
 		float fogDistanceFalloffLength;
 		float fogTiling;
 
+		Graphics::Resources::ResourceID fogMapId;
+		Graphics::Resources::ResourceID turbulenceMapId;
+
 		float3* windDirection;
 		float* windStrength;
 
@@ -78,9 +81,6 @@ namespace Common::Logic::SceneEntity
 
 		void LoadShaders(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			const std::vector<DxcDefine>& lightDefines);
-
-		void CreateTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-			Graphics::Resources::ResourceManager* resourceManager);
 
 		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
 			Graphics::DirectX12Renderer* renderer);
@@ -170,10 +170,6 @@ namespace Common::Logic::SceneEntity
 		static constexpr uint32_t HALF_BLUR_SAMPLES_NUMBER = 8u;
 		static constexpr uint32_t MAX_SIMULTANEOUS_BARRIER_NUMBER = 5u;
 
-		static constexpr uint32_t NOISE_SIZE_X = 128u;
-		static constexpr uint32_t NOISE_SIZE_Y = 128u;
-		static constexpr uint32_t NOISE_SIZE_Z = 64u;
-
 		VolumetricFogConstants* volumetricFogConstants;
 		MotionBlurConstants motionBlurConstants;
 		HDRConstants hdrConstants;
@@ -216,9 +212,6 @@ namespace Common::Logic::SceneEntity
 		Graphics::Resources::ResourceID temporaryRWTextureId;
 		Graphics::Resources::ResourceID luminanceBufferId;
 		Graphics::Resources::ResourceID bloomBufferId;
-
-		Graphics::Resources::ResourceID fogMapId;
-		Graphics::Resources::ResourceID turbulenceMapId;
 
 		Graphics::Resources::ResourceID quadVSId;
 		Graphics::Resources::ResourceID motionBlurCSId;

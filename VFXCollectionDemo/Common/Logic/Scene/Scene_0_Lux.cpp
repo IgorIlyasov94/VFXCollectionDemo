@@ -3,13 +3,16 @@
 #include "../SceneEntity/VFXLux.h"
 #include "../SceneEntity/VFXLuxSparkles.h"
 #include "../SceneEntity/VFXLuxDistorters.h"
-#include "../../../Graphics/Assets/MaterialBuilder.h"
-#include "../../../Graphics/Assets/Loaders/DDSLoader.h"
+#include "../../Graphics/Assets/MaterialBuilder.h"
+#include "../../Graphics/Assets/Loaders/DDSLoader.h"
+#include "../../Graphics/Assets/Generators/NoiseGenerator.h"
+#include "../../Graphics/Assets/Generators/TurbulenceMapGenerator.h"
 
 using namespace DirectX;
 using namespace Graphics::Assets;
 using namespace Graphics::Resources;
 using namespace Graphics::Assets::Loaders;
+using namespace Graphics::Assets::Generators;
 using namespace Common::Logic::SceneEntity;
 
 Common::Logic::Scene::Scene_0_Lux::Scene_0_Lux()
@@ -57,6 +60,7 @@ void Common::Logic::Scene::Scene_0_Lux::Load(Graphics::DirectX12Renderer* render
 	CreateConstantBuffers(device, resourceManager, renderSize.x, renderSize.y);
 	LoadShaders(device, resourceManager);
 	LoadTextures(device, commandList, resourceManager);
+	CreateTextures(device, commandList, resourceManager);
 
 	CreateMaterials(device, resourceManager, renderer);
 	CreateObjects(commandList, renderer);
@@ -89,6 +93,8 @@ void Common::Logic::Scene::Scene_0_Lux::Unload(Graphics::DirectX12Renderer* rend
 	resourceManager->DeleteResource<ConstantBuffer>(mutableConstantsId);
 	resourceManager->DeleteResource<Texture>(vfxAtlasId);
 	resourceManager->DeleteResource<Texture>(perlinNoiseId);
+	resourceManager->DeleteResource<Texture>(volumeNoiseId);
+	resourceManager->DeleteResource<Texture>(turbulenceMapId);
 
 	resourceManager->DeleteResource<Shader>(depthCubePassVSId);
 	resourceManager->DeleteResource<Shader>(depthCubePassGSId);
@@ -170,8 +176,12 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 	vfxLuxDistorters->Update(timer, _deltaTime);
 	vegetationSystem->Update(timer, _deltaTime);
 
+	float t = std::sin(timer * 1.2f) * 0.5f + 0.5f;
+
 	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
-	areaLightDesc.intensity = AREA_LIGHT_INTENSITY + std::pow(std::max(std::sin(timer * 0.4f), 0.0f), 60.0f) * 1.0f;
+	areaLightDesc.intensity = AREA_LIGHT_INTENSITY + t * 2.0f;
+	areaLightDesc.color = float3(std::lerp(0.8f, 1.0f, t), 0.5f, std::lerp(0.6f, 0.4f, t));
+	areaLightDesc.range = AREA_LIGHT_RANGE + t * 2.0f;
 
 	lightingSystem->UpdateSourceDesc(areaLightId);
 
@@ -224,7 +234,7 @@ void Common::Logic::Scene::Scene_0_Lux::Render(ID3D12GraphicsCommandList* comman
 	{
 		postProcessManager->SetMotionBuffer(commandList);
 
-		vfxLuxDistorters->Draw(commandList);
+		//vfxLuxDistorters->Draw(commandList);
 	}
 
 	postProcessManager->Render(commandList, renderer, _deltaTime);
@@ -303,6 +313,60 @@ void Common::Logic::Scene::Scene_0_Lux::LoadTextures(ID3D12Device* device, ID3D1
 
 	DDSLoader::Load("Resources\\Textures\\PerlinNoise.dds", textureDesc);
 	perlinNoiseId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
+}
+
+void Common::Logic::Scene::Scene_0_Lux::CreateTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+	Graphics::Resources::ResourceManager* resourceManager)
+{
+	TextureDesc textureDesc{};
+
+	std::filesystem::path fileName("Resources\\Textures\\FogMap.dds");
+
+	if (std::filesystem::exists(fileName))
+		DDSLoader::Load(fileName, textureDesc);
+	else
+	{
+		NoiseGenerator noiseGenerator{};
+
+		std::vector<floatN> noiseData;
+		noiseGenerator.Generate(NOISE_SIZE_X, NOISE_SIZE_Y, NOISE_SIZE_Z, float3(4.0f, 4.0f, 4.0f), noiseData);
+
+		DDSSaveDesc ddsSaveDesc{};
+		ddsSaveDesc.width = NOISE_SIZE_X;
+		ddsSaveDesc.height = NOISE_SIZE_Y;
+		ddsSaveDesc.depth = NOISE_SIZE_Z;
+		ddsSaveDesc.targetFormat = DDSFormat::R8G8B8A8_UNORM;
+		ddsSaveDesc.dimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+
+		DDSLoader::Save(fileName, ddsSaveDesc, noiseData);
+		DDSLoader::Load(fileName, textureDesc);
+	}
+
+	volumeNoiseId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
+
+	fileName = "Resources\\Textures\\TurbulenceMap.dds";
+
+	if (std::filesystem::exists(fileName))
+		DDSLoader::Load(fileName, textureDesc);
+	else
+	{
+		TurbulenceMapGenerator turbulenceMapGenerator{};
+
+		std::vector<floatN> turbulenceData;
+		turbulenceMapGenerator.Generate(NOISE_SIZE_X, NOISE_SIZE_Y, NOISE_SIZE_Z, float3(4.0f, 4.0f, 4.0f), turbulenceData);
+
+		DDSSaveDesc ddsSaveDesc{};
+		ddsSaveDesc.width = NOISE_SIZE_X;
+		ddsSaveDesc.height = NOISE_SIZE_Y;
+		ddsSaveDesc.depth = NOISE_SIZE_Z;
+		ddsSaveDesc.targetFormat = DDSFormat::R8G8B8A8_UNORM;
+		ddsSaveDesc.dimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+
+		DDSLoader::Save(fileName, ddsSaveDesc, turbulenceData);
+		DDSLoader::Load(fileName, textureDesc);
+	}
+
+	turbulenceMapId = resourceManager->CreateTextureResource(device, commandList, TextureResourceType::TEXTURE, textureDesc);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::CreateLights(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer)
@@ -391,6 +455,8 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	renderingScheme.fogDistanceFalloffStart = FOG_DISTANCE_FALLOFF_START;
 	renderingScheme.fogDistanceFalloffLength = FOG_DISTANCE_FALLOFF_LENGTH;
 	renderingScheme.fogTiling = FOG_TILING;
+	renderingScheme.fogMapId = volumeNoiseId;
+	renderingScheme.turbulenceMapId = turbulenceMapId;
 	renderingScheme.windDirection = &windDirection;
 	renderingScheme.windStrength = &windStrength;
 
@@ -470,8 +536,8 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	postProcessManager = new SceneEntity::PostProcessManager(commandList, renderer, camera,
 		lightingSystem, shaderDefines, renderingScheme);
 
-	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, vfxAtlasId, camera,
-		float3(0.0f, 0.0f, 1.25f));
+	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, volumeNoiseId, turbulenceMapId,
+		vfxAtlasId, camera, float3(0.0f, 0.0f, 1.25f));
 
 	vfxLuxSparkles = new SceneEntity::VFXLuxSparkles(commandList, renderer,
 		perlinNoiseId, vfxAtlasId, lightParticleBufferId, particleLightSimulationCSId, SPARKLES_NUMBER, camera);

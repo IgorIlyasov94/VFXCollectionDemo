@@ -45,6 +45,9 @@ namespace Common::Logic::Scene
 		void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 			Graphics::Resources::ResourceManager* resourceManager);
 
+		void CreateTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+			Graphics::Resources::ResourceManager* resourceManager);
+
 		void CreateLights(ID3D12GraphicsCommandList* commandList, Graphics::DirectX12Renderer* renderer);
 
 		void CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
@@ -57,14 +60,14 @@ namespace Common::Logic::Scene
 		static constexpr float Z_NEAR = 0.1f;
 		static constexpr float Z_FAR = 1000.0f;
 
-		static constexpr float AREA_LIGHT_INTENSITY = 15.0f;
-		static constexpr float AREA_LIGHT_RANGE = 8.0f;
+		static constexpr float AREA_LIGHT_INTENSITY = 20.0f;
+		static constexpr float AREA_LIGHT_RANGE = 7.0f;
 
 		static constexpr float AMBIENT_LIGHT_INTENSITY = 0.15f;
 
 		static constexpr bool DEPTH_PREPASS_ENABLED = true;
 		static constexpr bool FSR_ENABLED = true;
-		static constexpr bool MOTION_BLUR_ENABLED = true;
+		static constexpr bool MOTION_BLUR_ENABLED = false;
 		static constexpr bool VOLUMETRIC_FOG_ENABLED = true;
 		static constexpr bool USING_PARTICLE_LIGHT = true;
 
@@ -81,6 +84,10 @@ namespace Common::Logic::Scene
 		static constexpr float3 COLOR_GRADING = float3(1.0f, 1.1f, 1.4f);
 		
 		static constexpr uint32_t SPARKLES_NUMBER = 20u;
+
+		static constexpr uint32_t NOISE_SIZE_X = 128u;
+		static constexpr uint32_t NOISE_SIZE_Y = 128u;
+		static constexpr uint32_t NOISE_SIZE_Z = 64u;
 
 		struct MutableConstants
 		{
@@ -117,6 +124,8 @@ namespace Common::Logic::Scene
 		Graphics::Resources::ResourceID mutableConstantsId;
 		Graphics::Resources::ResourceID vfxAtlasId;
 		Graphics::Resources::ResourceID perlinNoiseId;
+		Graphics::Resources::ResourceID volumeNoiseId;
+		Graphics::Resources::ResourceID turbulenceMapId;
 		Graphics::Resources::ResourceID lightParticleBufferId;
 
 		Graphics::Resources::ResourceID depthPassVSId;
