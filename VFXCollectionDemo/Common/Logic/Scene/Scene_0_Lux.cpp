@@ -181,7 +181,7 @@ void Common::Logic::Scene::Scene_0_Lux::Update()
 
 	auto& areaLightDesc = lightingSystem->GetSourceDesc(areaLightId);
 	areaLightDesc.intensity = AREA_LIGHT_INTENSITY + t * 2.0f;
-	areaLightDesc.color = float3(std::lerp(0.8f, 1.0f, t), 0.5f, std::lerp(0.6f, 0.4f, t));
+	//areaLightDesc.color = float3(std::lerp(0.8f, 1.0f, t), 0.5f, std::lerp(0.6f, 0.4f, t));
 	areaLightDesc.range = AREA_LIGHT_RANGE + t * 2.0f;
 
 	lightingSystem->UpdateSourceDesc(areaLightId);
@@ -377,7 +377,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateLights(ID3D12GraphicsCommandList* 
 	LightDesc areaLight{};
 	areaLight.position = float3(0.0f, 0.0f, 1.5f);
 	areaLight.radius = 0.05f;
-	areaLight.color = float3(0.6f, 0.5f, 0.3f);
+	areaLight.color = LIGHT_COLOR;
 	areaLight.intensity = 0.0f;
 	areaLight.type = LightType::AREA_LIGHT;
 	areaLight.range = AREA_LIGHT_RANGE;
@@ -386,13 +386,13 @@ void Common::Logic::Scene::Scene_0_Lux::CreateLights(ID3D12GraphicsCommandList* 
 	areaLightId = lightingSystem->CreateLight(areaLight);
 
 	LightDesc ambientLight{};
-	ambientLight.color = float3(0.9f, 0.3f, 0.2f);
+	ambientLight.color = AMBIENT_COLOR;
 	ambientLight.intensity = 0.0f;
 	ambientLight.type = LightType::AMBIENT_LIGHT;
 
 	ambientLightId = lightingSystem->CreateLight(ambientLight);
 
-	lightParticleBufferId = lightingSystem->CreateLightParticleBuffer(commandList, SPARKLES_NUMBER);
+	lightParticleBufferId = lightingSystem->CreateLightParticleBuffer(commandList, FIREFLIES_NUMBER);
 }
 
 void Common::Logic::Scene::Scene_0_Lux::CreateMaterials(ID3D12Device* device, Graphics::Resources::ResourceManager* resourceManager,
@@ -436,7 +436,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	std::wstringstream lightParticleNumberStream;
 
 	if constexpr (USING_PARTICLE_LIGHT)
-		lightParticleNumberStream << SPARKLES_NUMBER;
+		lightParticleNumberStream << FIREFLIES_NUMBER;
 	else
 		lightParticleNumberStream << 0u;
 
@@ -456,6 +456,7 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	renderingScheme.whiteCutoff = WHITE_CUTOFF;
 	renderingScheme.brightThreshold = BRIGHT_THRESHOLD;
 	renderingScheme.bloomIntensity = BLOOM_INTENSITY;
+	renderingScheme.motionBlurThreshold = MOTION_BLUR_THRESHOLD;
 	renderingScheme.colorGrading = COLOR_GRADING;
 	renderingScheme.colorGradingFactor = COLOR_GRADING_FACTOR;
 	renderingScheme.fogDistanceFalloffStart = FOG_DISTANCE_FALLOFF_START;
@@ -545,8 +546,16 @@ void Common::Logic::Scene::Scene_0_Lux::CreateObjects(ID3D12GraphicsCommandList*
 	vfxLux = new SceneEntity::VFXLux(commandList, renderer, perlinNoiseId, volumeNoiseId, turbulenceMapId,
 		vfxAtlasId, camera, float3(0.0f, 0.0f, 1.25f));
 
-	vfxLuxSparkles = new SceneEntity::VFXLuxSparkles(commandList, renderer,
-		perlinNoiseId, vfxAtlasId, lightParticleBufferId, particleLightSimulationCSId, SPARKLES_NUMBER, camera);
+	SceneEntity::VFXLuxSparklesDesc sparklesDesc{};
+	sparklesDesc.firefliesNumber = FIREFLIES_NUMBER;
+	sparklesDesc.sparklesNumber = SPARKLES_NUMBER;
+	sparklesDesc.perlinNoiseId = perlinNoiseId;
+	sparklesDesc.vfxAtlasId = vfxAtlasId;
+	sparklesDesc.lightParticleBufferId = lightParticleBufferId;
+	sparklesDesc.firefliesSimulationCSId = particleLightSimulationCSId;
+	sparklesDesc.sparkleSimulationCSId = particleSimulationCSId;
+
+	vfxLuxSparkles = new SceneEntity::VFXLuxSparkles(commandList, renderer, camera, sparklesDesc);
 
 	vfxLuxDistorters = new SceneEntity::VFXLuxDistorters(commandList, renderer,
 		perlinNoiseId, vfxAtlasId, particleSimulationCSId, camera);

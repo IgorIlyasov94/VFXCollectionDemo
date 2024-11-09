@@ -1,6 +1,6 @@
 #include "DDSLoader.h"
 
-void Graphics::Assets::Loaders::DDSLoader::Load(std::filesystem::path filePath, Resources::TextureDesc& textureDesc)
+void Graphics::Assets::Loaders::DDSLoader::Load(const std::filesystem::path& filePath, Resources::TextureDesc& textureDesc)
 {
     if (!std::filesystem::exists(filePath))
         return;
@@ -85,7 +85,7 @@ void Graphics::Assets::Loaders::DDSLoader::Load(std::filesystem::path filePath, 
     ddsFile.read(reinterpret_cast<char*>(textureDesc.data.data()), textureSizeInBytes);
 }
 
-void Graphics::Assets::Loaders::DDSLoader::Save(std::filesystem::path filePath, const DDSSaveDesc& saveDesc,
+void Graphics::Assets::Loaders::DDSLoader::Save(const std::filesystem::path& filePath, const DDSSaveDesc& saveDesc,
     const std::vector<floatN>& data)
 {
     std::ofstream ddsFile(filePath, std::ios::binary);

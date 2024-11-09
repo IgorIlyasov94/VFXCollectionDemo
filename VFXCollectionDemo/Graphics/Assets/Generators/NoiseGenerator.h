@@ -17,6 +17,9 @@ namespace Graphics::Assets::Generators
 		void GenerateWhiteNoiseMap(uint32_t width, uint32_t height, uint32_t depth, std::vector<floatN>& noiseMap);
 		void GaussianBlur(int32_t width, int32_t height, int32_t depth, const float3& scale, std::vector<floatN>& noiseMap);
 
+		static constexpr uint32_t MIN_BLOCKS_PER_THREAD = 65535u;
+		static constexpr uint32_t THREAD_THRESHOLD = MIN_BLOCKS_PER_THREAD * 2u;
+
 		static constexpr uint32_t BASE_MAP_SIZE = 128u;
 		static constexpr uint32_t BASE_GAUSSIAN_BLUR_SIZE = 2u;
 

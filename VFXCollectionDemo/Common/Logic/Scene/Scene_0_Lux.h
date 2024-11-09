@@ -67,13 +67,14 @@ namespace Common::Logic::Scene
 
 		static constexpr bool DEPTH_PREPASS_ENABLED = true;
 		static constexpr bool FSR_ENABLED = false;
-		static constexpr bool MOTION_BLUR_ENABLED = false;
+		static constexpr bool MOTION_BLUR_ENABLED = true;
 		static constexpr bool VOLUMETRIC_FOG_ENABLED = true;
 		static constexpr bool USING_PARTICLE_LIGHT = true;
 
 		static constexpr float WHITE_CUTOFF = 1.7f;
 		static constexpr float BRIGHT_THRESHOLD = 2.0f;
 		static constexpr float BLOOM_INTENSITY = 1.0f;
+		static constexpr float MOTION_BLUR_THRESHOLD = 0.0f;
 
 		static constexpr float FOG_DISTANCE_FALLOFF_START = 0.5f;
 		static constexpr float FOG_DISTANCE_FALLOFF_LENGTH = 5.0f;
@@ -81,9 +82,12 @@ namespace Common::Logic::Scene
 
 		static constexpr float COLOR_GRADING_FACTOR = 0.4f;
 
-		static constexpr float3 COLOR_GRADING = float3(1.0f, 1.4f, 1.8f);
-		
-		static constexpr uint32_t SPARKLES_NUMBER = 20u;
+		static constexpr float3 COLOR_GRADING = float3(1.0f, 1.2f, 1.5f);
+		static constexpr float3 LIGHT_COLOR = float3(1.0f, 0.35f, 0.1f);
+		static constexpr float3 AMBIENT_COLOR = float3(0.0f, 0.4f, 0.8f);
+
+		static constexpr uint32_t FIREFLIES_NUMBER = 20u;
+		static constexpr uint32_t SPARKLES_NUMBER = 50u;
 
 		static constexpr uint32_t NOISE_SIZE_X = 128u;
 		static constexpr uint32_t NOISE_SIZE_Y = 128u;

@@ -5,7 +5,7 @@ static const int SAMPLES_NUMBER = 8;
 static const float PI = 3.14159265359f;
 static const float NORMAL_DISTRIBUTION_SIGMA = 2.75f;
 
-static const float3 STRENGTH_COEFF = float3(0.4f, 0.6f, 1.0f);
+static const float3 STRENGTH_COEFF = float3(0.2f, 0.6f, 1.0f);
 
 cbuffer RootConstants : register(b0)
 {
@@ -13,6 +13,7 @@ cbuffer RootConstants : register(b0)
 	uint area;
 	float width;
 	float height;
+	float threshold;
 };
 
 #if defined(FSR) || defined(VOLUMETRIC_FOG)
@@ -50,10 +51,18 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 	float2 motionG = motion * STRENGTH_COEFF.y;
 	float2 motionB = motion * STRENGTH_COEFF.z;
 	
+#if defined(FSR) || defined(VOLUMETRIC_FOG)
+		float4 originColor = sceneTarget.Load(texCoordU);
+#else
+		float4 originColor = sceneColor.SampleLevel(samplerLinear, texCoord, 0.0f);
+#endif
+	
+	const float firstWeight = Weight(0, NORMAL_DISTRIBUTION_SIGMA);
+	
 	float4 color = 0.0f.xxxx;
 	
 	[unroll]
-	for (int sampleIndex = 0; sampleIndex < SAMPLES_NUMBER; sampleIndex++)
+	for (int sampleIndex = 1; sampleIndex < SAMPLES_NUMBER; sampleIndex++)
 	{
 		float t = saturate(sampleIndex / (float)(SAMPLES_NUMBER - 1)) * 5.0f;
 		
@@ -64,9 +73,9 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 #if defined(FSR) || defined(VOLUMETRIC_FOG)
 		uint2 sizeVector = uint2(width, height);
 		
-		uint2 offsetRU = (uint2)floor(offsetR * sizeVector);
-		uint2 offsetGU = (uint2)floor(offsetG * sizeVector);
-		uint2 offsetBU = (uint2)floor(offsetB * sizeVector);
+		uint2 offsetRU = (uint2)round(offsetR * sizeVector);
+		uint2 offsetGU = (uint2)round(offsetG * sizeVector);
+		uint2 offsetBU = (uint2)round(offsetB * sizeVector);
 		
 		float2 colorRA = sceneTarget.Load(offsetRU).xw;
 		float colorG = sceneTarget.Load(offsetGU).y;
@@ -79,6 +88,8 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 		
 		color += float4(colorRA.x, colorG, colorB, colorRA.y) * Weight(sampleIndex, NORMAL_DISTRIBUTION_SIGMA);
 	}
+	
+	color = (length(motion) >= threshold) ? color + originColor * firstWeight : originColor;
 	
 	sceneTarget[texCoordU] = color;
 }

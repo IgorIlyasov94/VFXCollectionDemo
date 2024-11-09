@@ -134,13 +134,13 @@ void Common::Logic::SceneEntity::VFXLux::CreateConstantBuffers(ID3D12Device* dev
 	haloConstants->viewProjection = _camera->GetViewProjection();
 	haloConstants->worldPosition = position;
 	haloConstants->time = 0.0f;
-	haloConstants->tiling0 = float2(0.3f, 0.15f);
-	haloConstants->tiling1 = float2(0.2f, 0.1f);
-	haloConstants->scrollSpeed0 = float2(0.0f, -0.08f);
+	haloConstants->tiling0 = float2(0.2f, 0.2f);
+	haloConstants->tiling1 = float2(1.0f, 0.3f);
+	haloConstants->scrollSpeed0 = float2(0.0f, -0.02f);
 	haloConstants->scrollSpeed1 = float2(-0.01f, -0.015f);
 	haloConstants->colorIntensity = 0.0f;
 	haloConstants->alphaSharpness = HALO_SHARPNESS;
-	haloConstants->distortionStrength = 0.1f;
+	haloConstants->distortionStrength = HALO_DISTORTION_INTENSITY;
 	haloConstants->padding = 0.0f;
 }
 

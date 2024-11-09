@@ -33,7 +33,7 @@ struct Particle
 cbuffer MutableConstants : register(b0)
 {
 	float3 emitterOrigin;
-	float emitterRadiusOffset;
+	float padding;
 	
 	float3 minParticleVelocity;
 	float particleDamping;
@@ -65,7 +65,7 @@ cbuffer MutableConstants : register(b0)
 	float3 emitterRadius;
 	
 	float lightRange;
-	float3 padding;
+	float3 emitterRadiusOffset;
 	
 	ParticleSystemForce forces[MAX_FORCES_NUMBER];
 };
@@ -108,28 +108,25 @@ float3 SumAccelerations(float3 particlePosition)
 	return result;
 }
 
-float3 RandomPosition(float3 random, float offset, float3 radius)
+float3 RandomPosition(float3 random, float3 offset, float3 radius)
 {
-	float invHalfOffset = 1.0f - offset * 0.5f;
+	float3 shiftedRandom = random - 0.5f.xxx;
+	float3 randomDirection = normalize(shiftedRandom);
+	float3 randomRadius = abs(shiftedRandom * 2.0f) * radius;
 	
-	float3 result = step(0.5f.xxx, random);
-	result = lerp(random * offset, (random - 0.5f.xxx) * offset + invHalfOffset.xxx, result);
-	result = result * 2.0f - 1.0f.xxx;
-	result *= radius;
-	
-	return result;
+	return (randomRadius + offset) * randomDirection;
 }
 
-Particle EmitParticle(float4 random0_0, float4 random1_0)
+Particle EmitParticle(float4 random0_0, float4 random1_0, float4 random2_0)
 {
 	Particle newParticle = (Particle)0;
 	newParticle.position = emitterOrigin + RandomPosition(random0_0.xyz, emitterRadiusOffset, emitterRadius);
-	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, float3(random0_0.w, random1_0.wx));
+	newParticle.velocity = lerp(minParticleVelocity, maxParticleVelocity, random1_0.xyz);
 	
-	newParticle.rotation = lerp(minRotation, maxRotation, random1_0.x);
-	newParticle.rotationSpeed = lerp(minRotationSpeed, maxRotationSpeed, random1_0.y);
+	newParticle.rotation = lerp(minRotation, maxRotation, random2_0.z);
+	newParticle.rotationSpeed = lerp(minRotationSpeed, maxRotationSpeed, random2_0.x);
 	
-	newParticle.size = lerp(minSize, maxSize, random1_0.z);
+	newParticle.size = lerp(minSize, maxSize, random2_0.y);
 	newParticle.startLife = lerp(minLifeSec, maxLifeSec, random1_0.w);
 	
 	newParticle.life = newParticle.startLife;
@@ -155,14 +152,15 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 	float4 randomModifier1 = perlinNoise[texCoord0];
 	float4 random0_0 = frac(random0 + randomModifier0 + randomModifier1);
 	float4 random1_0 = frac(random1 + randomModifier0 + randomModifier1);
+	float4 random2_0 = frac(float4(random0.zw, random1.xy) + randomModifier0.wzxy + randomModifier1.yxwz);
 	
 	[branch]
 	if (particle.life <= 0.0f)
 	{
 		float emitProbability = averageParticleEmit * deltaTime;
 		
-		if (random0_0.z <= emitProbability)
-			particle = EmitParticle(random0_0, random1_0);
+		if (random0_0.w <= emitProbability)
+			particle = EmitParticle(random0_0, random1_0, random2_0);
 	}
 	else
 	{

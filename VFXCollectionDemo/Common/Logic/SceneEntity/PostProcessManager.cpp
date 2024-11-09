@@ -52,6 +52,7 @@ Common::Logic::SceneEntity::PostProcessManager::PostProcessManager(ID3D12Graphic
 	motionBlurConstants.area = hdrConstants.area;
 	motionBlurConstants.width = static_cast<float>(width);
 	motionBlurConstants.height = static_cast<float>(height);
+	motionBlurConstants.threshold = renderingScheme.motionBlurThreshold;
 
 	toneMappingConstants.width = width;
 	toneMappingConstants.area = hdrConstants.area;
@@ -323,7 +324,7 @@ void Common::Logic::SceneEntity::PostProcessManager::SetMotionBuffer(ID3D12Graph
 	if (!_renderingScheme.enableFSR)
 		commandList->ClearRenderTargetView(sceneMotionTargetDescriptor, CLEAR_COLOR, 0u, nullptr);
 
-	commandList->OMSetRenderTargets(1u, &sceneMotionTargetDescriptor, true, nullptr);
+	commandList->OMSetRenderTargets(1u, &sceneMotionTargetDescriptor, true, &sceneDepthTargetDescriptor);
 }
 
 void Common::Logic::SceneEntity::PostProcessManager::Render(ID3D12GraphicsCommandList* commandList,
@@ -841,7 +842,7 @@ void Common::Logic::SceneEntity::PostProcessManager::CreateComputeObjects(ID3D12
 	{
 		auto motionBlurCS = resourceManager->GetResource<Shader>(motionBlurCSId);
 
-		computeObjectBuilder.SetRootConstants(0u, 4u);
+		computeObjectBuilder.SetRootConstants(0u, 5u);
 
 		if (_renderingScheme.enableFSR || _renderingScheme.enableVolumetricFog)
 		{
@@ -1043,7 +1044,7 @@ void Common::Logic::SceneEntity::PostProcessManager::SetMotionBlur(ID3D12Graphic
 	uint32_t numGroupsX = std::max(static_cast<uint32_t>(numGroupsF), 1u);
 
 	motionBlurComputeObject->Set(commandList);
-	motionBlurComputeObject->SetRootConstants(commandList, 0u, 4u, &motionBlurConstants);
+	motionBlurComputeObject->SetRootConstants(commandList, 0u, 5u, &motionBlurConstants);
 	motionBlurComputeObject->Dispatch(commandList, numGroupsX, 1u, 1u);
 }
 
@@ -1053,16 +1054,12 @@ void Common::Logic::SceneEntity::PostProcessManager::SetVolumetricFog(ID3D12Grap
 	volumetricFogConstants->cameraPosition = _camera->GetPosition();
 	volumetricFogConstants->cameraDirection = _camera->GetDirection();
 
-	float numGroupsF = 1.0f;
-
 	if (_renderingScheme.enableFSR)
 	{
 		volumetricFogConstants->widthU = static_cast<uint32_t>(scissorRectangle.right);
 		volumetricFogConstants->area = static_cast<uint32_t>(scissorRectangle.right * scissorRectangle.bottom);
 		volumetricFogConstants->width = static_cast<float>(scissorRectangle.right);
 		volumetricFogConstants->height = static_cast<float>(scissorRectangle.bottom);
-
-		numGroupsF = std::ceil(volumetricFogConstants->area / static_cast<float>(THREADS_PER_GROUP));
 	}
 	else
 	{
@@ -1070,8 +1067,6 @@ void Common::Logic::SceneEntity::PostProcessManager::SetVolumetricFog(ID3D12Grap
 		volumetricFogConstants->area = _width * _height;
 		volumetricFogConstants->width = static_cast<float>(_width);
 		volumetricFogConstants->height = static_cast<float>(_height);
-
-		numGroupsF = std::ceil(volumetricFogConstants->area / static_cast<float>(THREADS_PER_GROUP));
 	}
 
 	if ((_renderingScheme.windStrength != nullptr) && (_renderingScheme.windDirection != nullptr))
@@ -1086,6 +1081,7 @@ void Common::Logic::SceneEntity::PostProcessManager::SetVolumetricFog(ID3D12Grap
 		volumetricFogConstants->fogOffset.z -= std::floor(volumetricFogConstants->fogOffset.z);
 	}
 
+	float numGroupsF = std::ceil(volumetricFogConstants->area / static_cast<float>(THREADS_PER_GROUP));
 	uint32_t numGroupsX = std::max(static_cast<uint32_t>(numGroupsF), 1u);
 
 	volumetricFogComputeObject->Set(commandList);

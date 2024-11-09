@@ -98,13 +98,13 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateConstantBuffers(ID3D12D
 	distortersConstants->viewProjection = _camera->GetViewProjection();
 	distortersConstants->atlasElementOffset = float2(0.0f, 0.0f);
 	distortersConstants->atlasElementSize = float2(1.0f / 8.0f, 1.0f / 8.0f);
-	distortersConstants->noiseTiling = float2(1.7f, 1.6f);
+	distortersConstants->noiseTiling = float2(3.2f, 3.2f);
 	distortersConstants->noiseScrollSpeed = float2(0.12f, 0.3f);
 	distortersConstants->time = 0.0f;
 	distortersConstants->deltaTime = 0.0f;
-	distortersConstants->particleNumber = 10.0f;
-	distortersConstants->noiseStrength = 0.01f;
-	distortersConstants->velocityStrength = 1.0f;
+	distortersConstants->particleNumber = 50.0f;
+	distortersConstants->noiseStrength = 0.035f;
+	distortersConstants->velocityStrength = 30.0f;
 	distortersConstants->padding = {};
 }
 
@@ -149,7 +149,7 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateMaterials(ID3D12Device*
 	materialBuilder.SetSampler(0u, samplerLinearResource->samplerDescriptor.gpuDescriptor, D3D12_SHADER_VISIBILITY_ALL);
 	materialBuilder.SetCullMode(D3D12_CULL_MODE_NONE);
 	materialBuilder.SetBlendMode(Graphics::DirectX12Utilities::CreateBlendDesc(Graphics::DefaultBlendSetup::BLEND_ADDITIVE));
-	materialBuilder.SetDepthStencilFormat(32u, false);
+	materialBuilder.SetDepthStencilFormat(32u, true, true);
 	materialBuilder.SetRenderTargetFormat(0u, DXGI_FORMAT_R16G16_FLOAT);
 
 	materialBuilder.SetGeometryFormat(Graphics::VertexFormat::POSITION | Graphics::VertexFormat::TEXCOORD0,
@@ -164,21 +164,21 @@ void Common::Logic::SceneEntity::VFXLuxDistorters::CreateMaterials(ID3D12Device*
 void Common::Logic::SceneEntity::VFXLuxDistorters::CreateParticleSystems(ID3D12GraphicsCommandList* commandList,
 	Graphics::DirectX12Renderer* renderer, ResourceID perlinNoiseId, ResourceID particleSimulationCSId)
 {
-	particleSystemDesc.emitterOrigin = new float3(0.0f, 0.0f, 1.35f);
-	particleSystemDesc.emitterRadiusOffset = 0.3f;
-	particleSystemDesc.emitterRadius = float3(0.3f, 0.3f, 0.3f);
-	particleSystemDesc.minParticleVelocity = float3(-0.2f, -0.2f, -0.05f);
+	particleSystemDesc.emitterOrigin = new float3(0.0f, 0.0f, 1.25f);
+	particleSystemDesc.emitterRadiusOffset = float3(0.0f, 0.0f, 0.0f);
+	particleSystemDesc.emitterRadius = float3(0.5f, 0.5f, 0.1f);
+	particleSystemDesc.minParticleVelocity = float3(0.0f, 0.0f, 0.0f);
+	particleSystemDesc.maxParticleVelocity = float3(0.0f, 0.0f, 0.0f);
 	particleSystemDesc.particleDamping = 0.996f;
-	particleSystemDesc.maxParticleVelocity = float3(0.2f, 0.2f, 0.5f);
 	particleSystemDesc.particleTurbulence = 0.0f;
 	particleSystemDesc.minRotation = 0.0f;
 	particleSystemDesc.maxRotation = static_cast<float>(std::numbers::pi * 2.0);
-	particleSystemDesc.minRotationSpeed = 0.0f;
-	particleSystemDesc.maxRotationSpeed = 0.0f;
+	particleSystemDesc.minRotationSpeed = -0.9f;
+	particleSystemDesc.maxRotationSpeed = 0.9f;
 	particleSystemDesc.minSize = float2(1.3f, 1.3f);
-	particleSystemDesc.maxSize = float2(3.2f, 3.2f);
-	particleSystemDesc.minLifeSec = 2.4f;
-	particleSystemDesc.maxLifeSec = 4.0f;
+	particleSystemDesc.maxSize = float2(2.2f, 2.2f);
+	particleSystemDesc.minLifeSec = 9.0f;
+	particleSystemDesc.maxLifeSec = 9.0f;
 	particleSystemDesc.averageParticleEmitPerSecond = 25u;
 	particleSystemDesc.maxParticlesNumber = 5u;
 	particleSystemDesc.perlinNoiseId = perlinNoiseId;

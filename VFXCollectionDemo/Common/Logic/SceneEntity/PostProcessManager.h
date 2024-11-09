@@ -16,7 +16,8 @@ namespace Common::Logic::SceneEntity
 		float whiteCutoff;
 		float brightThreshold;
 		float bloomIntensity;
-		
+		float motionBlurThreshold;
+
 		float3 colorGrading;
 		float colorGradingFactor;
 
@@ -61,8 +62,8 @@ namespace Common::Logic::SceneEntity
 
 		const Graphics::Assets::Mesh* GetFullscreenQuadMesh() const;
 
-		static constexpr uint32_t FSR_SIZE_NUMERATOR = 1u;
-		static constexpr uint32_t FSR_SIZE_DENOMINATOR = 2u;
+		static constexpr uint32_t FSR_SIZE_NUMERATOR = 3u;
+		static constexpr uint32_t FSR_SIZE_DENOMINATOR = 4u;
 
 	private:
 		PostProcessManager() = delete;
@@ -128,6 +129,7 @@ namespace Common::Logic::SceneEntity
 			uint32_t area;
 			float width;
 			float height;
+			float threshold;
 		};
 
 		struct HDRConstants
@@ -158,7 +160,7 @@ namespace Common::Logic::SceneEntity
 		static constexpr float CLEAR_COLOR[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
 		static constexpr float FOG_MOVING_COEFF = 0.002f;
-		static constexpr float SHARPNESS_FACTOR = 1.0f;
+		static constexpr float SHARPNESS_FACTOR = 0.8f;
 
 		static constexpr bool SHARPNESS_ENABLED = true;
 

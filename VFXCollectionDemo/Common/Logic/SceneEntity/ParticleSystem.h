@@ -21,7 +21,7 @@ namespace Common::Logic::SceneEntity
 		float3 position;
 		float strength;
 		float3 axis;
-		uint32_t type;
+		ParticleSystemForceType type;
 		float nAccelerationCoeff;
 		float tAccelerationCoeff;
 		float2 padding;
@@ -31,8 +31,12 @@ namespace Common::Logic::SceneEntity
 	{
 	public:
 		float3* emitterOrigin;
+
 		float3 emitterRadius;
-		float emitterRadiusOffset;
+		float lightRange;
+
+		float3 emitterRadiusOffset;
+		float maxLightIntensity;
 
 		float3 minParticleVelocity;
 		float particleDamping;
@@ -54,9 +58,7 @@ namespace Common::Logic::SceneEntity
 		uint32_t averageParticleEmitPerSecond;
 		uint32_t maxParticlesNumber;
 		bool hasLightSources;
-		float maxLightIntensity;
-		float lightRange;
-
+		
 		Graphics::Resources::ResourceID perlinNoiseId;
 		Graphics::Resources::ResourceID animationTextureId;
 		Graphics::Resources::ResourceID particleLightBufferId;
@@ -126,7 +128,7 @@ namespace Common::Logic::SceneEntity
 		{
 		public:
 			float3 emitterOrigin;
-			float emitterRadiusOffset;
+			float padding;
 
 			float3 minParticleVelocity;
 			float particleDamping;
@@ -158,7 +160,7 @@ namespace Common::Logic::SceneEntity
 			float3 emitterRadius;
 
 			float lightRange;
-			float3 padding;
+			float3 emitterRadiusOffset;
 
 			ParticleSystemForce forces[MAX_FORCES_NUMBER];
 		};

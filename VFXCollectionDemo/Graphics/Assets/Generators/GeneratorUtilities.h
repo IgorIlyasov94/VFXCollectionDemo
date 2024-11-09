@@ -18,7 +18,7 @@ namespace Graphics::Assets::Generators
 		static void Normalize(std::vector<floatN>& map);
 
 		static uint32_t GetIndexFromXYZ(uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height);
-		static void GetXYZFromIndex(uint32_t index, uint32_t width, uint32_t height, uint32_t& x, uint32_t& y, uint32_t& z);
+		static void GetXYZFromIndex(uint32_t index, const uint3& size, uint3& xyzIndex);
 
 		static float Sigma(float maxAbsX);
 		static float NormalDistribution(float x, float sigma);
@@ -33,5 +33,10 @@ namespace Graphics::Assets::Generators
 		static void GenerateWeights(int32_t startSampleOffset, int32_t endSampleOffset, std::vector<floatN>& weights);
 
 		static void FindMinMax(const std::vector<floatN>& map, floatN& minValue, floatN& maxValue);
+		static floatN DirectionalBlur(int32_t startSampleOffset, int32_t endSampleOffset, const std::vector<floatN>& weights,
+			const std::vector<floatN>& map, const floatN& force, const uint3& index, const uint3& size);
+
+		static constexpr uint32_t MIN_BLOCKS_PER_THREAD = 65535u;
+		static constexpr uint32_t THREAD_THRESHOLD = MIN_BLOCKS_PER_THREAD * 2u;
 	};
 }

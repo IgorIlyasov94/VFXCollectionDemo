@@ -122,8 +122,9 @@ namespace Common::Logic::SceneEntity
 		static constexpr float CIRCLE_INTENSITY = 2.0f;
 		static constexpr float CIRCLE_DISTORTION_INTENSITY = 0.3f;
 
-		static constexpr float HALO_INTENSITY = 3.0f;
-		static constexpr float HALO_SHARPNESS = 2.5f;
+		static constexpr float HALO_INTENSITY = 9.0f;
+		static constexpr float HALO_SHARPNESS = 4.25f;
+		static constexpr float HALO_DISTORTION_INTENSITY = 0.5f;
 
 		static constexpr float RING_START_OFFSET = 0.0f;
 		static constexpr float RING_WIDTH = 0.4f;

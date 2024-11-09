@@ -3,7 +3,7 @@
 
 Common::Application::Application(HINSTANCE instance, int cmdShow)
 {
-	RECT initialPlacement{ 50, 70, 1024, 768 };
+	RECT initialPlacement{ 20, 50, 1024, 768 };
 
 	procedure = new WindowProcedure();
 	window = new Window(instance, cmdShow, initialPlacement, false, procedure->Get());

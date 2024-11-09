@@ -42,7 +42,8 @@ struct Output
 {
 	float4 position : SV_Position;
 	float4 texCoord : TEXCOORD0;
-	float3 velocityAlpha : TEXCOORD1;
+	float4 velocityAlphaSize : TEXCOORD1;
+	float2 depth : TEXCOORD2;
 };
 
 StructuredBuffer<Particle> particleBuffer : register(t0);
@@ -76,7 +77,9 @@ Output main(Input input)
 	float2 size = vfxAnimation.SampleLevel(samplerLinear, float2(alpha, 0.9f), 0.0f).xy;
 	size *= particle.size;
 	
-	float3 localPosition = float3(input.position.xy * size, 0.0f);
+	float2 scaledQuad = input.position.xy * size;
+	
+	float3 localPosition = float3(scaledQuad, 0.0f);
 	localPosition.xy = RotateQuad(localPosition.xy, particle.rotation);
 	
 	float4 worldPosition = float4(mul((float3x3)invView, localPosition), 1.0f);
@@ -89,16 +92,22 @@ Output main(Input input)
 	
 	output.texCoord.zw = input.texCoord * noiseTiling + frac((time + swizzledOffset) * noiseScrollSpeed);
 	
-	float4 lastPosition = worldPosition;
+	float3 lastLocalPosition = float3(scaledQuad, 0.0f);
+	lastLocalPosition.xy = RotateQuad(lastLocalPosition.xy, particle.rotation - particle.rotationSpeed * deltaTime);
+	
+	float4 lastPosition = float4(mul((float3x3)invView, lastLocalPosition), 1.0f);
+	lastPosition.xyz += particle.position;
 	lastPosition.xyz -= particle.velocity * deltaTime;
 	lastPosition = mul(viewProjection, lastPosition);
 	
 	float2 projPosition = output.position.xy / output.position.w;
 	float2 lastProjPosition = lastPosition.xy / lastPosition.w;
 	
-	output.velocityAlpha.xy = (projPosition - lastProjPosition) * 0.5f;
-	output.velocityAlpha.y = -output.velocityAlpha.y;
-	output.velocityAlpha.z = vfxAnimation.SampleLevel(samplerLinear, float2(alpha, 0.1f), 0.0f).w;
+	output.velocityAlphaSize.xy = (projPosition - lastProjPosition) * 0.5f;
+	output.velocityAlphaSize.y = -output.velocityAlphaSize.y;
+	output.velocityAlphaSize.z = vfxAnimation.SampleLevel(samplerLinear, float2(alpha, 0.1f), 0.0f).w;
+	output.velocityAlphaSize.w = length(size);
+	output.depth = output.position.zw;
 	
 	return output;
 }

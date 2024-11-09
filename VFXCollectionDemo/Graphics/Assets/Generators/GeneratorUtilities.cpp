@@ -9,38 +9,49 @@ void Graphics::Assets::Generators::GeneratorUtilities::GaussianBlur(int32_t widt
 	std::vector<floatN> weights;
 	GenerateWeights(startSampleOffset, endSampleOffset, weights);
 
-	for (int32_t zIndex = 0u; zIndex < depth; zIndex++)
-	{
-		for (int32_t yIndex = 0u; yIndex < height; yIndex++)
+	auto forceV = XMLoadFloat3(&force);
+	auto size = uint3(width, height, depth);
+
+	auto threadFunc = [&map, &result, startSampleOffset, endSampleOffset,
+		&forceV, &size, &weights](uint32_t startIndex, uint32_t endIndex)
 		{
-			for (int32_t xIndex = 0u; xIndex < width; xIndex++)
+			for (uint32_t index = startIndex; index < endIndex; index++)
 			{
-				auto pixelIndex = GeneratorUtilities::GetIndexFromXYZ(xIndex, yIndex, zIndex, width, height);
+				uint3 xyzIndex{};
+				GeneratorUtilities::GetXYZFromIndex(index, size, xyzIndex);
 
-				floatN sampleSum{};
-				uint32_t weightIndex{};
-
-				for (auto sampleOffset = startSampleOffset; sampleOffset <= endSampleOffset; sampleOffset++)
-				{
-					auto offsettedXIndex = static_cast<int32_t>(std::round(sampleOffset * force.x));
-					auto offsettedYIndex = static_cast<int32_t>(std::round(sampleOffset * force.y));
-					auto offsettedZIndex = static_cast<int32_t>(std::round(sampleOffset * force.z));
-					offsettedXIndex = (width + xIndex + offsettedXIndex) % width;
-					offsettedYIndex = (height + yIndex + offsettedYIndex) % height;
-					offsettedZIndex = (depth + zIndex + offsettedZIndex) % depth;
-
-					auto offsettedPixelIndex = GeneratorUtilities::GetIndexFromXYZ(offsettedXIndex, offsettedYIndex,
-						offsettedZIndex, width, height);
-
-					const auto& weight = weights[weightIndex++];
-
-					sampleSum = XMVectorMultiplyAdd(map[offsettedPixelIndex], weight, sampleSum);
-				}
-
-				result[pixelIndex] = sampleSum;
+				result[index] = DirectionalBlur(startSampleOffset, endSampleOffset, weights, map, forceV, xyzIndex, size);
 			}
+		};
+
+	if (map.size() > THREAD_THRESHOLD)
+	{
+		const uint32_t maxThreads = std::thread::hardware_concurrency();
+		const uint32_t numThreads = std::min(static_cast<uint32_t>(map.size() / MIN_BLOCKS_PER_THREAD), maxThreads);
+		const uint32_t elementsPerThread = static_cast<uint32_t>(map.size() / numThreads);
+		
+		std::vector<std::thread> threads;
+		threads.reserve(numThreads);
+		
+		for (uint32_t threadIndex = 0u; threadIndex < numThreads; threadIndex++)
+		{
+			auto startIndex = static_cast<uint32_t>(static_cast<uint64_t>(threadIndex) * elementsPerThread);
+			uint32_t endIndex{};
+			
+			if (threadIndex == (numThreads - 1))
+				endIndex = static_cast<uint32_t>(map.size());
+			else
+				endIndex = static_cast<uint32_t>(static_cast<uint64_t>(threadIndex + 1u) * elementsPerThread);
+			
+			threads.push_back(std::thread(threadFunc, startIndex, endIndex));
 		}
+		
+		for (uint32_t threadIndex = 0u; threadIndex < numThreads; threadIndex++)
+			if (threads[threadIndex].joinable())
+				threads[threadIndex].join();
 	}
+	else
+		threadFunc(0u, static_cast<uint32_t>(map.size()));
 }
 
 void Graphics::Assets::Generators::GeneratorUtilities::GaussianBlur(int32_t width, int32_t height, int32_t depth,
@@ -50,38 +61,15 @@ void Graphics::Assets::Generators::GeneratorUtilities::GaussianBlur(int32_t widt
 	std::vector<floatN> weights;
 	GenerateWeights(startSampleOffset, endSampleOffset, weights);
 
-	for (int32_t zIndex = 0u; zIndex < depth; zIndex++)
+	auto size = uint3(width, height, depth);
+
+	for (uint32_t index = 0u; index < map.size(); index++)
 	{
-		for (int32_t yIndex = 0u; yIndex < height; yIndex++)
-		{
-			for (int32_t xIndex = 0u; xIndex < width; xIndex++)
-			{
-				auto pixelIndex = GeneratorUtilities::GetIndexFromXYZ(xIndex, yIndex, zIndex, width, height);
-				auto force = forceMap[pixelIndex];
+		uint3 xyzIndex{};
+		GeneratorUtilities::GetXYZFromIndex(index, size, xyzIndex);
+		auto& force = forceMap[index];
 
-				floatN sampleSum{};
-				uint32_t weightIndex{};
-
-				for (auto sampleOffset = startSampleOffset; sampleOffset <= endSampleOffset; sampleOffset++)
-				{
-					auto offsettedXIndex = static_cast<int32_t>(std::round(sampleOffset * force.m128_f32[0]));
-					auto offsettedYIndex = static_cast<int32_t>(std::round(sampleOffset * force.m128_f32[1]));
-					auto offsettedZIndex = static_cast<int32_t>(std::round(sampleOffset * force.m128_f32[2]));
-					offsettedXIndex = (width + xIndex + offsettedXIndex) % width;
-					offsettedYIndex = (height + yIndex + offsettedYIndex) % height;
-					offsettedZIndex = (depth + zIndex + offsettedZIndex) % depth;
-
-					auto offsettedPixelIndex = GeneratorUtilities::GetIndexFromXYZ(offsettedXIndex, offsettedYIndex,
-						offsettedZIndex, width, height);
-
-					const auto& weight = weights[weightIndex++];
-
-					sampleSum = XMVectorMultiplyAdd(map[offsettedPixelIndex], weight, sampleSum);
-				}
-
-				result[pixelIndex] = sampleSum;
-			}
-		}
+		result[index] = DirectionalBlur(startSampleOffset, endSampleOffset, weights, map, force, xyzIndex, size);
 	}
 }
 
@@ -115,12 +103,11 @@ uint32_t Graphics::Assets::Generators::GeneratorUtilities::GetIndexFromXYZ(uint3
 	return static_cast<uint32_t>(width * (static_cast<uint64_t>(z) * height + y) + x);
 }
 
-void Graphics::Assets::Generators::GeneratorUtilities::GetXYZFromIndex(uint32_t index, uint32_t width, uint32_t height,
-	uint32_t& x, uint32_t& y, uint32_t& z)
+void Graphics::Assets::Generators::GeneratorUtilities::GetXYZFromIndex(uint32_t index, const uint3& size, uint3& xyzIndex)
 {
-	x = index % width;
-	y = (index / width) % height;
-	z = (index / width) / height;
+	xyzIndex.x = index % size.x;
+	xyzIndex.y = (index / size.x) % size.y;
+	xyzIndex.z = (index / size.x) / size.y;
 }
 
 float Graphics::Assets::Generators::GeneratorUtilities::Sigma(float maxAbsX)
@@ -174,4 +161,30 @@ void Graphics::Assets::Generators::GeneratorUtilities::FindMinMax(const std::vec
 		minValue = XMVectorMin(minValue, element);
 		maxValue = XMVectorMax(maxValue, element);
 	}
+}
+
+floatN Graphics::Assets::Generators::GeneratorUtilities::DirectionalBlur(int32_t startSampleOffset, int32_t endSampleOffset,
+	const std::vector<floatN>& weights, const std::vector<floatN>& map, const floatN& force, const uint3& index, const uint3& size)
+{
+	floatN sampleSum{};
+	uint32_t weightIndex{};
+
+	for (auto sampleOffset = startSampleOffset; sampleOffset <= endSampleOffset; sampleOffset++)
+	{
+		auto offsettedXIndex = static_cast<int32_t>(std::round(sampleOffset * force.m128_f32[0]));
+		auto offsettedYIndex = static_cast<int32_t>(std::round(sampleOffset * force.m128_f32[1]));
+		auto offsettedZIndex = static_cast<int32_t>(std::round(sampleOffset * force.m128_f32[2]));
+		offsettedXIndex = (size.x + index.x + offsettedXIndex) % size.x;
+		offsettedYIndex = (size.y + index.y + offsettedYIndex) % size.y;
+		offsettedZIndex = (size.z + index.z + offsettedZIndex) % size.z;
+
+		auto offsettedPixelIndex = GeneratorUtilities::GetIndexFromXYZ(offsettedXIndex, offsettedYIndex,
+			offsettedZIndex, size.x, size.y);
+
+		const auto& weight = weights[weightIndex++];
+
+		sampleSum = XMVectorMultiplyAdd(map[offsettedPixelIndex], weight, sampleSum);
+	}
+
+	return sampleSum;
 }

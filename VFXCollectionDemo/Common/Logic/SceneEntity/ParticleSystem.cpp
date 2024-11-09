@@ -138,6 +138,7 @@ void Common::Logic::SceneEntity::ParticleSystem::CreateConstantBuffers(ID3D12Dev
 	mutableConstantsBuffer->perlinNoiseSize = _desc.perlinNoiseSize;
 	mutableConstantsBuffer->maxLightIntensity = _desc.maxLightIntensity;
 	mutableConstantsBuffer->lightRange = _desc.lightRange;
+	mutableConstantsBuffer->padding = {};
 
 	mutableConstantsBuffer->random0 = Utilities::Random4(randomEngine);
 	mutableConstantsBuffer->random1 = Utilities::Random4(randomEngine);

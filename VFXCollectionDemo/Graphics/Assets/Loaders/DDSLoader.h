@@ -23,8 +23,8 @@ namespace Graphics::Assets::Loaders
 	class DDSLoader final
 	{
 	public:
-		static void Load(std::filesystem::path filePath, Resources::TextureDesc& textureDesc);
-		static void Save(std::filesystem::path filePath, const DDSSaveDesc& saveDesc, const std::vector<floatN>& data);
+		static void Load(const std::filesystem::path& filePath, Resources::TextureDesc& textureDesc);
+		static void Save(const std::filesystem::path& filePath, const DDSSaveDesc& saveDesc, const std::vector<floatN>& data);
 
 	private:
 		DDSLoader() = delete;
