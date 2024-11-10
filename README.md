@@ -23,3 +23,6 @@
 # Control:
 1. SPACE - Switch to next scene
 2. ALT+ENTER - Switch window/fullscreen mode
+
+# Release build:
+[VFXCollectionDemo.zip](https://drive.google.com/file/d/1lr1Pk_Gij9fuEKZLNIKmUi8lGsF5srWr/view?usp=sharing)
