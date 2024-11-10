@@ -197,6 +197,10 @@
     <IncludePath>FSR\ffx-api\include;$(IncludePath)</IncludePath>
     <LibraryPath>FSR\ffx-api\bin;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>FSR\ffx-api\include;$(IncludePath)</IncludePath>
+    <LibraryPath>FSR\ffx-api\bin;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>

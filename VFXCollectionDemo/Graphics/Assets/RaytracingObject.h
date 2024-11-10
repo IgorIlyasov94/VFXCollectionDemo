@@ -9,17 +9,17 @@ namespace Graphics::Assets
 	struct RaytracingObjectDesc
 	{
 		ID3D12RootSignature* globalRootSignature;
-		const std::vector<ID3D12RootSignature*>& localRootSignatures;
+		std::vector<ID3D12RootSignature*> localRootSignatures;
 
 		ID3D12StateObject* pipelineState;
 
-		const std::map<uint32_t, uint32_t>& rootConstantIndices;
-		const std::vector<DescriptorSlot>& constantBufferSlots;
-		const std::vector<DescriptorSlot>& bufferSlots;
-		const std::vector<DescriptorSlot>& rwBufferSlots;
-		const std::vector<DescriptorTableSlot>& textureSlots;
+		std::map<uint32_t, uint32_t> rootConstantIndices;
+		std::vector<DescriptorSlot> constantBufferSlots;
+		std::vector<DescriptorSlot> bufferSlots;
+		std::vector<DescriptorSlot> rwBufferSlots;
+		std::vector<DescriptorTableSlot> textureSlots;
 
-		const D3D12_DISPATCH_RAYS_DESC& dispatchRaysDesc;
+		D3D12_DISPATCH_RAYS_DESC dispatchRaysDesc;
 
 		BufferAllocation shaderTable;
 		BufferAllocation bottomLevelStructure;
@@ -30,7 +30,7 @@ namespace Graphics::Assets
 	class RaytracingObject
 	{
 	public:
-		RaytracingObject(const RaytracingObjectDesc& desc);
+		RaytracingObject(RaytracingObjectDesc&& desc);
 		~RaytracingObject();
 
 		void Release(BufferManager* bufferManager);

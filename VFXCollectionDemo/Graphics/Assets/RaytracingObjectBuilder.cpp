@@ -301,7 +301,7 @@ Graphics::Assets::RaytracingObject* Graphics::Assets::RaytracingObjectBuilder::C
 	auto ratracingObjectDesc = SetRaytracingObjectDesc(device, commandList, bufferManager, stateObject,
 		globalRootSignatures, localRootSignatures);
 
-	auto newRaytracingObject = new RaytracingObject(ratracingObjectDesc);
+	auto newRaytracingObject = new RaytracingObject(std::move(ratracingObjectDesc));
 
 	Reset();
 
@@ -314,6 +314,7 @@ void Graphics::Assets::RaytracingObjectBuilder::Reset()
 
 	rootConstantIndices.clear();
 	constantBufferSlots.clear();
+	bufferSlots.resize(1u);
 	bufferSlots.clear();
 	rwBufferSlots.clear();
 	textureSlots.clear();
@@ -328,6 +329,8 @@ void Graphics::Assets::RaytracingObjectBuilder::Reset()
 	geometryDescs.clear();
 	hitGroupDescs.clear();
 	localSignatures.clear();
+
+	rootSignatureIndexCounter = 0;
 
 	SetBuffer(0u, 0u);
 }
@@ -514,18 +517,18 @@ Graphics::Assets::RaytracingObjectDesc Graphics::Assets::RaytracingObjectBuilder
 	RaytracingObjectDesc desc
 	{
 		globalRootSignature,
-		rootSignatures,
+		std::move(rootSignatures),
 		stateObject,
-		rootConstantIndices,
-		constantBufferSlots,
-		bufferSlots,
-		rwBufferSlots,
-		textureSlots,
-		dispatchDesc,
-		bufferAllocation,
-		bottomLevelStructure,
-		bottomLevelStructureAABB,
-		topLevelStructure
+		std::move(rootConstantIndices),
+		std::move(constantBufferSlots),
+		std::move(bufferSlots),
+		std::move(rwBufferSlots),
+		std::move(textureSlots),
+		std::move(dispatchDesc),
+		std::move(bufferAllocation),
+		std::move(bottomLevelStructure),
+		std::move(bottomLevelStructureAABB),
+		std::move(topLevelStructure)
 	};
 
 	return desc;

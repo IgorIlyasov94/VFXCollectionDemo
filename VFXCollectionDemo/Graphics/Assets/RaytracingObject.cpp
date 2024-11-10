@@ -1,14 +1,33 @@
 #include "RaytracingObject.h"
 
-Graphics::Assets::RaytracingObject::RaytracingObject(const RaytracingObjectDesc& desc)
+Graphics::Assets::RaytracingObject::RaytracingObject(RaytracingObjectDesc&& desc)
 	: dispatchDesc(desc.dispatchRaysDesc), globalRootSignature(desc.globalRootSignature),
-	localRootSignatures(desc.localRootSignatures), _pipelineState(desc.pipelineState),
-	_rootConstantIndices(desc.rootConstantIndices), _constantBufferSlots(desc.constantBufferSlots),
-	_bufferSlots(desc.bufferSlots), _rwBufferSlots(desc.rwBufferSlots), _textureSlots(desc.textureSlots),
-	shaderTable(desc.shaderTable), bottomLevelStructure(desc.bottomLevelStructure),
-	bottomLevelStructureAABB(desc.bottomLevelStructureAABB), topLevelStructure(desc.topLevelStructure)
+	_pipelineState(desc.pipelineState), localRootSignatures{}, _rootConstantIndices{},
+	_constantBufferSlots{}, _bufferSlots{}, _rwBufferSlots{}, _textureSlots{},
+	shaderTable{}, bottomLevelStructure{}, bottomLevelStructureAABB{}, topLevelStructure{}
 {
+	if (!desc.localRootSignatures.empty())
+		localRootSignatures = std::move(desc.localRootSignatures);
 
+	if (!desc.rootConstantIndices.empty())
+		_rootConstantIndices = std::move(desc.rootConstantIndices);
+
+	if (!desc.constantBufferSlots.empty())
+		_constantBufferSlots = std::move(desc.constantBufferSlots);
+
+	if (!desc.bufferSlots.empty())
+		_bufferSlots = std::move(desc.bufferSlots);
+
+	if (!desc.rwBufferSlots.empty())
+		_rwBufferSlots = std::move(desc.rwBufferSlots);
+
+	if (!desc.textureSlots.empty())
+		_textureSlots = std::move(desc.textureSlots);
+
+	shaderTable = std::move(desc.shaderTable);
+	bottomLevelStructure = std::move(desc.bottomLevelStructure);
+	bottomLevelStructureAABB = std::move(desc.bottomLevelStructureAABB);
+	topLevelStructure = std::move(desc.topLevelStructure);
 }
 
 Graphics::Assets::RaytracingObject::~RaytracingObject()
