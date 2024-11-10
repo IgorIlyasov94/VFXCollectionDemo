@@ -1,4 +1,4 @@
-#Scenes:
+# Scenes:
 1. Lux
    - Features:
      - Vegetation & Terrain Systems
@@ -12,6 +12,6 @@
      - FSR 3.1.1
 3. Coming soon...
 
-#Control:
+# Control:
 1. SPACE - Switch to next scene
 2. ALT+ENTER - Switch window/fullscreen mode
